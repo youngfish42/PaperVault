@@ -7,8 +7,8 @@ env:
 
 on:
   schedule:
-    # 每周二运行一次
-    - cron: "0 16 * * 2"
+    # 每月 15 号 16:00 (UTC) 运行一次，与 backfill_abstracts 错开
+    - cron: "0 16 15 * *"
   workflow_dispatch:
     inputs:
       mode:
