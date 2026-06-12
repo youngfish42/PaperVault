@@ -19,7 +19,7 @@ PaperVault is a fully automated tool for collecting and retrieving academic pape
 
 - 📅 **Last Updated**: 2026-06-08
 - 🆕 **New Papers This Update**: 0
-- 📊 **Database Scale**: 635,458 papers / 120 publication series / 137,292 with abstracts / 21,830 with code
+- 📊 **Database Scale**: 635,458 papers / 120 publication series / 150,869 with abstracts / 21,830 with code
 
 <!-- recent-update-end -->
 
