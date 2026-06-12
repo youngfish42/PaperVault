@@ -92,6 +92,11 @@ jobs:
             python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 18000 --max-failed-attempts 3
           fi
 
+      - name: Scan GitHub code links from newly backfilled abstracts
+        # Pure regex pass over all abstracts; cheap I/O-bound step that keeps the
+        # `paper_code` field in sync whenever new abstracts are introduced.
+        run: python scripts/fetch_code_links.py --year all --retry-failed
+
       - name: Regenerate stats overview chart
         run: |
           mkdir -p pics/stats

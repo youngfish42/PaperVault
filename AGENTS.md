@@ -50,6 +50,7 @@ PaperVault/
 │   └── generate_conf.py          # Generate/merge conf JSON from discovery results
 ├── scripts/                      # Maintenance / data enrichment scripts
 │   ├── fetch_abstracts.py        # Multi-source abstract backfill (Crossref/S2/arXiv/OpenAlex)
+│   ├── fetch_openreview_abstracts.py  # OpenReview-only abstract backfill (v2 batch → v1 fallback) for ICLR/NeurIPS forums
 │   └── fetch_code_links.py       # Extract GitHub code links from abstracts
 ├── docs/                         # Auxiliary docs & generated reports
 │   ├── automation_plan.md
@@ -179,6 +180,7 @@ Other frontend scripts:
 | `python maintain.py collect` | Incrementally collect papers for new conferences and update README. Supports `--soft-timeout N` for graceful timeout handling |
 | `python maintain.py force` | Force full cache rebuild and README update |
 | `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
+| `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
 | `python -m discovery.generate_conf` | Generate / merge discovered conference configs |
 | `cd web-vue && npm run dev` | Start frontend dev server |
@@ -216,7 +218,7 @@ Code links are enriched from [MLNLP-World/Top-AI-Conferences-Paper-with-Code](ht
 |----------|---------|--------|
 | `discover_and_update.yml` | Daily schedule / Manual | Auto-discovers new conference configs and creates PR |
 | `collect_papers.yml` | Weekly (Tue 16:00 UTC) / Manual / Push on `conf/**` | Incrementally collects papers with per-URL progress tracking and soft-timeout graceful save; creates PR to `auto-collect-papers` branch |
-| `backfill_abstracts.yml` | Every 6 hours / Manual | Backfills missing abstracts (timeout-aware, ~5h budget), pushes to `auto-backfill-abstracts` branch |
+| `backfill_abstracts.yml` | Monthly schedule (1st of month, UTC) / Manual | Backfills missing abstracts (timeout-aware, ~5h budget) and then re-scans GitHub code links from the freshly backfilled abstracts (`scripts/fetch_code_links.py --year all --retry-failed`), pushes to `auto-backfill-abstracts` branch |
 | `update_readme.yml` | Manual (`workflow_dispatch`) | Force rebuilds cache and updates README via PR |
 
 CI uses Python 3.10. The collected `cache/cache.jsonl.gz` (and optional Parquet artifact) can be synced to a Hugging Face dataset repo via `data_artifacts.sync_cache_artifacts` when `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` are configured.
