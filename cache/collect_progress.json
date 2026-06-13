@@ -2515,16 +2515,6 @@
       "ts": "2026-06-05T21:07:24",
       "legacy": true
     },
-    "ICLR::https://api.openreview.net/notes?content.venue=ICLR%202022%20Submitted&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2022%2FConference%2F-%2FBlind_Submission": {
-      "name": "ICLR2022",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
-    "ICLR::https://api.openreview.net/notes?content.venue=ICLR%202022%20Submitted&details=replyCount&offset=1000&limit=1000&invitation=ICLR.cc%2F2022%2FConference%2F-%2FBlind_Submission": {
-      "name": "ICLR2022",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
     "ICLR::https://api.openreview.net/notes?content.venue=ICLR%202023%20notable%20top%2025%25&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2023%2FConference%2F-%2FBlind_Submission": {
       "name": "ICLR2023",
       "ts": "2026-06-05T21:07:24",
@@ -2541,21 +2531,6 @@
       "legacy": true
     },
     "ICLR::https://api.openreview.net/notes?content.venue=ICLR%202023%20poster&details=replyCount&offset=1000&limit=1000&invitation=ICLR.cc%2F2023%2FConference%2F-%2FBlind_Submission": {
-      "name": "ICLR2023",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
-    "ICLR::https://api.openreview.net/notes?content.venue=Submitted%20to%20ICLR%202023&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2023%2FConference%2F-%2FBlind_Submission": {
-      "name": "ICLR2023",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
-    "ICLR::https://api.openreview.net/notes?content.venue=Submitted%20to%20ICLR%202023&details=replyCount&offset=1000&limit=1000&invitation=ICLR.cc%2F2023%2FConference%2F-%2FBlind_Submission": {
-      "name": "ICLR2023",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
-    "ICLR::https://api.openreview.net/notes?content.venue=Submitted%20to%20ICLR%202023&details=replyCount&offset=2000&limit=1000&invitation=ICLR.cc%2F2023%2FConference%2F-%2FBlind_Submission": {
       "name": "ICLR2023",
       "ts": "2026-06-05T21:07:24",
       "legacy": true
@@ -2585,11 +2560,6 @@
       "ts": "2026-06-05T21:07:24",
       "legacy": true
     },
-    "ICLR::https://api.openreview.net/notes?content.venue=NeurIPS%202021%20Submitted&details=replyCount&offset=0&limit=1000&invitation=NeurIPS.cc%2F2021%2FConference%2F-%2FBlind_Submission": {
-      "name": "NIPS2021",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
     "ICLR::https://api.openreview.net/notes?content.venue=NeurIPS%202022%20Accept&details=replyCount&offset=0&limit=1000&invitation=NeurIPS.cc%2F2022%2FConference%2F-%2FBlind_Submission": {
       "name": "NIPS2022",
       "ts": "2026-06-05T21:07:24",
@@ -2601,11 +2571,6 @@
       "legacy": true
     },
     "ICLR::https://api.openreview.net/notes?content.venue=NeurIPS%202022%20Accept&details=replyCount&offset=2000&limit=1000&invitation=NeurIPS.cc%2F2022%2FConference%2F-%2FBlind_Submission": {
-      "name": "NIPS2022",
-      "ts": "2026-06-05T21:07:24",
-      "legacy": true
-    },
-    "ICLR::https://api.openreview.net/notes?content.venue=NeurIPS%202022%20Submitted&details=replyCount&offset=0&limit=1000&invitation=NeurIPS.cc%2F2022%2FConference%2F-%2FBlind_Submission": {
       "name": "NIPS2022",
       "ts": "2026-06-05T21:07:24",
       "legacy": true

@@ -4,6 +4,22 @@ from typing import List, Dict, Any, Set
 from urllib.parse import quote
 from .base import BaseDiscovery
 
+# 复用 collector 中的「已接收 venue」判定，确保 discovery 与采集端口径一致。
+# 这样可以从源头避免将 Submitted / Withdrawn / Desk Rejected 等未接收 venue
+# 写入 conf/iclr_conf.json，从而减少抓取开销与缓存污染。
+#
+# 不在此处提供 fallback 内联实现，避免与 collector.py 中的关键字常量失同步
+# （例如新增 "blogpost" 白名单时遗漏会造成 ICLR Blogpost Track 被误过滤）。
+# 若 import 失败应直接抛错暴露环境问题，而不是静默退化到一个过时的实现。
+import sys
+from pathlib import Path
+
+# 兼容 `python -m discovery.generate_conf` 与从子目录直接执行两种调用方式
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from collector import is_openreview_accepted_venue  # noqa: E402
+
 
 # OpenReview 2024 起将主接口迁移到 v2（api2.openreview.net），
 # 同时 invitation 字段从 Blind_Submission 改名为 Submission。
@@ -29,7 +45,11 @@ class OpenReviewDiscovery(BaseDiscovery):
         return "https://api2.openreview.net" if year >= V2_START_YEAR else "https://api.openreview.net"
 
     def _fetch_venues(self, invitation_tpl: str, year: int) -> List[str]:
-        """返回该年份下所有 distinct 的 venue 字符串"""
+        """返回该年份下所有 distinct 的 *已接收* venue 字符串。
+
+        在源头过滤掉 Submitted / Reject / Withdrawn / Desk Rejected 等未接收
+        venue，避免后续为它们生成无效的抓取 URL。
+        """
         invitation = invitation_tpl.format(year=year)
         api_root = self._api_root(year)
         url = (
@@ -42,14 +62,21 @@ class OpenReviewDiscovery(BaseDiscovery):
         except Exception:
             return []
         venues: Set[str] = set()
+        skipped: Set[str] = set()
         for note in data.get("notes", []):
             content = note.get("content", {}) or {}
             v = content.get("venue")
             # v2 的 content 字段是嵌套结构 {"venue": {"value": "..."}}
             if isinstance(v, dict):
                 v = v.get("value")
-            if v:
+            if not v:
+                continue
+            if is_openreview_accepted_venue(v):
                 venues.add(v)
+            else:
+                skipped.add(v)
+        if skipped:
+            print(f"    [-] OpenReview: skip {len(skipped)} non-accepted venue(s) for {invitation}: {sorted(skipped)}")
         return sorted(venues)
 
     def _count_for_venue(self, venue: str, invitation: str, year: int) -> int:
@@ -113,6 +140,10 @@ class OpenReviewDiscovery(BaseDiscovery):
                     if not venues:
                         continue
                     for venue in venues:
+                        # 防御性双保险：即便 _fetch_venues 已过滤，这里再次校验，
+                        # 避免未来重构或 venue 字符串构造路径绕过过滤。
+                        if not is_openreview_accepted_venue(venue):
+                            continue
                         count = self._count_for_venue(venue, invitation, year)
                         if count == 0:
                             continue

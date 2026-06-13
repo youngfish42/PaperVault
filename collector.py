@@ -3,6 +3,7 @@ import os
 import re
 import warnings
 from collections import Counter
+from urllib.parse import unquote_plus
 import yaml
 import requests
 from requests.adapters import HTTPAdapter
@@ -37,22 +38,47 @@ def _create_session():
 
 SESSION = _create_session()
 
-def _is_openreview_accepted(venue: str) -> bool:
-    """判断 OpenReview 论文的 venue 字段是否表示已接收。
+# OpenReview venue 过滤关键字（统一来源，供 collector 与 discovery 共用）
+# 任何包含以下子串（大小写不敏感）的 venue 视为「未接收」，不应被采集，
+# 也不应在 discovery 阶段为其生成抓取 URL。
+OPENREVIEW_REJECTED_VENUE_KEYWORDS = (
+    "submitted",        # "Submitted to ICLR 2025" / "NeurIPS 2022 Submitted"
+    "reject",           # "Reject" / "Conference Desk Rejected Submission"
+    "withdrawn",        # "Conference Withdrawn Submission"
+    "desk rejected",    # 冗余兜底，防止 "reject" 关键字未来被改名
+)
 
-    排除：Submitted / Reject / Withdrawn / Desk Rejected
-    保留：Oral / Spotlight / Poster / Accept / Top
+# 已接收 venue 的正向白名单关键字。
+OPENREVIEW_ACCEPTED_VENUE_KEYWORDS = (
+    "oral",
+    "spotlight",
+    "poster",
+    "accept",
+    "top",              # "ICLR 2023 notable top 5%" / "top 25%"
+    "blogpost",         # "ICLR 2025 Blogpost Track"（官方正式 track，保留）
+)
+
+
+def is_openreview_accepted_venue(venue: str) -> bool:
+    """判断 OpenReview 论文的 venue 字段是否表示「已接收」。
+
+    采用「先黑名单后白名单」双重过滤：
+    - 排除：Submitted / Reject / Withdrawn / Desk Rejected
+    - 保留：Oral / Spotlight / Poster / Accept / Top
+    其余未知 venue 默认排除，保持保守策略。
     """
     if not venue:
         return False
     venue_lower = venue.lower()
-    # 严格排除未接收/撤回状态
-    if any(k in venue_lower for k in ("submitted", "reject", "withdrawn", "desk rejected")):
+    if any(k in venue_lower for k in OPENREVIEW_REJECTED_VENUE_KEYWORDS):
         return False
-    # 包含已接收状态（ oral, spotlight, poster, accept, top ）
-    if any(k in venue_lower for k in ("oral", "spotlight", "poster", "accept", "top")):
+    if any(k in venue_lower for k in OPENREVIEW_ACCEPTED_VENUE_KEYWORDS):
         return True
     return False
+
+
+# 保留旧名以兼容内部调用点
+_is_openreview_accepted = is_openreview_accepted_venue
 
 
 def _or_field(content: dict, key: str):
@@ -110,6 +136,23 @@ def _fetch_openreview_abstract(forum_id: str) -> str:
     return ""
 
 
+def _url_targets_rejected_venue(url: str) -> bool:
+    """快速判断一条 OpenReview 抓取 URL 是否指向「未接收」venue。
+
+    历史遗留的 conf/iclr_conf.json 中可能仍残留 content.venue=Submitted%20to...
+    /Withdrawn%20Submission/Desk%20Rejected%20Submission 这类 URL。
+    一旦发现，立即整条跳过，避免无谓的分页请求与噪音日志。
+
+    使用 ``unquote_plus`` 而非 ``unquote`` 是为了同时还原 ``%20`` 与 ``+`` 两种
+    空格编码形态，否则若 venue 写成 ``Desk+Rejected+Submission`` 这类
+    ``quote_plus`` 风格 URL，含空格的关键字（如 ``"desk rejected"``）将无法命中。
+    """
+    if not url:
+        return False
+    lowered = unquote_plus(url).lower()
+    return any(k in lowered for k in OPENREVIEW_REJECTED_VENUE_KEYWORDS)
+
+
 def search_from_iclr_openreview(url, name, res):
     """通过 OpenReview API 获取 ICLR 论文，自动分页并过滤已接收论文。
 
@@ -124,6 +167,12 @@ def search_from_iclr_openreview(url, name, res):
     """
     if name not in res:
         res[name] = []
+
+    # 源头过滤：若 URL 本身指向 Submitted/Withdrawn/Rejected 等未接收 venue，
+    # 直接跳过，避免拉取大量必然被 _is_openreview_accepted 丢弃的论文。
+    if _url_targets_rejected_venue(url):
+        print(f"[~] Skip non-accepted venue URL for {name}: {url}")
+        return res
 
     # 清理 URL 中已有的 offset/limit，由本函数自行分页
     base_url = re.sub(r"&offset=\d+", "", url)
