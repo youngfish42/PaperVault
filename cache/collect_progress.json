@@ -21407,6 +21407,99 @@
     "DBLP::https://dblp.org/db/conf/semweb/iswc2018.html": {
       "name": "ISWC2018",
       "ts": "2026-06-07T23:51:50"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202025%20Oral&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2025",
+      "ts": "2026-06-13T13:25:39",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202025%20Poster&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2025",
+      "ts": "2026-06-13T13:25:39",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202025%20Poster&details=replyCount&offset=1000&limit=1000&invitation=ICLR.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2025",
+      "ts": "2026-06-13T13:25:39",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202025%20Poster&details=replyCount&offset=2000&limit=1000&invitation=ICLR.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2025",
+      "ts": "2026-06-13T13:25:39",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202025%20Poster&details=replyCount&offset=3000&limit=1000&invitation=ICLR.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2025",
+      "ts": "2026-06-13T13:25:39",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202025%20Spotlight&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2025",
+      "ts": "2026-06-13T13:25:39",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Oral&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:25:40"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=0&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:26:20"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=1000&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:26:51"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=2000&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:27:23"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=3000&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:27:55"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=4000&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:28:28"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=5000&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission": {
+      "name": "ICLR2026",
+      "ts": "2026-06-13T13:29:02"
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20oral&details=replyCount&offset=0&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20poster&details=replyCount&offset=0&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20poster&details=replyCount&offset=1000&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20poster&details=replyCount&offset=2000&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20poster&details=replyCount&offset=3000&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20poster&details=replyCount&offset=4000&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
+    },
+    "ICLR::https://api2.openreview.net/notes?content.venue=NeurIPS%202025%20spotlight&details=replyCount&offset=0&limit=1000&invitation=NeurIPS.cc%2F2025%2FConference%2F-%2FSubmission": {
+      "name": "NIPS2025",
+      "ts": "2026-06-13T13:29:35",
+      "legacy": true
     }
   }
 }
