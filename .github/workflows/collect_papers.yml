@@ -186,6 +186,13 @@ jobs:
 
           baseline_count=$(cat "$RUNNER_TEMP/cache_baseline.count" | tr -d '[:space:]')
           current_count=$(cat "$RUNNER_TEMP/cache_current.count" | tr -d '[:space:]')
+          # Defensive defaults: if either snapshot file was unreadable
+          # (HF outage, disk full, etc.) treat the count as 0 so the
+          # bash arithmetic test below cannot blow up with "unary
+          # operator expected" and abort the workflow before we have a
+          # chance to print a useful skip message.
+          baseline_count=${baseline_count:-0}
+          current_count=${current_count:-0}
           echo "baseline_count=$baseline_count current_count=$current_count"
 
           cache_changed=false

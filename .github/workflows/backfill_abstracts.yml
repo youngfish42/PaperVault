@@ -215,6 +215,13 @@ jobs:
 
           baseline_abs=$(awk '{print $1}' "$RUNNER_TEMP/cache_baseline.count")
           current_abs=$(awk '{print $1}' "$RUNNER_TEMP/cache_current.count")
+          # Defensive defaults: if either snapshot file was unreadable
+          # (HF outage, disk full, etc.) treat the count as 0 so the
+          # bash arithmetic test below cannot blow up with "unary
+          # operator expected" and abort the workflow before we have a
+          # chance to print a useful skip message.
+          baseline_abs=${baseline_abs:-0}
+          current_abs=${current_abs:-0}
           echo "baseline_abstracts=$baseline_abs current_abstracts=$current_abs"
 
           cache_changed=false
@@ -222,13 +229,26 @@ jobs:
             cache_changed=true
           fi
 
-          echo "progress_changed=$progress_changed cache_changed=$cache_changed"
+          # Manual workflow_dispatch bypass (symmetric with collect_papers.yml).
+          # When an operator triggers the workflow by hand -- especially with a
+          # specific --conf target -- they usually want the resulting progress
+          # bookkeeping (failed_attempts increments, abstract_backfill_progress.md,
+          # regenerated stats SVG) to be pushed even if zero new abstracts were
+          # actually merged in (e.g. every targeted paper failed lookup on all
+          # four sources). Without this bypass those manual runs would never
+          # produce a PR and the bookkeeping would be lost on the next cron.
+          force_mode=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            force_mode=true
+          fi
 
-          if [ "$cache_changed" = "true" ] && [ "$progress_changed" = "true" ]; then
+          echo "progress_changed=$progress_changed cache_changed=$cache_changed force_mode=$force_mode"
+
+          if [ "$progress_changed" = "true" ] && { [ "$cache_changed" = "true" ] || [ "$force_mode" = "true" ]; }; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            if [ "$cache_changed" != "true" ]; then
+            if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
               echo "[*] cache.jsonl.gz gained no new abstracts; skipping PR creation to save bandwidth."
             fi
           fi
