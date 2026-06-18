@@ -30,7 +30,7 @@ PaperVault/
 ├── data_artifacts.py             # Parquet export & Hugging Face dataset sync helpers
 ├── requirements.txt              # Python dependencies
 ├── cache/
-│   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (Git LFS)
+│   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
 │   ├── abstract_backfill_progress.json  # Abstract backfill progress tracking
 │   └── readme_meta.json          # README rendering metadata snapshot
@@ -117,25 +117,56 @@ The Flask server runs on `http://127.0.0.1:5000` by default.
 - `OPENAI_API_KEY` - OpenAI API key for "Guess You Like" feature
 - `OPENAI_API_BASE` - OpenAI API base URL (optional, defaults to official endpoint)
 - `CONTACT_EMAIL` - Contact email injected into `User-Agent` for discovery / scraping (default `im.young@foxmail.com`)
-- `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` - Hugging Face credentials/repo for `data_artifacts.sync_cache_artifacts`
-- `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS`, `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF` - HF upload retry tuning
+- `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` - **Required** for cache reads/writes. The authoritative `cache/cache.jsonl.gz` lives on this Hugging Face dataset repo; every entry point calls `data_artifacts.ensure_cache_local()` on startup to pull the latest revision before reading
+- `PAPERVAULT_HF_REPO_TYPE` - Repo kind, defaults to `dataset`
+- `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS`, `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF` - HF upload retry tuning (the upload uses `parent_commit` optimistic locking and will rebase + retry on stale-parent rejections)
+- `PAPERVAULT_OFFLINE=1` - Skip HF refresh entirely; only the local copy of the cache will be used (useful for air-gapped dev or when HF is unreachable)
 
-### Git LFS
+### Cache Storage (Hugging Face)
 
-The paper cache file (`cache/cache.jsonl.gz`) is managed by [Git LFS](https://git-lfs.github.com) due to its large size. Make sure you have Git LFS installed before cloning:
+`cache/cache.jsonl.gz` is **no longer tracked by Git or Git LFS**. The authoritative copy lives on the Hugging Face dataset repo named by `PAPERVAULT_HF_REPO_ID`. Locally:
 
 ```bash
-# Install Git LFS (one-time setup)
-git lfs install
-
-# Then clone the repository normally
+# Clone the repo (no LFS pull is required for cache.jsonl.gz)
 git clone https://github.com/youngfish42/PaperVault.git
+cd PaperVault
+
+# Configure Hugging Face credentials so the cache can be downloaded
+export HF_TOKEN=hf_xxx
+export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
+
+# Any entry point will now fetch the latest cache on startup
+python app.py            # also serves the cache to the web UI
+python collector.py      # incremental collection
+python maintain.py       # README + stats rebuild
 ```
 
-If you already cloned the repo without LFS, pull the LFS objects with:
+How synchronisation works:
+
+1. Every entry point (`app.py`, `collector.do_collect`, `maintain.*`, `scripts/fetch_*`) calls `data_artifacts.ensure_cache_local()` before reading or writing the cache. This downloads the latest revision from HF (if missing or stale) and records the current HF head as the `parent_commit` for the upcoming write.
+2. `data_artifacts.upload_to_huggingface()` performs an atomic upload using that `parent_commit`. If another workflow pushed in between, HF rejects with HTTP 412 / "stale parent_commit"; we then re-fetch the new head, rebase locally, and retry up to `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS` times (with exponential `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF`).
+3. All cache-mutating GitHub Actions workflows (`collect_papers.yml`, `backfill_abstracts.yml`, `update_readme.yml`) share a single concurrency group `papervault-cache` so they run strictly serially. `cancel-in-progress: false` ensures an in-flight job is allowed to finish its HF push.
+4. PRs created by these workflows **exclude** `cache/cache.jsonl.gz` (`AUTO_*_FILES` / `add-paths`) and only commit progress / metadata files (`cache/collect_progress.json`, `cache/abstract_backfill_progress.json`, `docs/...`, `pics/...`, `README.md`).
+
+### One-time migration from Git LFS
+
+If you are upgrading an existing checkout that still has the LFS-tracked cache:
+
 ```bash
-git lfs pull
+# 1) Make sure you have a recent local copy before disconnecting from LFS
+ls -lh cache/cache.jsonl.gz
+
+# 2) Pull the new branch / commit that removes LFS tracking, then:
+git lfs untrack "cache/cache.jsonl.gz"   # already done in .gitattributes
+git rm --cached cache/cache.jsonl.gz     # stop tracking in git index (keeps local file)
+
+# 3) Upload the local copy to Hugging Face once to seed the authoritative repo
+python -c "from data_artifacts import sync_cache_artifacts; sync_cache_artifacts(commit_message='Initial migration from Git LFS')"
+
+# 4) From now on, the local copy is git-ignored and synced via HF only.
 ```
+
+> Note: GitHub LFS bandwidth is **not** consumed any more after the migration. CI runners no longer call `git lfs pull`; they download the cache directly from HF.
 
 ### Frontend
 
@@ -221,7 +252,7 @@ Code links are enriched from [MLNLP-World/Top-AI-Conferences-Paper-with-Code](ht
 | `backfill_abstracts.yml` | Monthly schedule (1st of month, UTC) / Manual | Backfills missing abstracts (timeout-aware, ~5h budget) and then re-scans GitHub code links from the freshly backfilled abstracts (`scripts/fetch_code_links.py --year all --retry-failed`), pushes to `auto-backfill-abstracts` branch |
 | `update_readme.yml` | Manual (`workflow_dispatch`) | Force rebuilds cache and updates README via PR |
 
-CI uses Python 3.10. The collected `cache/cache.jsonl.gz` (and optional Parquet artifact) can be synced to a Hugging Face dataset repo via `data_artifacts.sync_cache_artifacts` when `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` are configured.
+CI uses Python 3.10. The collected `cache/cache.jsonl.gz` is **always** synced to the Hugging Face dataset repo named by `PAPERVAULT_HF_REPO_ID` (HF is now the authoritative store; Git no longer ships this file). All three cache-mutating workflows above share the `papervault-cache` concurrency group so they run strictly serially, and each upload uses `parent_commit` optimistic locking so concurrent local runs cannot silently overwrite each other.
 
 ## License
 
