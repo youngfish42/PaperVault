@@ -15,7 +15,7 @@ This project was originally forked from [MLNLP-World/AI-Paper-Collector](https:/
 | **UI Framework** | Element Plus 2.14 (auto-imported via `unplugin-vue-components`) |
 | **HTTP Client** | Axios 1.x |
 | **Data Collection** | BeautifulSoup4, Requests, PyYAML, tqdm, thefuzz / python-Levenshtein |
-| **Data Artifacts** | pyarrow (Parquet export), huggingface_hub (dataset upload) |
+| **Data Artifacts** | huggingface_hub (dataset upload) |
 | **AI Features** | OpenAI GPT API (for "Guess You Like" keyword suggestions), tiktoken |
 | **Stats / Visualization** | numpy, matplotlib, wordcloud |
 | **Build Tool** | Vite 8 with `vite-plugin-compression2` (gzip), `unplugin-auto-import` |
@@ -27,7 +27,7 @@ PaperVault/
 ├── app.py                        # Flask backend API server
 ├── collector.py                  # Multi-source data collector for paper metadata
 ├── maintain.py                   # README updater, stats renderer, cache refresh utility
-├── data_artifacts.py             # Parquet export & Hugging Face dataset sync helpers
+├── data_artifacts.py             # Hugging Face dataset sync helpers (cache.jsonl.gz upload with parent_commit optimistic locking)
 ├── requirements.txt              # Python dependencies
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
