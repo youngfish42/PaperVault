@@ -59,6 +59,66 @@ PaperVault is a fully automated tool for collecting and retrieving academic pape
 
 <!-- stats-end -->
 
+## :inbox_tray: Dataset Access
+
+The core data artifact `cache/cache.jsonl.gz` (papers with titles, authors, abstracts, links, and code URLs) is published as a companion dataset on Hugging Face:
+
+> 📦 **Hugging Face Dataset: [`youngfish42/papervault-cache`](https://huggingface.co/datasets/youngfish42/papervault-cache)**
+>
+> Available in both gzip-compressed JSON Lines (`cache/cache.jsonl.gz`) and Parquet (`cache/papers.parquet`).
+
+### Option 1: Download the dataset only (recommended for getting started)
+
+For users who only want to analyze paper metadata, without cloning this repo:
+
+```bash
+pip install huggingface_hub
+
+huggingface-cli download youngfish42/papervault-cache \
+    cache/cache.jsonl.gz --repo-type dataset --local-dir .
+```
+
+Read example:
+
+```python
+import gzip, json
+with gzip.open("cache/cache.jsonl.gz", "rt", encoding="utf-8") as fh:
+    for line in fh:
+        paper = json.loads(line)
+        # {"conf", "paper_name", "paper_authors", "paper_url",
+        #  "paper_abstract", "paper_code"}
+```
+
+If you prefer a DataFrame:
+
+```python
+import pandas as pd
+from huggingface_hub import hf_hub_download
+
+path = hf_hub_download(
+    repo_id="youngfish42/papervault-cache",
+    filename="cache/papers.parquet",
+    repo_type="dataset",
+)
+df = pd.read_parquet(path)
+```
+
+### Option 2: Auto-sync from this project
+
+For developers who want to run the web search service, perform incremental collection, or re-render the README. Every entry script fetches the latest cache from Hugging Face on startup; you only need to configure two environment variables:
+
+```bash
+cp .env.example .env
+# Edit .env and fill in:
+#   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
+#   PAPERVAULT_HF_REPO_ID=youngfish42/papervault-cache
+
+pip install -r requirements.txt
+python app.py            # Start the web search server
+```
+
+> For details on the sync mechanism, concurrency control, offline options such as `PAPERVAULT_OFFLINE`, and how to host the dataset yourself, see [TECHNICAL.md](TECHNICAL.md) and [AGENTS.md](AGENTS.md).
+
 ## :open_book: Coverage
 
 <!-- confs-list-start -->

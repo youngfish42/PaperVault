@@ -59,6 +59,66 @@ PaperVault 是一个用于收集和检索人工智能领域学术论文的全自
 
 <!-- stats-end -->
 
+## :inbox_tray: 数据集获取
+
+本项目的核心数据产物 `cache/cache.jsonl.gz`（论文的标题、作者、摘要、链接、代码仓库等元数据）作为伴生数据集发布在 Hugging Face：
+
+> 📦 **Hugging Face Dataset：[`youngfish42/papervault-cache`](https://huggingface.co/datasets/youngfish42/papervault-cache)**
+>
+> 同时提供 gzip 压缩的 JSON Lines (`cache/cache.jsonl.gz`) 与 Parquet (`cache/papers.parquet`) 两种格式。
+
+### 方式 1：仅下载数据集（推荐入门）
+
+适合只想分析论文元数据的用户，无需克隆本仓库：
+
+```bash
+pip install huggingface_hub
+
+huggingface-cli download youngfish42/papervault-cache \
+    cache/cache.jsonl.gz --repo-type dataset --local-dir .
+```
+
+读取示例：
+
+```python
+import gzip, json
+with gzip.open("cache/cache.jsonl.gz", "rt", encoding="utf-8") as fh:
+    for line in fh:
+        paper = json.loads(line)
+        # {"conf", "paper_name", "paper_authors", "paper_url",
+        #  "paper_abstract", "paper_code"}
+```
+
+如果偏好 DataFrame：
+
+```python
+import pandas as pd
+from huggingface_hub import hf_hub_download
+
+path = hf_hub_download(
+    repo_id="youngfish42/papervault-cache",
+    filename="cache/papers.parquet",
+    repo_type="dataset",
+)
+df = pd.read_parquet(path)
+```
+
+### 方式 2：在本项目代码中自动同步
+
+适合需要运行 Web 检索服务、增量收集或重新渲染 README 的开发者。所有入口脚本启动时会自动从 Hugging Face 拉取最新缓存，你只需配置两个环境变量：
+
+```bash
+cp .env.example .env
+# 编辑 .env，填入：
+#   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
+#   PAPERVAULT_HF_REPO_ID=youngfish42/papervault-cache
+
+pip install -r requirements.txt
+python app.py            # 启动 Web 检索服务
+```
+
+> 关于同步机制、并发控制、`PAPERVAULT_OFFLINE` 等离线选项及自托管数据集的详细说明，请参阅 [TECHNICAL.md](TECHNICAL.md) 与 [AGENTS.md](AGENTS.md)。
+
 ## :open_book: 收录会议范围
 
 <!-- confs-list-start -->
