@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from tqdm import tqdm
 
 import gzip
-from data_artifacts import sync_cache_artifacts
+from data_artifacts import ensure_cache_local, sync_cache_artifacts
 
 # 忽略 ACL Anthology 某些 XML 页面被 HTML 解析器解析时的警告
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -987,6 +987,10 @@ def save_cache(path, data):
 
 def do_collect(cache_file=None, force=False, soft_timeout=None):
     gz_path = _to_gz_path(cache_file) if cache_file else None
+    # Synchronise the local cache with the Hugging Face authoritative copy
+    # before deciding whether we need to do a full or incremental collection.
+    if gz_path:
+        ensure_cache_local(gz_path, refresh=True)
     if force or gz_path is None or not os.path.exists(gz_path):
         print(f"[+] Collecting papers...")
         res = collect(cache_file, force=force, soft_timeout=soft_timeout)

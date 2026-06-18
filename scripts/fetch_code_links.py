@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from data_artifacts import sync_cache_artifacts
+from data_artifacts import ensure_cache_local, sync_cache_artifacts
 
 CACHE_FILE = Path("cache/cache.jsonl.gz")
 BACKUP_FILE = Path("cache/cache.jsonl.gz.bak")
@@ -50,6 +50,10 @@ def extract_github_link(text: str) -> str:
 def run(year: str = None, retry_failed: bool = False) -> None:
     if year is None:
         year = str(datetime.now().year)
+
+    # Pull the latest cache from Hugging Face before scanning so we don't
+    # overwrite a newer cache produced by a concurrent abstract-backfill run.
+    ensure_cache_local(CACHE_FILE, refresh=True)
 
     # 读取缓存
     papers = []

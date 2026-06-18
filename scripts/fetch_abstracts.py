@@ -34,7 +34,7 @@ from requests.adapters import HTTPAdapter
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from data_artifacts import sync_cache_artifacts
+from data_artifacts import sync_cache_artifacts, ensure_cache_local
 
 # Windows 控制台 UTF-8 编码修复
 if sys.platform == "win32":
@@ -775,6 +775,9 @@ def run(
     max_failed_attempts: int = 3,
 ) -> None:
     global_start = time.time()
+    # Pull the latest cache from Hugging Face before reading/writing anything.
+    # This is the canonical source of truth across all workflows.
+    ensure_cache_local(CACHE_FILE, refresh=True)
     print(f"[*] Phase: {phase}, conf: {target_conf or 'all'}, chunk_size: {chunk_size}, max_papers: {max_papers or 'unlimited'}")
     if query_doi_by_title:
         print("[*] DOI query by title: ENABLED (slower, use with caution)")

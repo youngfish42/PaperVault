@@ -51,6 +51,7 @@ from collector import (  # noqa: E402
     _batch_fetch_openreview_abstracts,
     _extract_forum_id,
 )
+from data_artifacts import ensure_cache_local, sync_cache_artifacts  # noqa: E402
 
 # tqdm 进度条；若环境缺失则降级为简单打印
 try:
@@ -204,6 +205,10 @@ def build_task(records: List[dict], *, conf_filter, year_filter, retry_failed: b
 # ---------- 主流程 ----------
 
 def run(args) -> int:
+    # Pull the latest cache from Hugging Face before touching it locally; this
+    # is necessary because another workflow (e.g. collect_papers) may have
+    # pushed a newer cache while this script was queued.
+    ensure_cache_local(CACHE_FILE, refresh=True)
     if not CACHE_FILE.exists():
         print(f"[!] Cache file not found: {CACHE_FILE}")
         return 1
@@ -352,6 +357,18 @@ def run(args) -> int:
             f"    {miss} paper(s) still missing abstract on OpenReview "
             f"(可能是被作者删除或仅 PDF 可见，可后续走 scripts/fetch_abstracts.py)"
         )
+
+    # Push the updated cache to Hugging Face so other workflows / the live app
+    # see the new abstracts. parent_commit optimistic locking inside
+    # data_artifacts will reject the push if another writer landed first.
+    if total_filled > 0 and not args.dry_run:
+        try:
+            sync_cache_artifacts(
+                cache_path=CACHE_FILE,
+                commit_message=f"Backfill OpenReview abstracts (+{total_filled})",
+            )
+        except Exception as exc:
+            print(f"[!] sync_cache_artifacts failed (non-fatal): {exc}")
     return 0
 
 
