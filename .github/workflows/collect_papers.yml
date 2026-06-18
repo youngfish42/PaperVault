@@ -39,6 +39,10 @@ jobs:
       TZ: Asia/Shanghai
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
+      # Force the classic HTTPS/LFS download path on the runner; the Xet
+      # protocol has been observed to stall on some networks and there is no
+      # benefit to it for our single ~250MB cache file.
+      HF_HUB_DISABLE_XET: "1"
     permissions:
       contents: write
       pull-requests: write
@@ -154,3 +158,11 @@ jobs:
             *For questions, please contact: im.young@foxmail.com*
           branch: ${{ env.AUTO_COLLECT_BRANCH }}
           delete-branch: false
+          # Defensive whitelist: never let cache/cache.jsonl.gz sneak into the PR.
+          # The authoritative copy lives on Hugging Face (PAPERVAULT_HF_REPO_ID)
+          # and is uploaded by data_artifacts.sync_cache_artifacts; only the
+          # collection progress + rendered README should be committed back to git.
+          add-paths: |
+            cache/collect_progress.json
+            cache/collect_failures.json
+            README.md
