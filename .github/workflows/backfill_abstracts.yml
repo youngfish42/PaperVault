@@ -3,7 +3,9 @@ name: Backfill Abstracts
 env:
   PYTHON_VERSION: "3.10"
   AUTO_BACKFILL_BRANCH: "auto-backfill-abstracts"
-  AUTO_BACKFILL_FILES: "cache/cache.jsonl.gz cache/abstract_backfill_progress.json docs/abstract_backfill_progress.md pics/stats/stats_overview.svg"
+  # cache/cache.jsonl.gz is intentionally excluded: it lives on Hugging Face
+  # (PAPERVAULT_HF_REPO_ID) and is synced via data_artifacts.ensure_cache_local.
+  AUTO_BACKFILL_FILES: "cache/abstract_backfill_progress.json docs/abstract_backfill_progress.md pics/stats/stats_overview.svg"
 
 on:
   schedule:
@@ -17,7 +19,9 @@ on:
         default: ""
 
 concurrency:
-  group: backfill-abstracts
+  # Shared with collect_papers / update_readme to serialise every workflow
+  # that mutates cache.jsonl.gz on Hugging Face.
+  group: papervault-cache
   cancel-in-progress: false
 
 jobs:
@@ -28,15 +32,17 @@ jobs:
       TZ: Asia/Shanghai
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
+      # Force the classic HTTPS/LFS download path on the runner; the Xet
+      # protocol has been observed to stall on some networks and there is no
+      # benefit to it for our single ~250MB cache file.
+      HF_HUB_DISABLE_XET: "1"
     permissions:
       contents: write
       pull-requests: write
       actions: write
     steps:
-      - name: Checkout with LFS
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -166,7 +172,6 @@ jobs:
           branch: ${{ env.AUTO_BACKFILL_BRANCH }}
           delete-branch: false
           add-paths: |
-            cache/cache.jsonl.gz
             cache/abstract_backfill_progress.json
             docs/abstract_backfill_progress.md
             pics/stats/stats_overview.svg

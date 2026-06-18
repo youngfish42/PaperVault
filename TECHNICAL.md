@@ -6,7 +6,7 @@ PaperVault 采用**前后端分离**架构：
 
 - **后端**：Python Flask 提供 REST API，启动时加载本地 JSON 缓存，所有检索均在内存中完成，不依赖数据库。
 - **前端**：Vue 3 + Vite + TypeScript 构建的单页应用（SPA），打包后输出为静态文件，由 Flask 直接托管。
-- **数据层**：`cache/cache.jsonl.gz` 是原始论文目录缓存（JSON Lines + gzip），使用 **Git LFS** 管理；`cache/papers.parquet` 是同步生成并上传 Hugging Face 的列式数据；`conf/*.json` 定义需要采集的会议列表。
+- **数据层**：`cache/cache.jsonl.gz` 是原始论文目录缓存（JSON Lines + gzip），**权威副本托管于 Hugging Face Dataset**（由 `PAPERVAULT_HF_REPO_ID` 指定），本地副本由 `data_artifacts.ensure_cache_local()` 在每个入口启动时同步拉取，并通过 `parent_commit` 乐观锁回写；`cache/papers.parquet` 是同步生成并上传 Hugging Face 的列式数据；`conf/*.json` 定义需要采集的会议列表。
 
 ```
 conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
@@ -221,14 +221,24 @@ cd web-vue && npm install && npm run build
 python app.py
 ```
 
-### 6.3 Git LFS
+### 6.3 缓存存储（Hugging Face，已替代 Git LFS）
 
-首次克隆或更新缓存文件前，请确保已安装 Git LFS：
+自迁移完成后，`cache/cache.jsonl.gz` 不再由 Git 或 Git LFS 跟踪，请勿尝试 `git lfs pull`。本地副本由 `data_artifacts.ensure_cache_local()` 自动从 Hugging Face Dataset 拉取，回写时使用 `parent_commit` 乐观锁；并发写入冲突会自动重新基线并重试（受 `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS` / `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF` 控制）。
+
+最少配置：
 
 ```bash
-git lfs install
-git lfs pull
+export HF_TOKEN=hf_xxx
+export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
+# 可选：完全离线模式，跳过任何 HF 拉取
+# export PAPERVAULT_OFFLINE=1
 ```
+
+详细机制与一次性迁移步骤见 `AGENTS.md` 的 "Cache Storage (Hugging Face)" 与 "One-time migration from Git LFS" 章节。
+
+### 6.4 工作流并发控制
+
+所有会修改 `cache.jsonl.gz` 的 GitHub Actions 工作流（`collect_papers.yml`、`backfill_abstracts.yml`、`update_readme.yml`）共用同一个 concurrency group `papervault-cache`，且 `cancel-in-progress: false`，从而保证它们串行执行、不会互相覆盖。即便如此，本地手工运行 + 自动工作流仍可能并发，因此上传层额外使用 `parent_commit` 乐观锁兜底。
 
 ---
 

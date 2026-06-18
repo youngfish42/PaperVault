@@ -11,6 +11,14 @@ on:
         required: false
         default: "readme"
 
+concurrency:
+  # Shared with collect_papers / backfill_abstracts to serialise every
+  # workflow that mutates cache.jsonl.gz on Hugging Face. Even readme-only
+  # runs read the cache, so we keep them on the same queue to avoid PR
+  # races on README.md / pics/stats/.
+  group: papervault-cache
+  cancel-in-progress: false
+
 jobs:
   rebuild:
     runs-on: ubuntu-latest
@@ -19,15 +27,17 @@ jobs:
       TZ: Asia/Shanghai
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
+      # Force the classic HTTPS/LFS download path on the runner; the Xet
+      # protocol has been observed to stall on some networks and there is no
+      # benefit to it for our single ~250MB cache file.
+      HF_HUB_DISABLE_XET: "1"
     permissions:
       contents: write
       pull-requests: write
       actions: write
     steps:
-      - name: Checkout with LFS
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -96,3 +106,16 @@ jobs:
             *For questions, please contact: im.young@foxmail.com*
           branch: auto-rebuild-cache
           delete-branch: true
+          # Defensive whitelist: never let cache/cache.jsonl.gz sneak into the PR.
+          # The authoritative copy lives on Hugging Face (PAPERVAULT_HF_REPO_ID)
+          # and is uploaded by data_artifacts.sync_cache_artifacts; only the
+          # rendered README + stats artefacts should be committed back to git.
+          add-paths: |
+            README.md
+            README.en.md
+            cache/readme_meta.json
+            pics/stats/stats_overview.svg
+            pics/stats/papers_by_category.svg
+            pics/stats/papers_by_year.svg
+            pics/stats/wordcloud.svg
+            docs/stats.html

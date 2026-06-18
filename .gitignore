@@ -3,6 +3,11 @@
 cache/dblp_discovery_cache.json
 cache/*.parquet
 cache/*.parquet.tmp
+# cache.jsonl.gz now lives on Hugging Face (PAPERVAULT_HF_REPO_ID); the local
+# copy is downloaded by data_artifacts.ensure_cache_local() and must not be
+# committed to git.
+cache/cache.jsonl.gz
+cache/cache.jsonl.gz.tmp
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

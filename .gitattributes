@@ -1,2 +1,6 @@
-cache/cache.jsonl.gz filter=lfs diff=lfs merge=lfs -text
+# cache/cache.jsonl.gz is no longer tracked by Git LFS.
+# The authoritative copy lives on Hugging Face (see PAPERVAULT_HF_REPO_ID
+# in AGENTS.md / data_artifacts.py) and is synchronised locally by
+# data_artifacts.ensure_cache_local(). Keep this file present so existing
+# clones still resolve the historical LFS pointers gracefully.
 cache/abstract_backfill_progress.json filter=lfs diff=lfs merge=lfs -text

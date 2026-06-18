@@ -7,6 +7,7 @@ import re
 import time
 from openai import OpenAI
 from collector import load_cache
+from data_artifacts import ensure_cache_local
 
 app = Flask(__name__, static_folder='static', static_url_path="")
 
@@ -42,6 +43,10 @@ def add_item(item: dict):
 
 
 def load_data():
+    # Pull the latest cache from Hugging Face before reading it into memory.
+    # Falls back silently to the existing local copy if HF is unreachable or
+    # PAPERVAULT_HF_REPO_ID is not configured (see data_artifacts.ensure_cache_local).
+    ensure_cache_local(cache_path, refresh=True)
     data = load_cache(cache_path)
 
     for conf in data:

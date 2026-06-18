@@ -14,7 +14,7 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
 from collector import collect, save_cache, load_cache
-from data_artifacts import sync_cache_artifacts
+from data_artifacts import ensure_cache_local, sync_cache_artifacts
 
 try:
     from wordcloud import WordCloud
@@ -958,6 +958,9 @@ def _update_single_readme(path: str, lang: str, stats: dict, meta: dict):
 
 
 def update_readme():
+    # README rendering only reads the cache, but we still refresh so the rendered
+    # stats reflect the latest authoritative HF revision.
+    ensure_cache_local(cache_path, refresh=True)
     cache_data = load_cache(cache_path) if os.path.exists(cache_path) else {}
     stats = compute_stats(cache_data)
     meta = _read_meta()
@@ -976,6 +979,11 @@ def update_readme():
 
 
 def force_update():
+    # Refresh the local cache to record the current HF head as our parent_commit
+    # baseline; even though force mode rebuilds the cache from scratch, this gives
+    # the upload step a valid parent so the optimistic lock can detect concurrent
+    # writers landing between our download and upload windows.
+    ensure_cache_local(cache_path, refresh=True)
     res = collect(cache_file=None, force=True)
     save_cache(cache_path, res)
     sync_cache_artifacts(
@@ -994,6 +1002,10 @@ def force_update():
 
 def incremental_update(soft_timeout=None):
     """增量收集：只收集 conf 中有但 cache 中没有的会议，并更新 README。"""
+    # Sync the local cache with HF before deciding whether to fall back to a
+    # full rebuild; this avoids re-collecting everything just because the local
+    # workspace was freshly checked out without the file.
+    ensure_cache_local(cache_path, refresh=True)
     if not os.path.exists(cache_path):
         print("[!] Cache file not found, falling back to force update...")
         force_update()

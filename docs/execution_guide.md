@@ -190,16 +190,19 @@ python scripts/fetch_code_links.py --year all
 
 ### 任务 4：提交 cache 更新
 
-`cache/cache.jsonl.gz` 由 Git LFS 管理。每完成一个 major phase 后建议提交：
+`cache/cache.jsonl.gz` **已不再由 Git LFS 管理**，权威副本托管于 Hugging Face Dataset。脚本（`scripts/fetch_*`）在写入本地副本后会自动调用 `data_artifacts.sync_cache_artifacts()` 将其推送回 HF（带 `parent_commit` 乐观锁与重试）。本地 git 操作中无需也不应该再 `git add cache/cache.jsonl.gz`——它已经在 `.gitignore` 中。
+
+只需提交进度元数据即可：
 
 ```bash
-git add cache/cache.jsonl.gz cache/abstract_backfill_progress.json
+git add cache/abstract_backfill_progress.json docs/abstract_backfill_progress.md
 git commit -m "chore: abstract backfill phase X completed"
 ```
 
 **注意**：
-- `cache/cache.jsonl.gz` 文件很大，提交前确认 Git LFS 已安装且工作正常
-- `cache/abstract_backfill_progress.json` 也应一并提交，便于其他环境恢复进度
+- 确认环境变量 `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` 已配置，否则脚本只会修改本地副本而无法同步到权威源
+- 如果同时有 GitHub Actions 在跑（如 `backfill_abstracts.yml`），不要并发执行同一脚本；工作流之间已通过 `papervault-cache` 并发组互斥，但本地手工运行不在该组内
+- 离线/无 HF 凭据时可设 `PAPERVAULT_OFFLINE=1` 跳过远端同步（仅写本地副本，事后再手工 `python -c "from data_artifacts import sync_cache_artifacts; sync_cache_artifacts(commit_message='...')"` 上传）
 
 ---
 
@@ -239,7 +242,7 @@ python -c "import json; [json.load(open(f)) for f in ['conf/acl_conf.json','conf
 
 1. **Abstract 回填耗时长**：63,906 条空 abstract 全部处理完预计需要 **20–40 小时**的墙钟时间。请利用断点续传机制分多次执行。
 2. **API 限流**：Crossref / Semantic Scholar / OpenAlex 均有可能返回 429。脚本已内置指数退避（遇到 429 自动等待），请勿频繁重启脚本。
-3. **Cache 文件大**：`cache.jsonl.gz` 约数百 MB，Git LFS 推送可能需要较长时间。
+3. **Cache 文件大**：`cache.jsonl.gz` 约数百 MB，Hugging Face 上传可能需要较长时间；并发写入会触发 `parent_commit` 乐观锁重试，请耐心等待脚本输出 `[+] Uploaded to Hugging Face` 后再退出。
 4. **Cache 写入安全**：脚本已改为原子重命名写入，但执行前仍建议手动备份 `cache/cache.jsonl.gz`。
 5. **标题匹配误差**：API 返回的标题与本地标题可能存在细微差异，脚本已记录匹配日志，如遇大批量不匹配请检查日志并调整阈值。
 6. **进度文件格式**：进度文件已升级为 v2 格式（记录 success/failed），兼容旧版 `processed_urls` 列表格式。
