@@ -65,7 +65,7 @@ PaperVault 是一个用于收集和检索人工智能领域学术论文的全自
 
 > 📦 **Hugging Face Dataset：[`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault)**
 >
-> 同时提供 gzip 压缩的 JSON Lines (`cache/cache.jsonl.gz`) 与 Parquet (`cache/papers.parquet`) 两种格式。
+> 仓库以 gzip 压缩的 JSON Lines (`cache/cache.jsonl.gz`) 形式发布；Hugging Face 会自动为该数据集生成 Parquet 视图，可直接通过其 Datasets / Parquet API 消费。
 
 ### 方式 1：仅下载数据集（推荐入门）
 
@@ -89,19 +89,17 @@ with gzip.open("cache/cache.jsonl.gz", "rt", encoding="utf-8") as fh:
         #  "paper_abstract", "paper_code"}
 ```
 
-如果偏好 DataFrame：
+如果偏好 DataFrame，可直接使用 Hugging Face 自动生成的 Parquet 视图：
 
 ```python
 import pandas as pd
-from huggingface_hub import hf_hub_download
 
-path = hf_hub_download(
-    repo_id="youngfish42/PaperVault",
-    filename="cache/papers.parquet",
-    repo_type="dataset",
+df = pd.read_parquet(
+    "hf://datasets/youngfish42/PaperVault/cache/cache.jsonl.gz"
 )
-df = pd.read_parquet(path)
 ```
+
+> 说明：Hugging Face 会自动为 Hub 上的 JSON Lines 数据集生成 Parquet 视图，因此无需在仓库内单独维护 `.parquet` 文件。
 
 ### 方式 2：在本项目代码中自动同步
 

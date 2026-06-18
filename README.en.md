@@ -65,7 +65,7 @@ The core data artifact `cache/cache.jsonl.gz` (papers with titles, authors, abst
 
 > 📦 **Hugging Face Dataset: [`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault)**
 >
-> Available in both gzip-compressed JSON Lines (`cache/cache.jsonl.gz`) and Parquet (`cache/papers.parquet`).
+> Published as gzip-compressed JSON Lines (`cache/cache.jsonl.gz`); Hugging Face automatically materialises a Parquet view of the dataset that can be consumed via its Datasets / Parquet APIs.
 
 ### Option 1: Download the dataset only (recommended for getting started)
 
@@ -89,19 +89,17 @@ with gzip.open("cache/cache.jsonl.gz", "rt", encoding="utf-8") as fh:
         #  "paper_abstract", "paper_code"}
 ```
 
-If you prefer a DataFrame:
+If you prefer a DataFrame, use Hugging Face's auto-generated Parquet view:
 
 ```python
 import pandas as pd
-from huggingface_hub import hf_hub_download
 
-path = hf_hub_download(
-    repo_id="youngfish42/PaperVault",
-    filename="cache/papers.parquet",
-    repo_type="dataset",
+df = pd.read_parquet(
+    "hf://datasets/youngfish42/PaperVault/cache/cache.jsonl.gz"
 )
-df = pd.read_parquet(path)
 ```
+
+> Note: Hugging Face automatically generates a Parquet view for JSON Lines datasets hosted on the Hub, so this repository no longer ships a separate `.parquet` artifact.
 
 ### Option 2: Auto-sync from this project
 

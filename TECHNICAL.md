@@ -6,7 +6,7 @@ PaperVault 采用**前后端分离**架构：
 
 - **后端**：Python Flask 提供 REST API，启动时加载本地 JSON 缓存，所有检索均在内存中完成，不依赖数据库。
 - **前端**：Vue 3 + Vite + TypeScript 构建的单页应用（SPA），打包后输出为静态文件，由 Flask 直接托管。
-- **数据层**：`cache/cache.jsonl.gz` 是原始论文目录缓存（JSON Lines + gzip），**权威副本托管于 Hugging Face Dataset**（由 `PAPERVAULT_HF_REPO_ID` 指定），本地副本由 `data_artifacts.ensure_cache_local()` 在每个入口启动时同步拉取，并通过 `parent_commit` 乐观锁回写；`cache/papers.parquet` 是同步生成并上传 Hugging Face 的列式数据；`conf/*.json` 定义需要采集的会议列表。
+- **数据层**：`cache/cache.jsonl.gz` 是原始论文目录缓存（JSON Lines + gzip），**权威副本托管于 Hugging Face Dataset**（由 `PAPERVAULT_HF_REPO_ID` 指定），本地副本由 `data_artifacts.ensure_cache_local()` 在每个入口启动时同步拉取，并通过 `parent_commit` 乐观锁回写；`conf/*.json` 定义需要采集的会议列表。
 
 ```
 conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
@@ -33,7 +33,7 @@ conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
 | `app.py` | Flask 服务入口，加载缓存、暴露 API |
 | `collector.py` | 多源论文采集器 |
 | `maintain.py` | README 会议列表自动更新工具 |
-| `data_artifacts.py` | 从 `cache/cache.jsonl.gz` 生成 Parquet 并上传到 Hugging Face |
+| `data_artifacts.py` | 同步 `cache/cache.jsonl.gz` 至 Hugging Face Dataset（含 `parent_commit` 乐观锁与重试） |
 
 ### 2.2 API 接口
 
@@ -72,7 +72,7 @@ conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
 
 `app.py` 在模块导入时即执行 `load_data()`，将 `cache/cache.jsonl.gz` 流式读入内存，按会议和年份组织为嵌套字典 `cache_data`。此后所有搜索均在内存中进行，无磁盘 I/O。
 
-`cache/cache.jsonl.gz` 被重新生成或更新后，`data_artifacts.py` 会同步生成 `cache/papers.parquet` 并在配置 Hugging Face 环境变量时上传。
+`cache/cache.jsonl.gz` 被重新生成或更新后，`data_artifacts.py` 会在配置 Hugging Face 环境变量时将其上传到对应的 Dataset 仓库。Hugging Face 会自动将 JSON Lines 数据集转换为 Parquet 视图，因此本仓库不再在本地生成或维护 Parquet 文件。
 
 ---
 
@@ -181,20 +181,7 @@ cache_conf = [name for name in cache_res.keys()]
 
 `paper_code` 默认值为 `#`，表示暂无代码链接。
 
-### 5.3 Parquet 格式 (`cache/papers.parquet`)
-
-Parquet 文件由 `data_artifacts.py` 从 `cache/cache.jsonl.gz` 生成，字段包括：
-
-| 字段 | 说明 |
-|------|------|
-| `conf` | 会议实例名，如 `CVPR2024` |
-| `paper_name` | 论文标题 |
-| `paper_url` | 论文链接 |
-| `paper_authors` | 作者列表 |
-| `paper_abstract` | 摘要 |
-| `paper_code` | 代码链接，缺失时为 `#` |
-
-`cache/papers.parquet` 是可生成产物，默认不纳入 Git 跟踪；配置 Hugging Face 后会和 `cache/cache.jsonl.gz` 一起上传。
+> 仓库的权威数据集托管于 Hugging Face，Hugging Face 会自动为该 JSON Lines 数据集生成 Parquet 视图，便于通过 `pandas.read_parquet` 等工具直接消费；本仓库不再单独维护 Parquet 产物。
 
 ---
 
