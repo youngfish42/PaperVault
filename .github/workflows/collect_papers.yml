@@ -3,7 +3,9 @@ name: Collect Papers
 env:
   PYTHON_VERSION: "3.10"
   AUTO_COLLECT_BRANCH: "auto-collect-papers"
-  AUTO_COLLECT_FILES: "cache/cache.jsonl.gz cache/collect_progress.json cache/collect_failures.json README.md"
+  # cache/cache.jsonl.gz is intentionally excluded: it is now stored on
+  # Hugging Face (PAPERVAULT_HF_REPO_ID) and pulled via data_artifacts.ensure_cache_local.
+  AUTO_COLLECT_FILES: "cache/collect_progress.json cache/collect_failures.json README.md"
 
 on:
   schedule:
@@ -22,7 +24,11 @@ on:
       - "conf/**"
 
 concurrency:
-  group: collect-papers
+  # Shared across collect_papers / backfill_abstracts / update_readme to
+  # serialise every workflow that mutates cache.jsonl.gz on Hugging Face.
+  # cancel-in-progress is false so already-running jobs finish gracefully
+  # (each holds a snapshot of the cache and an in-flight HF push).
+  group: papervault-cache
   cancel-in-progress: false
 
 jobs:
@@ -38,10 +44,8 @@ jobs:
       pull-requests: write
       actions: write
     steps:
-      - name: Checkout with LFS
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
