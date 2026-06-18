@@ -90,6 +90,46 @@ jobs:
 
           write_hashes "$RUNNER_TEMP/backfill_baseline.sha256"
 
+      - name: Snapshot cache.jsonl.gz abstract baseline (from Hugging Face)
+        # Pull the authoritative cache from HF and count how many records
+        # currently have a non-empty paper_abstract BEFORE the backfill runs.
+        # We gate PR creation on this number growing, so a no-op backfill
+        # (every targeted paper failed lookup, or all targets were already
+        # covered) does not open a bandwidth-wasting PR just because
+        # progress JSON timestamps moved.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import json
+          import os
+
+          from data_artifacts import ensure_cache_local, DEFAULT_CACHE_PATH
+
+          cache_path, _ = ensure_cache_local(DEFAULT_CACHE_PATH)
+          cache_path = Path(cache_path)
+
+          total = 0
+          with_abstract = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      line = line.strip()
+                      if not line:
+                          continue
+                      total += 1
+                      try:
+                          record = json.loads(line)
+                      except json.JSONDecodeError:
+                          continue
+                      if (record.get("paper_abstract") or "").strip():
+                          with_abstract += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_baseline.count"
+          out.write_text(f"{with_abstract} {total}\n", encoding="utf-8")
+          print(f"[+] cache baseline abstracts={with_abstract}/{total}")
+          PY
+
       - name: Run abstract backfill
         run: |
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
@@ -122,6 +162,14 @@ jobs:
 
       - name: Check for changes
         id: check_changes
+        # Two gates must both hold for a PR to be opened:
+        #   1. The number of records carrying a non-empty paper_abstract grew
+        #      (i.e. the backfill actually merged in at least one new abstract),
+        #   2. At least one tracked progress/stats file changed.
+        # Gate (1) prevents the bandwidth-wasting "ghost PR" pattern where
+        # only timestamps inside cache/abstract_backfill_progress.json moved
+        # while no new abstract content was added to the authoritative
+        # cache.jsonl.gz on Hugging Face.
         run: |
           : > "$RUNNER_TEMP/backfill_current.sha256"
           for file in ${{ env.AUTO_BACKFILL_FILES }}; do
@@ -132,10 +180,77 @@ jobs:
             fi
           done
 
+          progress_changed=false
           if ! cmp --silent "$RUNNER_TEMP/backfill_baseline.sha256" "$RUNNER_TEMP/backfill_current.sha256"; then
+            progress_changed=true
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import json
+          import os
+
+          cache_path = Path("cache/cache.jsonl.gz")
+          total = 0
+          with_abstract = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      line = line.strip()
+                      if not line:
+                          continue
+                      total += 1
+                      try:
+                          record = json.loads(line)
+                      except json.JSONDecodeError:
+                          continue
+                      if (record.get("paper_abstract") or "").strip():
+                          with_abstract += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_current.count"
+          out.write_text(f"{with_abstract} {total}\n", encoding="utf-8")
+          print(f"[+] cache current abstracts={with_abstract}/{total}")
+          PY
+
+          baseline_abs=$(awk '{print $1}' "$RUNNER_TEMP/cache_baseline.count")
+          current_abs=$(awk '{print $1}' "$RUNNER_TEMP/cache_current.count")
+          # Defensive defaults: if either snapshot file was unreadable
+          # (HF outage, disk full, etc.) treat the count as 0 so the
+          # bash arithmetic test below cannot blow up with "unary
+          # operator expected" and abort the workflow before we have a
+          # chance to print a useful skip message.
+          baseline_abs=${baseline_abs:-0}
+          current_abs=${current_abs:-0}
+          echo "baseline_abstracts=$baseline_abs current_abstracts=$current_abs"
+
+          cache_changed=false
+          if [ "$current_abs" -gt "$baseline_abs" ]; then
+            cache_changed=true
+          fi
+
+          # Manual workflow_dispatch bypass (symmetric with collect_papers.yml).
+          # When an operator triggers the workflow by hand -- especially with a
+          # specific --conf target -- they usually want the resulting progress
+          # bookkeeping (failed_attempts increments, abstract_backfill_progress.md,
+          # regenerated stats SVG) to be pushed even if zero new abstracts were
+          # actually merged in (e.g. every targeted paper failed lookup on all
+          # four sources). Without this bypass those manual runs would never
+          # produce a PR and the bookkeeping would be lost on the next cron.
+          force_mode=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            force_mode=true
+          fi
+
+          echo "progress_changed=$progress_changed cache_changed=$cache_changed force_mode=$force_mode"
+
+          if [ "$progress_changed" = "true" ] && { [ "$cache_changed" = "true" ] || [ "$force_mode" = "true" ]; }; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
+              echo "[*] cache.jsonl.gz gained no new abstracts; skipping PR creation to save bandwidth."
+            fi
           fi
 
       - name: Setup GIT user

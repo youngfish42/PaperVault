@@ -100,6 +100,36 @@ jobs:
 
           write_hashes "$RUNNER_TEMP/collect_baseline.sha256"
 
+      - name: Snapshot cache.jsonl.gz baseline (from Hugging Face)
+        # Pull the authoritative cache from HF and count its records BEFORE
+        # any collection runs. We gate PR creation on this count so PRs are
+        # only opened when cache.jsonl.gz actually grew (i.e. real new
+        # papers were merged in). Record-count is the invariant signal:
+        # save_cache always rewrites the gzip (so sha256 alone is noisy),
+        # but the line count only grows when new papers are appended.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import os
+
+          from data_artifacts import ensure_cache_local, DEFAULT_CACHE_PATH
+
+          cache_path, _ = ensure_cache_local(DEFAULT_CACHE_PATH)
+          cache_path = Path(cache_path)
+
+          count = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      if line.strip():
+                          count += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_baseline.count"
+          out.write_text(f"{count}\n", encoding="utf-8")
+          print(f"[+] cache baseline record count={count}")
+          PY
+
       - name: Run paper collection
         run: |
           if [ "${{ github.event.inputs.mode }}" == "force" ]; then
@@ -112,6 +142,15 @@ jobs:
 
       - name: Check for changes
         id: check_changes
+        # Two gates must both hold for a PR to be opened:
+        #   1. cache.jsonl.gz gained at least one new record (real new papers),
+        #   2. at least one tracked progress/README file changed.
+        # The first gate is the important one: it prevents bandwidth-wasting
+        # PRs like #77 where progress JSON timestamps moved but zero new
+        # papers were added to the authoritative cache on Hugging Face.
+        # Force-mode runs (manual workflow_dispatch with mode=force) bypass
+        # the cache-count gate because a full rebuild legitimately wants to
+        # refresh the README/stats artefacts regardless of net record delta.
         run: |
           : > "$RUNNER_TEMP/collect_current.sha256"
           for file in ${{ env.AUTO_COLLECT_FILES }}; do
@@ -122,10 +161,59 @@ jobs:
             fi
           done
 
+          progress_changed=false
           if ! cmp --silent "$RUNNER_TEMP/collect_baseline.sha256" "$RUNNER_TEMP/collect_current.sha256"; then
+            progress_changed=true
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import os
+
+          cache_path = Path("cache/cache.jsonl.gz")
+          count = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      if line.strip():
+                          count += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_current.count"
+          out.write_text(f"{count}\n", encoding="utf-8")
+          print(f"[+] cache current record count={count}")
+          PY
+
+          baseline_count=$(cat "$RUNNER_TEMP/cache_baseline.count" | tr -d '[:space:]')
+          current_count=$(cat "$RUNNER_TEMP/cache_current.count" | tr -d '[:space:]')
+          # Defensive defaults: if either snapshot file was unreadable
+          # (HF outage, disk full, etc.) treat the count as 0 so the
+          # bash arithmetic test below cannot blow up with "unary
+          # operator expected" and abort the workflow before we have a
+          # chance to print a useful skip message.
+          baseline_count=${baseline_count:-0}
+          current_count=${current_count:-0}
+          echo "baseline_count=$baseline_count current_count=$current_count"
+
+          cache_changed=false
+          if [ "$current_count" -gt "$baseline_count" ]; then
+            cache_changed=true
+          fi
+
+          force_mode=false
+          if [ "${{ github.event.inputs.mode }}" = "force" ]; then
+            force_mode=true
+          fi
+
+          echo "progress_changed=$progress_changed cache_changed=$cache_changed force_mode=$force_mode"
+
+          if [ "$progress_changed" = "true" ] && { [ "$cache_changed" = "true" ] || [ "$force_mode" = "true" ]; }; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
+              echo "[*] cache.jsonl.gz gained no new records; skipping PR creation to save bandwidth."
+            fi
           fi
 
       - name: Setup GIT user
