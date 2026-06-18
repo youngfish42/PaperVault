@@ -66,6 +66,32 @@ def _path_in_repo(local_path: Path) -> str:
         return local_path.name
 
 
+def _is_stale_parent_commit_error(exc: Exception) -> bool:
+    """Detect HF Hub's "parent_commit is stale" rejection.
+
+    Preference order:
+      1. Structured HTTP status (412 Precondition Failed) if the exception
+         exposes a ``response`` attribute (HfHubHTTPError and subclasses).
+      2. Tightened substring matches: only treat the error as stale when the
+         message clearly references parent commits, optimistic locking or
+         precondition failures. Plain "conflict" or a bare "412" appearing
+         inside an unrelated message will no longer trigger a false rebase.
+    """
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code == 412:
+        return True
+
+    message = str(exc).lower()
+    keywords = (
+        "parent_commit",
+        "parent commit",
+        "stale parent",
+        "precondition failed",
+    )
+    return any(keyword in message for keyword in keywords)
+
+
 def _get_remote_commit(api, repo_id: str, path_in_repo: str) -> Optional[str]:
     """Return the most recent commit oid that touched ``path_in_repo``.
 
@@ -76,13 +102,13 @@ def _get_remote_commit(api, repo_id: str, path_in_repo: str) -> Optional[str]:
     """
     try:
         info = api.dataset_info(repo_id=repo_id, revision="main")
-        return getattr(info, "sha", None) or info.sha  # type: ignore[attr-defined]
+        return getattr(info, "sha", None)
     except Exception:
         try:
             refs = api.list_repo_refs(repo_id=repo_id, repo_type=_hf_repo_type())
             for branch in getattr(refs, "branches", []):
-                if branch.name == "main":
-                    return branch.target_commit
+                if getattr(branch, "name", None) == "main":
+                    return getattr(branch, "target_commit", None)
         except Exception:
             return None
     return None
@@ -173,7 +199,18 @@ def ensure_cache_local(
 
     downloaded_path = Path(downloaded).resolve()
     if downloaded_path != cache_path:
-        shutil.copyfile(downloaded_path, cache_path)
+        # Write through a sibling .tmp file so a half-finished copy (process
+        # killed, soft-timeout, Ctrl-C) cannot leave a corrupt gzip behind.
+        tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+        try:
+            shutil.copyfile(downloaded_path, tmp_path)
+            os.replace(tmp_path, cache_path)
+        finally:
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
     parent_commit = _get_remote_commit(api, repo_id, path_in_repo)
     if parent_commit:
         _HF_PARENT_COMMITS[path_in_repo] = parent_commit
@@ -304,8 +341,13 @@ def upload_to_huggingface(paths: Iterable[PathLike], commit_message: str) -> Lis
     max_attempts = max(1, HF_UPLOAD_MAX_ATTEMPTS)
     backoff = max(0.0, HF_UPLOAD_RETRY_BACKOFF)
 
-    for path in paths:
-        path = Path(path).resolve()
+    # Materialise so we can tell whether more uploads follow the current one;
+    # this lets us skip an otherwise-wasted ``dataset_info`` round-trip after
+    # the final push (parent_commit is only useful for subsequent uploads).
+    path_list = [Path(p) for p in paths]
+
+    for index, path in enumerate(path_list):
+        path = path.resolve()
         if not path.exists():
             continue
         path_in_repo = _path_in_repo(path)
@@ -328,23 +370,20 @@ def upload_to_huggingface(paths: Iterable[PathLike], commit_message: str) -> Lis
                 kwargs["parent_commit"] = parent_commit
             try:
                 api.upload_file(**kwargs)
-                # Refresh parent commit to the just-pushed head for the next call
-                new_head = _get_remote_commit(api, repo_id, path_in_repo)
-                if new_head:
-                    _HF_PARENT_COMMITS[path_in_repo] = new_head
+                # Only refresh parent_commit if more uploads follow in this
+                # batch; on the last path no one will read the value and we
+                # save one HF round-trip (helpful under HF rate limiting).
+                if index < len(path_list) - 1:
+                    new_head = _get_remote_commit(api, repo_id, path_in_repo)
+                    if new_head:
+                        _HF_PARENT_COMMITS[path_in_repo] = new_head
                 uploaded.append(path_in_repo)
                 print(f"[+] Uploaded to Hugging Face: {repo_id}/{path_in_repo}")
                 last_exc = None
                 break
             except Exception as exc:
                 last_exc = exc
-                message = str(exc).lower()
-                stale = (
-                    "parent_commit" in message
-                    or "stale" in message
-                    or "412" in message
-                    or "conflict" in message
-                )
+                stale = _is_stale_parent_commit_error(exc)
                 print(
                     f"[!] Hugging Face upload failed for {path_in_repo} "
                     f"(attempt {attempt}/{max_attempts}): {exc}"

@@ -361,6 +361,7 @@ def run(args) -> int:
     # Push the updated cache to Hugging Face so other workflows / the live app
     # see the new abstracts. parent_commit optimistic locking inside
     # data_artifacts will reject the push if another writer landed first.
+    sync_failed = False
     if total_filled > 0 and not args.dry_run:
         try:
             sync_cache_artifacts(
@@ -368,8 +369,16 @@ def run(args) -> int:
                 commit_message=f"Backfill OpenReview abstracts (+{total_filled})",
             )
         except Exception as exc:
-            print(f"[!] sync_cache_artifacts failed (non-fatal): {exc}")
-    return 0
+            sync_failed = True
+            print(f"[!] sync_cache_artifacts failed: {exc}")
+            print(
+                "    Local cache has been updated but Hugging Face was NOT "
+                "synced. The next ensure_cache_local(refresh=True) call may "
+                "OVERWRITE the local changes with the stale HF copy. "
+                "Re-run sync_cache_artifacts manually before re-launching "
+                "any other workflow that touches the cache."
+            )
+    return 1 if sync_failed else 0
 
 
 def parse_args(argv=None) -> argparse.Namespace:
