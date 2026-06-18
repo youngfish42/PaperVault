@@ -63,7 +63,7 @@ PaperVault 是一个用于收集和检索人工智能领域学术论文的全自
 
 本项目的核心数据产物 `cache/cache.jsonl.gz`（论文的标题、作者、摘要、链接、代码仓库等元数据）作为伴生数据集发布在 Hugging Face：
 
-> 📦 **Hugging Face Dataset：[`youngfish42/papervault-cache`](https://huggingface.co/datasets/youngfish42/papervault-cache)**
+> 📦 **Hugging Face Dataset：[`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault)**
 >
 > 同时提供 gzip 压缩的 JSON Lines (`cache/cache.jsonl.gz`) 与 Parquet (`cache/papers.parquet`) 两种格式。
 
@@ -74,7 +74,7 @@ PaperVault 是一个用于收集和检索人工智能领域学术论文的全自
 ```bash
 pip install huggingface_hub
 
-huggingface-cli download youngfish42/papervault-cache \
+huggingface-cli download youngfish42/PaperVault \
     cache/cache.jsonl.gz --repo-type dataset --local-dir .
 ```
 
@@ -96,7 +96,7 @@ import pandas as pd
 from huggingface_hub import hf_hub_download
 
 path = hf_hub_download(
-    repo_id="youngfish42/papervault-cache",
+    repo_id="youngfish42/PaperVault",
     filename="cache/papers.parquet",
     repo_type="dataset",
 )
@@ -111,7 +111,7 @@ df = pd.read_parquet(path)
 cp .env.example .env
 # 编辑 .env，填入：
 #   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
-#   PAPERVAULT_HF_REPO_ID=youngfish42/papervault-cache
+#   PAPERVAULT_HF_REPO_ID=youngfish42/PaperVault
 
 pip install -r requirements.txt
 python app.py            # 启动 Web 检索服务

@@ -63,7 +63,7 @@ PaperVault is a fully automated tool for collecting and retrieving academic pape
 
 The core data artifact `cache/cache.jsonl.gz` (papers with titles, authors, abstracts, links, and code URLs) is published as a companion dataset on Hugging Face:
 
-> 📦 **Hugging Face Dataset: [`youngfish42/papervault-cache`](https://huggingface.co/datasets/youngfish42/papervault-cache)**
+> 📦 **Hugging Face Dataset: [`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault)**
 >
 > Available in both gzip-compressed JSON Lines (`cache/cache.jsonl.gz`) and Parquet (`cache/papers.parquet`).
 
@@ -74,7 +74,7 @@ For users who only want to analyze paper metadata, without cloning this repo:
 ```bash
 pip install huggingface_hub
 
-huggingface-cli download youngfish42/papervault-cache \
+huggingface-cli download youngfish42/PaperVault \
     cache/cache.jsonl.gz --repo-type dataset --local-dir .
 ```
 
@@ -96,7 +96,7 @@ import pandas as pd
 from huggingface_hub import hf_hub_download
 
 path = hf_hub_download(
-    repo_id="youngfish42/papervault-cache",
+    repo_id="youngfish42/PaperVault",
     filename="cache/papers.parquet",
     repo_type="dataset",
 )
@@ -111,7 +111,7 @@ For developers who want to run the web search service, perform incremental colle
 cp .env.example .env
 # Edit .env and fill in:
 #   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
-#   PAPERVAULT_HF_REPO_ID=youngfish42/papervault-cache
+#   PAPERVAULT_HF_REPO_ID=youngfish42/PaperVault
 
 pip install -r requirements.txt
 python app.py            # Start the web search server

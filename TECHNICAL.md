@@ -207,7 +207,7 @@ Parquet 文件由 `data_artifacts.py` 从 `cache/cache.jsonl.gz` 生成，字段
 | `OPENAI_API_KEY` | GPT-3.5 关键词推荐功能 |
 | `OPENAI_API_BASE` | OpenAI API 代理地址（可选） |
 | `HF_TOKEN` | Hugging Face 写入 token，用于上传数据产物 |
-| `PAPERVAULT_HF_REPO_ID` | Hugging Face Dataset 仓库 ID，如 `lokinko/papervault-cache`；未设置时跳过上传 |
+| `PAPERVAULT_HF_REPO_ID` | Hugging Face Dataset 仓库 ID，如 `youngfish42/PaperVault`；未设置时跳过上传 |
 | `PAPERVAULT_HF_REPO_TYPE` | Hugging Face 仓库类型，默认 `dataset` |
 
 ### 6.2 生产构建流程
