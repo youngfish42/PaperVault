@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, shallowRef, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FILE from '@/utils/file'
 import type { PaperItem } from '@/api/paper'
@@ -11,6 +11,7 @@ import {
   labelOfOther,
   OTHER_FIELD_KEY
 } from '@/utils/fields'
+import { evaluateDsl, type AstNode } from '@/utils/queryDsl'
 
 const { t, lang } = useI18n()
 
@@ -18,9 +19,32 @@ const emits = defineEmits<{
   (e: 'searchAuthor', val: string): void
 }>()
 
-type SortKey = 'year-desc' | 'year-asc' | 'conf' | 'title'
+const props = withDefaults(
+  defineProps<{
+    ast?: AstNode
+  }>(),
+  {
+    ast: () => ({ kind: 'empty' as const })
+  }
+)
 
-const rawList = ref<PaperItem[]>([])
+type SortKey =
+  | 'year-desc'
+  | 'year-asc'
+  | 'conf-asc'
+  | 'conf-desc'
+  | 'title-asc'
+  | 'title-desc'
+
+// Use a shallow ref so individual PaperItem objects are NOT recursively
+// wrapped in reactive proxies. Each paper card renders ~10+ Element Plus
+// sub-components (tags, icons, tooltips, links, the abstract block, etc.),
+// and when a filter like "has-code" sharply changes the visible slice, Vue
+// must diff hundreds of children whose every field went through a Proxy
+// get-trap. Switching to shallowRef collapses that per-field overhead
+// since paper fields are never mutated in place (rawList is only ever
+// wholesale-replaced via filterResult / deleteResult below).
+const rawList = shallowRef<PaperItem[]>([])
 const sortMethod = ref<SortKey>('year-desc')
 
 const refine = reactive({
@@ -31,11 +55,47 @@ const refine = reactive({
   fields: [] as string[]
 })
 
+// ``searchedList`` is the stable "search-matched" baseline: it applies the
+// residual DSL (the AND/OR/NOT/field-scoped clauses the backend could not
+// pre-narrow with, e.g. ``OR(topic:privacy, topic:fairness)`` after the
+// backend already filtered by ``q=federated`` + conf + year) on top of
+// rawList. Counts surfaced to the user as "matched 199 / 471" used to use
+// rawList as the denominator, which was misleading: 471 was just the
+// backend's pre-filtered candidate set, not the actual hit count of the
+// expression the user typed. Treat the DSL as part of the query (denominator)
+// and only refine.* controls as the numerator narrower.
+//
+// IMPORTANT: This must be declared *before* ``yearBounds`` / ``fieldOptions``
+// (and before ``watch(yearBounds, ...)``), because ``watch`` synchronously
+// reads its source to subscribe, which would otherwise hit the TDZ on
+// ``searchedList`` and throw ``Cannot access 'searchedList' before
+// initialization``.
+const searchedList = computed<PaperItem[]>(() => {
+  const ast = props.ast
+  if (!ast || ast.kind === 'empty') return rawList.value
+  return rawList.value.filter(p =>
+    evaluateDsl(
+      {
+        title: p.title,
+        abstract: p.abstract,
+        authors: p.authors,
+        conf: p.conf,
+        year: p.year
+      },
+      ast
+    )
+  )
+})
+
 const yearBounds = computed<[number, number]>(() => {
-  if (rawList.value.length === 0) return [0, 0]
+  // Use the search-matched baseline (rawList ∩ DSL) so the year slider
+  // bounds match the actual hit set rather than the backend's wider
+  // candidate set.
+  const source = searchedList.value
+  if (source.length === 0) return [0, 0]
   let min = Infinity
   let max = -Infinity
-  for (const p of rawList.value) {
+  for (const p of source) {
     const y = Number(p.year)
     if (!Number.isFinite(y)) continue
     if (y < min) min = y
@@ -65,9 +125,13 @@ const exportFile = (method: string): void => {
 }
 
 const deleteResult = (item: PaperItem): void => {
+  // shallowRef does not track in-place mutations such as Array#splice, so
+  // we must replace the array reference for the UI to refresh.
   const idx = rawList.value.indexOf(item)
   if (idx >= 0) {
-    rawList.value.splice(idx, 1)
+    const next = rawList.value.slice()
+    next.splice(idx, 1)
+    rawList.value = next
   }
 }
 
@@ -144,11 +208,15 @@ watch(yearBounds, ([lo, hi]) => {
   }
 })
 
+// ``searchedList`` is declared earlier in this file (above ``yearBounds``)
+// because ``watch(yearBounds, ...)`` synchronously reads its source on
+// subscription and would otherwise hit the TDZ on ``searchedList``.
+
 const filteredList = computed<PaperItem[]>(() => {
   const kw = refine.keyword.trim().toLowerCase()
   const [lo, hi] = refine.yearRange
   const fieldSet = refine.fields.length > 0 ? new Set(refine.fields) : null
-  let list = rawList.value.filter(p => {
+  let list = searchedList.value.filter(p => {
     if (refine.hasAbstract && !p.abstract) return false
     if (refine.hasCode && (!p.code || p.code === '#')) return false
     const y = Number(p.year)
@@ -170,6 +238,9 @@ const filteredList = computed<PaperItem[]>(() => {
         .toLowerCase()
       if (!hay.includes(kw)) return false
     }
+    // Note: residual DSL evaluation has been hoisted into ``searchedList``
+    // so that "matched X / Y" reports the true hit count (Y) of the
+    // user-typed expression, not the backend's pre-narrowed candidate set.
     return true
   })
 
@@ -178,7 +249,7 @@ const filteredList = computed<PaperItem[]>(() => {
     case 'year-asc':
       list.sort((a, b) => Number(a.year) - Number(b.year))
       break
-    case 'conf':
+    case 'conf-asc':
       list.sort((a, b) => {
         const a1 = (a.conf || '').toUpperCase()
         const b1 = (b.conf || '').toUpperCase()
@@ -186,9 +257,24 @@ const filteredList = computed<PaperItem[]>(() => {
         return Number(b.year) - Number(a.year)
       })
       break
-    case 'title':
+    case 'conf-desc':
+      list.sort((a, b) => {
+        const a1 = (a.conf || '').toUpperCase()
+        const b1 = (b.conf || '').toUpperCase()
+        if (a1 !== b1) return a1 < b1 ? 1 : -1
+        return Number(b.year) - Number(a.year)
+      })
+      break
+    case 'title-asc':
       list.sort((a, b) =>
         (a.title || '').localeCompare(b.title || '', undefined, {
+          sensitivity: 'base'
+        })
+      )
+      break
+    case 'title-desc':
+      list.sort((a, b) =>
+        (b.title || '').localeCompare(a.title || '', undefined, {
           sensitivity: 'base'
         })
       )
@@ -231,7 +317,8 @@ watch(
     refine.yearRange[0],
     refine.yearRange[1],
     refine.fields.slice().sort().join('|'),
-    sortMethod.value
+    sortMethod.value,
+    props.ast
   ],
   () => {
     page.current = 1
@@ -257,9 +344,13 @@ interface FieldFacet {
 }
 
 const fieldOptions = computed<FieldFacet[]>(() => {
-  if (rawList.value.length === 0) return []
+  // Field facet counts must reflect the actual search hit set, not the
+  // backend's wider candidate set; otherwise the chip totals (e.g. "AI
+  // (471)") would mismatch the headline "matched X / Y" denominator.
+  const source = searchedList.value
+  if (source.length === 0) return []
   const counts = new Map<string, number>()
-  for (const p of rawList.value) {
+  for (const p of source) {
     const k = getFieldKeyForConf(p.conf) || OTHER_FIELD_KEY
     counts.set(k, (counts.get(k) ?? 0) + 1)
   }
@@ -297,7 +388,13 @@ const isRefineDirty = computed<boolean>(
 )
 
 defineExpose({
-  filterResult
+  filterResult,
+  setRefineKeyword: (kw: string) => {
+    refine.keyword = kw
+  },
+  clearRefineKeyword: () => {
+    refine.keyword = ''
+  }
 })
 </script>
 
@@ -310,27 +407,27 @@ defineExpose({
       shadow="never"
     >
       <div class="pv-refine-grid">
-        <div class="refine-cell refine-search">
-          <span class="cell-label">{{ t('result.filter.searchWithin') }}</span>
-          <el-input
-            v-model="refine.keyword"
-            :placeholder="t('result.filter.searchWithinPh')"
-            clearable
-            size="small"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </div>
-
         <div class="refine-cell">
           <span class="cell-label">{{ t('result.sortBy') }}</span>
           <el-select v-model="sortMethod" size="small" style="width: 100%">
-            <el-option :label="t('result.sort.year')" :value="'year-desc'" />
+            <el-option
+              :label="t('result.sort.yearDesc')"
+              :value="'year-desc'"
+            />
             <el-option :label="t('result.sort.yearAsc')" :value="'year-asc'" />
-            <el-option :label="t('result.sort.conf')" :value="'conf'" />
-            <el-option :label="t('result.sort.title')" :value="'title'" />
+            <el-option :label="t('result.sort.confAsc')" :value="'conf-asc'" />
+            <el-option
+              :label="t('result.sort.confDesc')"
+              :value="'conf-desc'"
+            />
+            <el-option
+              :label="t('result.sort.titleAsc')"
+              :value="'title-asc'"
+            />
+            <el-option
+              :label="t('result.sort.titleDesc')"
+              :value="'title-desc'"
+            />
           </el-select>
         </div>
 
@@ -380,7 +477,7 @@ defineExpose({
             @change="refine.fields = []"
           >
             {{ t('result.filter.fieldAll') }}
-            <span class="chip-count">({{ rawList.length }})</span>
+            <span class="chip-count">({{ searchedList.length }})</span>
           </el-check-tag>
           <el-check-tag
             v-for="f in fieldOptions"
@@ -410,7 +507,7 @@ defineExpose({
           {{
             t('result.filter.matched', {
               n: filteredList.length,
-              total: rawList.length
+              total: searchedList.length
             })
           }}
         </span>
@@ -451,16 +548,6 @@ defineExpose({
             </el-tag>
             <el-tag size="small" type="danger" effect="plain" class="tag-year">
               {{ itm.year }}
-            </el-tag>
-            <el-tag
-              v-if="itm.abstract"
-              size="small"
-              type="success"
-              effect="plain"
-              class="tag-flag"
-            >
-              <el-icon><Reading /></el-icon>
-              <span>{{ t('result.abstract') }}</span>
             </el-tag>
             <el-tag
               v-if="itm.code && itm.code !== '#'"
@@ -557,9 +644,12 @@ defineExpose({
       </li>
     </ul>
 
-    <el-empty v-show="rawList.length <= 0" :description="t('result.empty')" />
     <el-empty
-      v-show="rawList.length > 0 && filteredList.length <= 0"
+      v-show="searchedList.length <= 0"
+      :description="t('result.empty')"
+    />
+    <el-empty
+      v-show="searchedList.length > 0 && filteredList.length <= 0"
       :description="t('result.empty')"
     />
 
