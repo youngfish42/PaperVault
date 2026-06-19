@@ -1,170 +1,155 @@
-<!--
- * @Author: 0x3E5
- * @Date: 2023-02-11 13:48:18
- * @LastEditTime: 2023-02-24 17:38:08
- * @LastEditors: 0x3E5
- * @Description: 
- * @FilePath: \ai-paper-search-web\src\views\HomeView.vue
--->
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { onMounted, reactive, ref, shallowRef } from 'vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage, ElLoading } from 'element-plus'
 import AdvancedSettingDlg from '@/components/AdvancedSettingDlg.vue'
 import ConfsTree from '@/components/ConfsTree.vue'
 import SearchResultList from '@/components/SearchResultList.vue'
 import GuessYourLike from '@/components/GuessYourLike.vue'
-import { paperSearch, guessYourLike } from '@/api/paper.js'
-// First entry
-let firstEntry = ref(true)
-// Query content
-let searchContent = reactive({
+import {
+  listConfs,
+  searchPapers,
+  suggestKeywords,
+  type PaperItem
+} from '@/api/paper'
+
+const firstEntry = ref(true)
+const availableConfs = shallowRef<string[]>([])
+
+const searchContent = reactive({
   query: '',
-  searchtype: 'title',
+  searchtype: 'title' as 'title' | 'author',
   year: '',
   sp_year: '',
   sp_author: '',
-  confs: [
-    'AAAI',
-    'ACL',
-    'AISTATS',
-    'BMVC',
-    'CIKM',
-    'COLING',
-    'COLT',
-    'CVPR',
-    'ECCV',
-    'ECIR',
-    'EMNLP',
-    'FAST',
-    'ICASSP',
-    'ICCV',
-    'ICDM',
-    'ICLR',
-    'ICME',
-    'ICML',
-    'IJCAI',
-    'IJCV',
-    'INTERSPEECH',
-    'ISWC',
-    'JMLR',
-    'KDD',
-    'MICCAI',
-    'MLSYS',
-    'MM',
-    'NAACL',
-    'NIPS',
-    'RECSYS',
-    'SIGIR',
-    'SIGMOD',
-    'TASLP',
-    'TIP',
-    'TKDE',
-    'TNNLS',
-    'TOIS',
-    'TPAMI',
-    'VLDB',
-    'WACV',
-    'WSDM',
-    'WWW'
-  ]
+  confs: [] as string[]
 })
-// Search type list
+
 const SEARCH_TYPE_LIST = [
   { label: 'Title', value: 'title' },
   { label: 'Author', value: 'author' }
 ]
-// Query result
-let queryResult = reactive({
-  val: {}
-})
-// Advanced setting dialog
-const settingDlg = ref(null)
-// Search result component
-const searchResult = ref(null)
 
-// Handle Search
-let guessLoading = ref(false)
-let guessList = reactive({
-  val: []
-})
+const queryResult = shallowRef<Record<string, Record<string, PaperItem[]>>>({})
+
+const settingDlg = ref<InstanceType<typeof AdvancedSettingDlg> | null>(null)
+const searchResult = ref<InstanceType<typeof SearchResultList> | null>(null)
+
+const guessLoading = ref(false)
+const guessList = ref<string[]>([])
+
+const groupByConfYear = (items: PaperItem[]) => {
+  const out: Record<string, Record<string, PaperItem[]>> = {}
+  for (const it of items) {
+    const conf = it.conf || 'UNKNOWN'
+    const year = String(it.year || 'NA')
+    if (!out[conf]) out[conf] = {}
+    if (!out[conf][year]) out[conf][year] = []
+    out[conf][year].push(it)
+  }
+  return out
+}
+
+const buildQuery = () => {
+  const params: Record<string, unknown> = {
+    field: searchContent.searchtype,
+    sort: '-year',
+    page: 1,
+    size: 500
+  }
+  if (searchContent.query) params.q = searchContent.query
+  if (searchContent.sp_author) params.author = searchContent.sp_author
+  if (searchContent.sp_year) {
+    const y = Number(searchContent.sp_year)
+    if (!Number.isNaN(y)) {
+      params.since = y
+      params.until = y
+    }
+  } else if (searchContent.year) {
+    const y = Number(searchContent.year)
+    if (!Number.isNaN(y)) params.since = y
+  }
+  if (searchContent.confs.length > 0) {
+    params.conf = searchContent.confs.join(',')
+  }
+  return params
+}
+
 const search = (): void => {
   if (searchContent.query === '' && searchContent.sp_author === '') {
     ElMessage.warning('Please input your keywords for search.')
     return
   }
-  const loading = ElLoading.service({
-    lock: true,
-    text: 'Searching...'
-    // background: 'rgba(0, 0, 0, 0.7)',
-  })
-  queryResult.val = {}
-  guessList.val = []
-  paperSearch({
-    ...searchContent,
-    confs: searchContent.confs.join(',')
-  })
-    .then((res: any) => {
-      const { data, msg } = res
-      if (msg === 'success') {
-        queryResult.val = data
-        handleTreeClick({ level: 1 })
-      }
+  const loading = ElLoading.service({ lock: true, text: 'Searching...' })
+  queryResult.value = {}
+  guessList.value = []
+
+  searchPapers(buildQuery())
+    .then(res => {
+      queryResult.value = groupByConfYear(res.items || [])
+      handleTreeClick({ level: 1 })
     })
     .catch(err => {
-      console.log(err)
+      console.error(err)
     })
     .finally(() => {
       firstEntry.value = false
       loading && loading.close()
     })
-  guessLoading.value = true
-  guessYourLike({ query: searchContent.query })
-    .then((res: any) => {
-      const { data, msg } = res
-      if (msg === 'success' && data.keywords) {
-        guessList.val = data.keywords
-      }
-    })
-    .catch(err => {
-      console.log(err)
-    })
-    .finally(() => {
-      guessLoading.value = false
-    })
+
+  if (searchContent.query) {
+    guessLoading.value = true
+    suggestKeywords(searchContent.query)
+      .then(res => {
+        guessList.value = res.keywords || []
+      })
+      .catch(err => {
+        console.error(err)
+      })
+      .finally(() => {
+        guessLoading.value = false
+      })
+  }
 }
 
-// Handle search author
 const handleSearchAuthor = (data: string): void => {
   searchContent.query = ''
-  // searchContent.searchtype = 'author'
   searchContent.sp_author = data
   search()
 }
 
-// Handle search guess
 const handleSearchGuess = (data: string): void => {
   searchContent.query = data
   search()
 }
 
-// Handle tree click
-const handleTreeClick = (data: Object): void => {
+const handleTreeClick = (data: { level: number; key?: string; parent?: string }): void => {
   if (searchResult.value) {
-    ;(searchResult.value as any).filterResult(queryResult.val, data)
+    ;(searchResult.value as any).filterResult(queryResult.value, data)
   }
 }
 
-// Show advanced setting dialog
 const showSetting = (): void => {
   if (settingDlg.value) {
     ;(settingDlg.value as any).isVisible = true
   }
 }
 
-// Change dark mode
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+
+onMounted(async () => {
+  try {
+    const res = await listConfs()
+    const names = (res.items || []).map(c => c.name)
+    availableConfs.value = names
+    if (searchContent.confs.length === 0) {
+      searchContent.confs = [...names]
+    }
+  } catch (err) {
+    console.error('Failed to load confs', err)
+  }
+})
 </script>
 
 <template>
@@ -174,7 +159,7 @@ const toggleDark = useToggle(isDark)
       :class="['mb-15 pos-absolute', firstEntry ? 'first-entry' : 'normal']"
     >
       <el-col class="gutter-20" :xs="24" :sm="16" :md="14" :lg="10" :xl="8">
-        <h1 class="title mb-15"><a href="/">AI-Paper-Search</a></h1>
+        <h1 class="title mb-15"><a href="/">PaperVault</a></h1>
         <!-- Search Bar -->
         <el-input
           v-model="searchContent.query"
@@ -236,7 +221,7 @@ const toggleDark = useToggle(isDark)
     <el-row justify="center" v-show="!firstEntry">
       <el-col class="gutter-20" :xs="24" :sm="16" :md="5" :lg="4" :xl="3">
         <!-- Select tree -->
-        <ConfsTree :data="queryResult.val" @click="handleTreeClick" />
+        <ConfsTree :data="queryResult" @click="handleTreeClick" />
       </el-col>
       <el-col class="gutter-20" :xs="24" :sm="16" :md="14" :lg="10" :xl="8">
         <!-- Search result list -->
@@ -248,14 +233,18 @@ const toggleDark = useToggle(isDark)
       <el-col class="gutter-20" :xs="24" :sm="16" :md="5" :lg="4" :xl="3">
         <GuessYourLike
           :loading="guessLoading"
-          :result="guessList.val"
+          :result="guessList"
           @search-guess="handleSearchGuess"
         />
       </el-col>
     </el-row>
 
     <!-- Advanced setting dialog -->
-    <AdvancedSettingDlg ref="settingDlg" v-model:data="searchContent" />
+    <AdvancedSettingDlg
+      ref="settingDlg"
+      v-model:data="searchContent"
+      :confs="availableConfs"
+    />
     <!-- Back to top -->
     <el-backtop :right="50" :bottom="50" />
     <!-- Copy right -->

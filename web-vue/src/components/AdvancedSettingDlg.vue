@@ -7,12 +7,7 @@
  * @FilePath: \ai-paper-search-web\src\components\AdvancedSettingDlg.vue
 -->
 <script lang="ts" setup>
-import { ref, watch, reactive } from 'vue'
-
-const props = defineProps(['data'])
-const emits = defineEmits<{
-  (e: 'update:data', value: object): void
-}>()
+import { computed, reactive, ref, watch } from 'vue'
 
 type FORMDATA = {
   query: string
@@ -23,6 +18,14 @@ type FORMDATA = {
   confs: string[]
 }
 
+const props = defineProps<{
+  data: FORMDATA
+  confs?: string[]
+}>()
+const emits = defineEmits<{
+  (e: 'update:data', value: FORMDATA): void
+}>()
+
 const isVisible = ref(false)
 const CURRENT_YEAR = new Date().getFullYear()
 const SPECIFIC_YEAR_LIST = [
@@ -31,51 +34,10 @@ const SPECIFIC_YEAR_LIST = [
   { label: `Since ${CURRENT_YEAR - 5}`, value: `${String(CURRENT_YEAR - 5)}` },
   { label: 'All', value: '' }
 ]
-const CONFS_LIST = [
-  'AAAI',
-  'ACL',
-  'AISTATS',
-  'BMVC',
-  'CIKM',
-  'COLING',
-  'COLT',
-  'CVPR',
-  'ECCV',
-  'ECIR',
-  'EMNLP',
-  'FAST',
-  'ICASSP',
-  'ICCV',
-  'ICDM',
-  'ICLR',
-  'ICME',
-  'ICML',
-  'IJCAI',
-  'IJCV',
-  'INTERSPEECH',
-  'ISWC',
-  'JMLR',
-  'KDD',
-  'MICCAI',
-  'MLSYS',
-  'MM',
-  'NAACL',
-  'NIPS',
-  'RECSYS',
-  'SIGIR',
-  'SIGMOD',
-  'TASLP',
-  'TIP',
-  'TKDE',
-  'TNNLS',
-  'TOIS',
-  'TPAMI',
-  'VLDB',
-  'WACV',
-  'WSDM',
-  'WWW'
-]
-let formData: FORMDATA = reactive({
+
+const confsList = computed(() => props.confs ?? [])
+
+const formData: FORMDATA = reactive({
   query: '',
   searchtype: '',
   year: '',
@@ -87,7 +49,9 @@ let formData: FORMDATA = reactive({
 watch(
   () => props.data,
   v => {
-    formData = v
+    if (v) {
+      Object.assign(formData, v)
+    }
   },
   {
     deep: true,
@@ -96,11 +60,12 @@ watch(
 )
 
 const checkMethod: (method: string) => void = method => {
+  const all = confsList.value
   if (method === 'all') {
-    formData.confs = CONFS_LIST
+    formData.confs = [...all]
   } else if (method === 'invert') {
     const SELECTED = new Set(formData.confs)
-    formData.confs = CONFS_LIST.filter(v => !SELECTED.has(v))
+    formData.confs = all.filter(v => !SELECTED.has(v))
   }
 }
 
@@ -108,11 +73,11 @@ const resetForm = (): void => {
   formData.year = ''
   formData.sp_year = ''
   formData.sp_author = ''
-  formData.confs = CONFS_LIST
+  formData.confs = [...confsList.value]
 }
 
 const confirmForm = (): void => {
-  emits('update:data', formData)
+  emits('update:data', { ...formData })
   isVisible.value = false
 }
 
@@ -174,10 +139,10 @@ defineExpose({
               :md="8"
               :lg="8"
               :xl="6"
-              v-for="(itm, index) in CONFS_LIST"
+              v-for="(itm, index) in confsList"
               :key="index"
             >
-              <el-checkbox :label="itm">
+              <el-checkbox :value="itm" :label="itm">
                 {{ itm }}
               </el-checkbox>
             </el-col>
@@ -221,7 +186,7 @@ defineExpose({
   }
 }
 </style>
-<style scioed>
+<style scoped>
 .checkbox-advancedSetting {
   width: 50%;
   margin-right: 0%;

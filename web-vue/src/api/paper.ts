@@ -1,25 +1,80 @@
-/*
- * @Author: 0x3E5
- * @Date: 2023-02-12 16:16:30
- * @LastEditTime: 2023-02-12 16:27:43
- * @LastEditors: 0x3E5
- * @Description:
- * @FilePath: \web\src\api\paper.ts
- */
 import request from '@/utils/axios'
 
-// paper search
-export const paperSearch = (params: Object) =>
-  request({
-    url: '/search',
-    method: 'get',
-    params
-  })
+export interface PaperItem {
+  id: string
+  conf: string
+  year: string
+  title: string
+  url?: string | null
+  authors: string[]
+  abstract?: string | null
+  code?: string | null
+}
 
-// guess your like
-export const guessYourLike = (params: Object) =>
-  request({
-    url: '/get_guess_you_like',
+export interface PageMeta {
+  page: number
+  size: number
+  total: number
+}
+
+export interface PaperSearchQuery {
+  q?: string
+  field?: 'title' | 'author' | 'any'
+  conf?: string[]
+  since?: number
+  until?: number
+  author?: string
+  sort?: string
+  page?: number
+  size?: number
+}
+
+export interface PaperSearchResponse {
+  items: PaperItem[]
+  meta: PageMeta
+}
+
+export interface ConfYear {
+  year: string
+  count: number
+}
+
+export interface ConfItem {
+  name: string
+  total: number
+  years: ConfYear[]
+}
+
+export interface ConfListResponse {
+  items: ConfItem[]
+  total: number
+}
+
+export interface SuggestResponse {
+  keywords: string[]
+  timecost_ms: number
+  model: string
+}
+
+export const searchPapers = (params: PaperSearchQuery) =>
+  request<PaperSearchResponse>({
+    url: '/v1/papers',
     method: 'get',
-    params
-  })
+    params,
+    paramsSerializer: {
+      indexes: null
+    }
+  }) as unknown as Promise<PaperSearchResponse>
+
+export const listConfs = () =>
+  request<ConfListResponse>({
+    url: '/v1/confs',
+    method: 'get'
+  }) as unknown as Promise<ConfListResponse>
+
+export const suggestKeywords = (query: string) =>
+  request<SuggestResponse>({
+    url: '/v1/suggest',
+    method: 'post',
+    data: { query }
+  }) as unknown as Promise<SuggestResponse>
