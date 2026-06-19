@@ -9,8 +9,11 @@ on:
       - "web-vue/**"
       - "app.py"
       - "data_artifacts.py"
+      - "collector.py"
       - "requirements.txt"
       - "pytest.ini"
+      - "web-vue/package.json"
+      - "web-vue/package-lock.json"
       - ".github/workflows/ci.yml"
   pull_request:
     branches: [main, master]
@@ -20,8 +23,11 @@ on:
       - "web-vue/**"
       - "app.py"
       - "data_artifacts.py"
+      - "collector.py"
       - "requirements.txt"
       - "pytest.ini"
+      - "web-vue/package.json"
+      - "web-vue/package-lock.json"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
 
