@@ -48,19 +48,23 @@ def _envelope(code: str, message: str, details: Any = None) -> dict:
     return body
 
 
+def _handle_api_error(err: ApiError):
+    return jsonify(_envelope(err.code, err.message, err.details)), err.status_code
+
+
+def _handle_http_exception(err: HTTPException):
+    return (
+        jsonify(_envelope(err.name.upper().replace(" ", "_"), err.description or err.name)),
+        err.code or 500,
+    )
+
+
+def _handle_unexpected(err: Exception):
+    logger.exception("Unhandled exception: %s", err)
+    return jsonify(_envelope("INTERNAL_ERROR", "Internal server error")), 500
+
+
 def register_error_handlers(app: Flask) -> None:
-    @app.errorhandler(ApiError)
-    def _handle_api_error(err: ApiError):
-        return jsonify(_envelope(err.code, err.message, err.details)), err.status_code
-
-    @app.errorhandler(HTTPException)
-    def _handle_http_exception(err: HTTPException):
-        return (
-            jsonify(_envelope(err.name.upper().replace(" ", "_"), err.description or err.name)),
-            err.code or 500,
-        )
-
-    @app.errorhandler(Exception)
-    def _handle_unexpected(err: Exception):
-        logger.exception("Unhandled exception: %s", err)
-        return jsonify(_envelope("INTERNAL_ERROR", "Internal server error")), 500
+    app.register_error_handler(ApiError, _handle_api_error)
+    app.register_error_handler(HTTPException, _handle_http_exception)
+    app.register_error_handler(Exception, _handle_unexpected)
