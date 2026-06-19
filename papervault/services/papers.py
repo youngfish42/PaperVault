@@ -145,8 +145,10 @@ def _author_matches(authors: Iterable[str], needle: str) -> bool:
 
 
 def _title_matches(paper: Paper, query: str) -> bool:
-    if not query or query == "#":
-        return True
+    # ``query`` is assumed to be normalised and non-empty by the caller
+    # (``search_papers`` filters out the empty/sentinel ``"#"`` token before
+    # invoking us). Keeping the function focused on the actual match avoids a
+    # second, dead "is this the # sentinel?" branch.
     return query in paper.title_format
 
 
@@ -172,10 +174,15 @@ def search_papers(repo: PaperRepository, criteria: SearchCriteria) -> Tuple[List
     confs_filter = {c.upper() for c in criteria.confs} if criteria.confs else None
     author_needle = _normalize(criteria.author) if criteria.author else ""
     query_value = _normalize(criteria.query) if criteria.query else ""
+    # ``#`` is the legacy "match-all" sentinel inherited from the original UI.
+    # We collapse it to an empty query exactly once here, so every downstream
+    # branch (and ``_title_matches``) only ever sees real search tokens.
+    if query_value == "#":
+        query_value = ""
 
-    use_title = criteria.field in ("title", "any") and query_value not in ("", "#")
-    use_author_field = criteria.field == "author" and query_value not in ("", "#")
-    use_any_author = criteria.field == "any" and query_value not in ("", "#")
+    use_title = criteria.field in ("title", "any") and query_value != ""
+    use_author_field = criteria.field == "author" and query_value != ""
+    use_any_author = criteria.field == "any" and query_value != ""
 
     matched: List[Paper] = []
     for paper in repo.all_papers():
@@ -192,7 +199,7 @@ def search_papers(repo: PaperRepository, criteria: SearchCriteria) -> Tuple[List
         if author_needle and not _author_matches(paper.authors, author_needle):
             continue
 
-        if query_value and query_value != "#":
+        if query_value:
             ok = False
             if use_title and _title_matches(paper, query_value):
                 ok = True

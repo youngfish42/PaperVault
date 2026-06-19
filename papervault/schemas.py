@@ -46,7 +46,11 @@ class PaperSearchParams(BaseModel):
     author: Optional[str] = None
     sort: str = Field(default="-year", pattern="^-?(year|conf|title)$")
     page: int = Field(default=1, ge=1)
-    size: int = Field(default=50, ge=1, le=500)
+    # NOTE: the *authoritative* upper bound on ``size`` is
+    # ``settings.max_page_size`` (validated at the API layer). We keep a wide
+    # pydantic lower-bound check (``ge=1``) without any hard upper bound so
+    # there is exactly one place to update the limit.
+    size: int = Field(default=50, ge=1)
 
     @field_validator("conf", mode="before")
     @classmethod
