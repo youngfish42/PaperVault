@@ -9,32 +9,33 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import FILE from '@/utils/file'
+import type { PaperItem } from '@/api/paper'
 
 const emits = defineEmits<{
   (e: 'searchAuthor', val: string): void
 }>()
 
-let resultList: any = reactive({
-  val: []
-})
+const resultList = ref<PaperItem[]>([])
 
 let sortMethod = ref('Year')
 
 const exportFile = (method: string): void => {
   if (method === 'csv') {
-    FILE.exportCSV(resultList.val, 'result.csv')
+    FILE.exportCSV(resultList.value, 'result.csv')
   } else if (method === 'txt') {
-    FILE.exportTxt(resultList.val, 'result.txt')
+    FILE.exportTxt(resultList.value, 'result.txt')
   }
 }
 
-const deleteResult = (index: number): void => {
-  const absoluteIndex = (page.current - 1) * page.size + index
-  resultList.val.splice(absoluteIndex, 1)
+const deleteResult = (item: PaperItem): void => {
+  const idx = resultList.value.indexOf(item)
+  if (idx >= 0) {
+    resultList.value.splice(idx, 1)
+  }
 }
 
-const jumpUrl = (url: string) => {
-  url && window.open(url)
+const jumpUrl = (url?: string | null) => {
+  if (url) window.open(url)
 }
 
 const searchAuthor = (author: string): void => {
@@ -42,45 +43,44 @@ const searchAuthor = (author: string): void => {
 }
 
 const filterResult: (target: any, option: any) => void = (target, option) => {
-  resultList.val = []
+  let next: PaperItem[] = []
   const { level, key, parent } = option
   if (Number(level) === 1) {
-    getAllResult(target)
+    next = collectAll(target)
   } else if (Number(level) === 2) {
-    for (let k in target[key]) {
-      resultList.val = resultList.val.concat(target[key][k])
-    }
+    const group = target?.[key] ?? {}
+    for (const k in group) next = next.concat(group[k])
   } else if (Number(level) === 3) {
-    resultList.val = resultList.val.concat(target[parent][key])
+    next = next.concat(target?.[parent]?.[key] ?? [])
   }
+  resultList.value = next
   changeSortMethod(sortMethod.value)
 }
 
-const getAllResult = (target: any): void => {
-  if (Array.isArray(target)) {
-    resultList.val = resultList.val.concat(target as never)
-  } else {
-    for (let k in target) {
-      getAllResult(target[k])
+const collectAll = (target: any): PaperItem[] => {
+  const out: PaperItem[] = []
+  const walk = (node: any) => {
+    if (Array.isArray(node)) {
+      out.push(...node)
+    } else if (node && typeof node === 'object') {
+      for (const k in node) walk(node[k])
     }
   }
+  walk(target)
+  return out
 }
 
 const changeSortMethod = (method: any): void => {
   if (method === 'Year') {
-    resultList.val = resultList.val.sort(
-      (a: any, b: any) => Number(b.year) - Number(a.year)
-    )
+    resultList.value = resultList.value
+      .slice()
+      .sort((a, b) => Number(b.year) - Number(a.year))
   } else if (method === 'Conf') {
-    resultList.val = resultList.val.sort((a: any, b: any) => {
-      let a1 = a.conf.toUpperCase()
-      let b1 = b.conf.toUpperCase()
-      if (a1 < b1) {
-        return -1
-      }
-      if (a1 > b1) {
-        return 1
-      }
+    resultList.value = resultList.value.slice().sort((a, b) => {
+      const a1 = (a.conf || '').toUpperCase()
+      const b1 = (b.conf || '').toUpperCase()
+      if (a1 < b1) return -1
+      if (a1 > b1) return 1
       return 0
     })
   }
@@ -106,7 +106,7 @@ const pageSizeChange = (v: number): void => {
 }
 
 const virtualList = computed(() => {
-  return resultList.val.slice(
+  return resultList.value.slice(
     (page.current - 1) * page.size,
     page.current * page.size
   )
@@ -119,7 +119,7 @@ defineExpose({
 
 <template>
   <el-card class="search-result-card mb-15" shadow="never">
-    <el-row v-show="resultList.val.length > 0">
+    <el-row v-show="resultList.length > 0">
       <el-col class="align-right" :span="24">
         <el-space wrap>
           <el-link @click="exportFile('txt')">
@@ -131,15 +131,12 @@ defineExpose({
         </el-space>
       </el-col>
     </el-row>
-    <el-divider v-show="resultList.val.length > 0" />
-    <el-row
-      class="mb-10 flex flex-align-center"
-      v-show="resultList.val.length > 0"
-    >
+    <el-divider v-show="resultList.length > 0" />
+    <el-row class="mb-10 flex flex-align-center" v-show="resultList.length > 0">
       <span style="padding-right: 10px">Sort By:</span>
       <el-radio-group v-model="sortMethod" @change="changeSortMethod">
-        <el-radio label="Year" />
-        <el-radio label="Conf" />
+        <el-radio :value="'Year'" label="Year" />
+        <el-radio :value="'Conf'" label="Conf" />
       </el-radio-group>
     </el-row>
     <el-space class="w-100" wrap fill direction="vertical">
@@ -152,7 +149,7 @@ defineExpose({
         <!-- Delete button -->
         <el-icon
           class="pos-absoulte delete pointer no-select"
-          @click="deleteResult(Number(index))"
+          @click="deleteResult(itm)"
           ><CloseBold
         /></el-icon>
         <el-row class="mb-5">
@@ -160,7 +157,7 @@ defineExpose({
             <!-- Title -->
             <el-link
               class="title"
-              :href="itm.url"
+              :href="itm.url ?? undefined"
               :underline="false"
               target="_blank"
               >{{ itm.title }}</el-link
@@ -217,17 +214,17 @@ defineExpose({
       </el-card>
     </el-space>
     <el-empty
-      v-show="resultList.val.length <= 0"
+      v-show="resultList.length <= 0"
       description="No Search Result"
     ></el-empty>
-    <div class="mt-15" v-show="resultList.val.length > 0">
+    <div class="mt-15" v-show="resultList.length > 0">
       <el-pagination
         class="align-right"
         v-model:current-page="page.current"
         v-model:page-size="page.size"
         :page-sizes="[10, 20, 30, 50, 100, 150, 200, 300]"
         layout="sizes, prev, pager, next"
-        :total="resultList.val.length"
+        :total="resultList.length"
         @size-change="pageSizeChange"
         @current-change="pageCurrentChange"
       />

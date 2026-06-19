@@ -1,12 +1,4 @@
-/*
- * @Author: 0x3E5
- * @Date: 2023-02-11 15:11:13
- * @LastEditTime: 2023-02-15 22:21:32
- * @LastEditors: 0x3E5
- * @Description:
- * @FilePath: \web\src\utils\axios.ts
- */
-import axios from 'axios'
+import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { ERROR_CODE_TYPE } from '@/types/error-code-type'
 import { ElMessage } from 'element-plus'
 
@@ -15,47 +7,66 @@ const service = axios.create({
   timeout: 60000
 })
 
-// 请求拦截
 service.interceptors.request.use(
-  config => {
-    // TODO 在此处对发起的请求进行定制化操作
-    return config
-  },
+  config => config,
   err => {
-    console.log(err)
+    console.error(err)
     return Promise.reject(err)
   }
 )
 
-// 响应拦截
 service.interceptors.response.use(
-  res => {
-    const CODE = res.data['code'] || 200
-    if (CODE === 200) {
-      return Promise.resolve(res.data)
-    } else {
-      const MSG =
-        ERROR_CODE_TYPE(CODE) || res.data['msg'] || ERROR_CODE_TYPE('default')
-      ElMessage.error(MSG)
-      return Promise.reject(res.data)
+  // The interceptor narrows the resolved value to ``res.data`` so callers
+  // receive the raw payload. The ``as unknown as AxiosResponse`` cast keeps
+  // axios' runtime contract while our module augmentation above corrects the
+  // public-facing type.
+  (res: AxiosResponse) => {
+    const body = res.data
+    if (
+      body &&
+      typeof body === 'object' &&
+      'msg' in body &&
+      body.msg !== 'success'
+    ) {
+      const message =
+        (body as any)?.data?.message ||
+        (body as any).msg ||
+        ERROR_CODE_TYPE('default')
+      ElMessage.error(message)
+      return Promise.reject(body)
     }
+    if (body && typeof body === 'object' && 'error' in body) {
+      const error = (body as any).error
+      const message =
+        error?.message || error?.code || ERROR_CODE_TYPE('default')
+      ElMessage.error(message)
+      return Promise.reject(body)
+    }
+    return body as unknown as AxiosResponse
   },
   err => {
-    console.log(err)
+    console.error(err)
     let { message } = err
-    if (message == 'Network Error') {
+    if (message === 'Network Error') {
       message = '后端接口连接异常'
-    } else if (message.includes('timeout')) {
+    } else if (message?.includes('timeout')) {
       message = '系统接口请求超时'
-    } else if (message.includes('Request failed with status code')) {
-      message = `系统接口${message.substr(message.length - 3)}异常`
+    } else if (message?.includes('Request failed with status code')) {
+      const code = message.substr(message.length - 3)
+      message = ERROR_CODE_TYPE(code)
     }
-    ElMessage.error({
-      message: message,
-      duration: 5 * 1000
-    })
+    ElMessage.error({ message, duration: 5 * 1000 })
     return Promise.reject(err)
   }
 )
 
-export default service
+// Typed wrapper: the response interceptor already unwraps ``res.data`` and
+// returns the raw payload, so callers should see ``Promise<T>`` instead of
+// axios' default ``Promise<AxiosResponse<T>>``. We expose a thin generic
+// helper rather than augmenting axios' module declarations - this avoids
+// having to mirror axios' overloaded call signatures and keeps the
+// public-facing type strictly aligned with the runtime contract.
+const request = <T = unknown>(config: AxiosRequestConfig): Promise<T> =>
+  service.request(config) as unknown as Promise<T>
+
+export default request

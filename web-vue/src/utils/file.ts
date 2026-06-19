@@ -1,58 +1,63 @@
-/*
- * @Author: 0x3E5
- * @Date: 2023-02-13 22:14:30
- * @LastEditTime: 2023-02-14 21:30:02
- * @LastEditors: 0x3E5
- * @Description:
- * @FilePath: \web\src\utils\file.ts
- */
-export default {
-  exportCSV: (jsonData: any, fileName: string = 'exportCSV.csv') => {
-    if (!jsonData || jsonData.length == 0) {
-      return
-    }
-    const header = [
-      'title',
-      'url',
-      'authors',
-      'abstract',
-      'code',
-      'conf',
-      'year'
-    ]
-    let csvText = ''
-    csvText = `${header.join(',')}\n`
+type PaperLike = {
+  title?: string | null
+  url?: string | null
+  authors?: string[] | string | null
+  abstract?: string | null
+  code?: string | null
+  conf?: string | null
+  year?: string | number | null
+}
 
-    jsonData.forEach((v: any) => {
-      let row = ''
-      header.map(key => {
-        if (v[key] instanceof Array) {
-          row += `"${v[key].join(',')}\t",`
-        } else {
-          row += `"${String(v[key]).replaceAll('"', '""')}\t",`
-        }
-      })
-      row = row.substring(0, row.length - 1) + '\n'
-      csvText += row
-    })
-    const uri =
-      'data:text/csv;charset=utf-8,\ufeff' + encodeURIComponent(csvText)
-    const link = document.createElement('a')
-    link.href = uri
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+const CSV_HEADER = [
+  'title',
+  'url',
+  'authors',
+  'abstract',
+  'code',
+  'conf',
+  'year'
+] as const
+
+function escapeCsvCell(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `"${value.join(',').replace(/"/g, '""')}"`
+  }
+  const str = value == null ? '' : String(value)
+  return `"${str.replace(/"/g, '""')}"`
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export default {
+  exportCSV(jsonData: PaperLike[], fileName = 'exportCSV.csv'): void {
+    if (!jsonData || jsonData.length === 0) return
+    const lines: string[] = [CSV_HEADER.join(',')]
+    for (const row of jsonData) {
+      lines.push(
+        CSV_HEADER.map(key => escapeCsvCell((row as any)[key])).join(',')
+      )
+    }
+    const text = '\ufeff' + lines.join('\n')
+    downloadBlob(new Blob([text], { type: 'text/csv;charset=utf-8' }), fileName)
   },
-  exportTxt(jsonData: any, fileName: string = 'exportTXT.txt') {
-    let text = ''
-    jsonData.forEach((v: any) => {
-      text += `[${v.conf + v.year}]\t${v.title}\r\n`
-    })
-    const uri = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text)
-    const link = document.createElement('a')
-    link.setAttribute('href', uri)
-    link.setAttribute('download', fileName)
-    link.click()
+
+  exportTxt(jsonData: PaperLike[], fileName = 'exportTXT.txt'): void {
+    if (!jsonData || jsonData.length === 0) return
+    const text = jsonData
+      .map(v => `[${(v.conf ?? '') + (v.year ?? '')}]\t${v.title ?? ''}`)
+      .join('\r\n')
+    downloadBlob(
+      new Blob([text], { type: 'text/plain;charset=utf-8' }),
+      fileName
+    )
   }
 }
