@@ -7,14 +7,26 @@
  * @FilePath: \web-vue\src\components\ConfsTree.vue
 -->
 <script setup lang="ts">
-import { ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useI18n } from '@/utils/i18n'
 
 const { t, lang } = useI18n()
 
-const props = defineProps<{
-  data: Record<string, Record<string, unknown[]>> | unknown
-}>()
+interface TreeMeta {
+  total: number
+  fetched: number
+  truncated: boolean
+}
+
+const props = withDefaults(
+  defineProps<{
+    data: Record<string, Record<string, unknown[]>> | unknown
+    meta?: TreeMeta
+  }>(),
+  {
+    meta: () => ({ total: 0, fetched: 0, truncated: false })
+  }
+)
 const emits = defineEmits<{
   (e: 'click', val: { level: number; key?: string; parent?: string }): void
 }>()
@@ -24,7 +36,7 @@ interface Tree {
   children?: Tree[]
 }
 
-const total = ref(0)
+const fetchedCount = ref(0)
 const tree = shallowRef<Tree[]>([
   { label: `${t('tree.all')} (0)`, children: [] }
 ])
@@ -34,10 +46,19 @@ const defaultProps = {
   label: 'label'
 }
 
+const rootLabel = computed(() => {
+  // Prefer the authoritative server-side total when available so the sidebar
+  // does not under-count after the result list is truncated client-side.
+  const n = props.meta?.total ?? fetchedCount.value
+  const suffix = props.meta?.truncated
+    ? ` ${t('tree.truncatedMark').replace('{n}', String(fetchedCount.value))}`
+    : ''
+  return `${t('tree.all')} (${n})${suffix}`
+})
+
 const formatData = (treeData: any, target: Tree): number => {
   if (Array.isArray(treeData)) {
-    total.value += treeData.length
-    tree.value[0].label = `${t('tree.all')} (${total.value})`
+    fetchedCount.value += treeData.length
     target.label = `${target.label} (${treeData.length})`
     return treeData.length
   }
@@ -54,9 +75,10 @@ const formatData = (treeData: any, target: Tree): number => {
 }
 
 const rebuild = (v: unknown): void => {
-  total.value = 0
-  const root: Tree = { label: `${t('tree.all')} (0)`, children: [] }
+  fetchedCount.value = 0
+  const root: Tree = { label: rootLabel.value, children: [] }
   formatData(v, root)
+  root.label = rootLabel.value
   tree.value = [root]
 }
 
@@ -81,6 +103,11 @@ watch(
   }
 )
 
+watch(
+  () => props.meta,
+  () => rebuild(props.data),
+  { deep: true }
+)
 watch(lang, () => rebuild(props.data))
 </script>
 <template>
@@ -95,6 +122,9 @@ watch(lang, () => rebuild(props.data))
         @node-click="treeNodeClick"
       />
     </el-scrollbar>
+    <div v-if="props.meta?.truncated" class="tree-truncated-hint">
+      {{ t('tree.truncatedHint').replace('{n}', String(fetchedCount)) }}
+    </div>
   </el-card>
 </template>
 
@@ -104,5 +134,14 @@ watch(lang, () => rebuild(props.data))
 }
 .tree-card :deep(.el-tree-node__label) {
   font-size: 13px;
+}
+.tree-truncated-hint {
+  margin-top: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--el-color-warning, #e6a23c);
+  background: var(--el-color-warning-light-9, #fdf6ec);
+  border-radius: 4px;
 }
 </style>
