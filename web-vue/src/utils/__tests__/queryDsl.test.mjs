@@ -237,8 +237,14 @@ test('evaluateDsl: NEAR/x respects word distance', () => {
 })
 
 test('evaluateDsl: NOT excludes matching papers', () => {
-  assert.equal(evaluateDsl(samplePaper, parseDsl('federated NOT privacy')), false)
-  assert.equal(evaluateDsl(samplePaper, parseDsl('federated NOT survey')), true)
+  assert.equal(
+    evaluateDsl(samplePaper, parseDsl('federated NOT privacy')),
+    false
+  )
+  assert.equal(
+    evaluateDsl(samplePaper, parseDsl('federated NOT survey')),
+    true
+  )
 })
 
 test('evaluateDsl: empty AST is permissive (matches everything)', () => {
