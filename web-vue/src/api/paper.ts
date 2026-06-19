@@ -80,5 +80,6 @@ export const suggestKeywords = (query: string) =>
   request<SuggestResponse>({
     url: '/v1/suggest',
     method: 'post',
-    data: { query }
+    data: { query },
+    silent: true
   })

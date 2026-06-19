@@ -2,6 +2,15 @@ import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { ERROR_CODE_TYPE } from '@/types/error-code-type'
 import { ElMessage } from 'element-plus'
 
+export interface AppAxiosRequestConfig extends AxiosRequestConfig {
+  /**
+   * When ``true`` the response interceptor will suppress the global
+   * ``ElMessage.error`` toast for this request. Callers should handle the
+   * rejection locally (e.g. surface the failure inside a specific widget).
+   */
+  silent?: boolean
+}
+
 const service = axios.create({
   baseURL: '/api',
   timeout: 60000
@@ -14,6 +23,9 @@ service.interceptors.request.use(
     return Promise.reject(err)
   }
 )
+
+const isSilent = (config: AxiosRequestConfig | undefined): boolean =>
+  Boolean((config as AppAxiosRequestConfig | undefined)?.silent)
 
 service.interceptors.response.use(
   // The interceptor narrows the resolved value to ``res.data`` so callers
@@ -32,14 +44,14 @@ service.interceptors.response.use(
         (body as any)?.data?.message ||
         (body as any).msg ||
         ERROR_CODE_TYPE('default')
-      ElMessage.error(message)
+      if (!isSilent(res.config)) ElMessage.error(message)
       return Promise.reject(body)
     }
     if (body && typeof body === 'object' && 'error' in body) {
       const error = (body as any).error
       const message =
         error?.message || error?.code || ERROR_CODE_TYPE('default')
-      ElMessage.error(message)
+      if (!isSilent(res.config)) ElMessage.error(message)
       return Promise.reject(body)
     }
     return body as unknown as AxiosResponse
@@ -55,7 +67,9 @@ service.interceptors.response.use(
       const code = message.substr(message.length - 3)
       message = ERROR_CODE_TYPE(code)
     }
-    ElMessage.error({ message, duration: 5 * 1000 })
+    if (!isSilent(err?.config)) {
+      ElMessage.error({ message, duration: 5 * 1000 })
+    }
     return Promise.reject(err)
   }
 )
@@ -66,7 +80,7 @@ service.interceptors.response.use(
 // helper rather than augmenting axios' module declarations - this avoids
 // having to mirror axios' overloaded call signatures and keeps the
 // public-facing type strictly aligned with the runtime contract.
-const request = <T = unknown>(config: AxiosRequestConfig): Promise<T> =>
+const request = <T = unknown>(config: AppAxiosRequestConfig): Promise<T> =>
   service.request(config) as unknown as Promise<T>
 
 export default request

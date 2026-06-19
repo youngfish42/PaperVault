@@ -72,6 +72,18 @@ class Settings:
         default_factory=lambda: _env_int("PAPERVAULT_OPENAI_MAX_KEYWORDS", 10)
     )
 
+    suggest_provider: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_SUGGEST_PROVIDER", "deepseek").lower()
+    )
+    deepseek_model: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_DEEPSEEK_MODEL", "deepseek-chat")
+    )
+    deepseek_base_url: str = field(
+        default_factory=lambda: _env_str(
+            "PAPERVAULT_DEEPSEEK_BASE_URL", "https://api.deepseek.com"
+        )
+    )
+
     cors_origins: str = field(
         default_factory=lambda: _env_str("PAPERVAULT_CORS_ORIGINS", "")
     )

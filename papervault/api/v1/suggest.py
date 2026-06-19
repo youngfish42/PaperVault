@@ -27,9 +27,15 @@ def post_suggest():
         )
 
     settings = current_app.extensions["settings"]
+    provider = (getattr(settings, "suggest_provider", "") or "").lower()
+    if provider == "openai":
+        default_model = settings.openai_model
+    else:
+        default_model = getattr(settings, "deepseek_model", None) or settings.openai_model
+
     result = suggest_keywords(
         req.query,
-        model=req.model or settings.openai_model,
+        model=req.model or default_model,
         temperature=settings.openai_temperature,
         max_keywords=req.max_keywords or settings.openai_max_keywords,
     )
