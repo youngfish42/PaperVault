@@ -198,9 +198,20 @@ const search = (): void => {
       loading && loading.close()
     })
 
-  if (searchContent.query) {
+  // Strip DSL syntax (field tags, quotes, year ranges, operators…) before
+  // asking the LLM for related keywords. ``baseParams.q`` is exactly the
+  // free-text topic the splitter already hoisted out of the user expression
+  // (see ``buildBaseQuery`` above); falling back to the raw query mirrors
+  // the same fallback we use for the backend ``q`` parameter so the
+  // suggestion is always grounded in real topic words rather than syntax
+  // noise like ``AU="..."`` or ``PY=2023-2026``.
+  const suggestSeed =
+    typeof baseParams.q === 'string' && baseParams.q.trim()
+      ? baseParams.q.trim()
+      : ''
+  if (suggestSeed) {
     guessLoading.value = true
-    suggestKeywords(searchContent.query)
+    suggestKeywords(suggestSeed)
       .then(res => {
         guessList.value = res.keywords || []
       })
