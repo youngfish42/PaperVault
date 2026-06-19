@@ -1,15 +1,10 @@
-<!--
- * @Author: 0x3E5
- * @Date: 2023-02-13 13:47:11
- * @LastEditTime: 2023-02-26 13:20:28
- * @LastEditors: 0x3E5
- * @Description: 
- * @FilePath: \web\src\components\SearchResultList.vue
--->
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import FILE from '@/utils/file'
 import type { PaperItem } from '@/api/paper'
+import { useI18n } from '@/utils/i18n'
+
+const { t } = useI18n()
 
 const emits = defineEmits<{
   (e: 'searchAuthor', val: string): void
@@ -17,7 +12,7 @@ const emits = defineEmits<{
 
 const resultList = ref<PaperItem[]>([])
 
-let sortMethod = ref('Year')
+const sortMethod = ref<'Year' | 'Conf'>('Year')
 
 const exportFile = (method: string): void => {
   if (method === 'csv') {
@@ -86,14 +81,13 @@ const changeSortMethod = (method: any): void => {
   }
 }
 
-// Handler pagination
 type PAGE = {
   current: number
   size: number
 }
 const page: PAGE = reactive({
   current: 1,
-  size: 200
+  size: 50
 })
 
 const pageCurrentChange = (v: number): void => {
@@ -112,118 +106,138 @@ const virtualList = computed(() => {
   )
 })
 
+const formatAuthors = (authors?: string[] | null): string => {
+  if (!authors || authors.length === 0) return ''
+  return authors.join(' · ')
+}
+
 defineExpose({
   filterResult
 })
 </script>
 
 <template>
-  <el-card class="search-result-card mb-15" shadow="never">
-    <el-row v-show="resultList.length > 0">
-      <el-col class="align-right" :span="24">
-        <el-space wrap>
-          <el-link @click="exportFile('txt')">
-            <el-icon class="el-icon--left"><Document /></el-icon>Export txt
+  <el-card class="pv-result-card pv-flat-card" shadow="never">
+    <div class="pv-result-toolbar" v-show="resultList.length > 0">
+      <div class="left">
+        <span class="muted">{{ t('result.sortBy') }}</span>
+        <el-radio-group
+          v-model="sortMethod"
+          size="small"
+          @change="changeSortMethod"
+        >
+          <el-radio-button :value="'Year'">
+            {{ t('result.sort.year') }}
+          </el-radio-button>
+          <el-radio-button :value="'Conf'">
+            {{ t('result.sort.conf') }}
+          </el-radio-button>
+        </el-radio-group>
+        <span class="muted total">{{ resultList.length }}</span>
+      </div>
+      <div class="right">
+        <el-link @click="exportFile('txt')" :underline="false">
+          <el-icon class="el-icon--left"><Document /></el-icon>
+          {{ t('result.export.txt') }}
+        </el-link>
+        <el-link @click="exportFile('csv')" :underline="false">
+          <el-icon class="el-icon--left"><Collection /></el-icon>
+          {{ t('result.export.csv') }}
+        </el-link>
+      </div>
+    </div>
+
+    <ul class="pv-paper-list" v-show="resultList.length > 0">
+      <li v-for="(itm, index) in virtualList" :key="index" class="pv-paper-itm">
+        <div class="row-1">
+          <el-tag size="small" type="warning" class="tag-conf">
+            {{ itm.conf }}
+          </el-tag>
+          <el-tag size="small" type="danger" class="tag-year">
+            {{ itm.year }}
+          </el-tag>
+          <el-link
+            class="paper-title"
+            :href="itm.url ?? undefined"
+            :underline="false"
+            target="_blank"
+          >
+            {{ itm.title }}
           </el-link>
-          <el-link @click="exportFile('csv')">
-            <el-icon class="el-icon--left"><Collection /></el-icon>Export csv
-          </el-link>
-        </el-space>
-      </el-col>
-    </el-row>
-    <el-divider v-show="resultList.length > 0" />
-    <el-row class="mb-10 flex flex-align-center" v-show="resultList.length > 0">
-      <span style="padding-right: 10px">Sort By:</span>
-      <el-radio-group v-model="sortMethod" @change="changeSortMethod">
-        <el-radio :value="'Year'" label="Year" />
-        <el-radio :value="'Conf'" label="Conf" />
-      </el-radio-group>
-    </el-row>
-    <el-space class="w-100" wrap fill direction="vertical">
-      <el-card
-        shadow="never"
-        v-for="(itm, index) in virtualList"
-        :key="index"
-        class="paper-itm pos-relative"
-      >
-        <!-- Delete button -->
-        <el-icon
-          class="pos-absoulte delete pointer no-select"
-          @click="deleteResult(itm)"
-          ><CloseBold
-        /></el-icon>
-        <el-row class="mb-5">
-          <el-col :span="24">
-            <!-- Title -->
+          <span class="row-actions">
+            <el-popover
+              v-if="itm.abstract"
+              placement="left-start"
+              :width="420"
+              trigger="click"
+            >
+              <template #reference>
+                <el-tag
+                  size="small"
+                  class="pointer no-select"
+                  type="success"
+                  effect="plain"
+                >
+                  {{ t('result.abstract') }}
+                </el-tag>
+              </template>
+              <div>
+                <h3 class="mb-10">{{ itm.title }}</h3>
+                <p class="abstract-text">{{ itm.abstract }}</p>
+              </div>
+            </el-popover>
+            <el-tag
+              v-if="itm.code && itm.code !== '#'"
+              size="small"
+              class="pointer no-select"
+              effect="plain"
+              @click="jumpUrl(itm.code)"
+            >
+              {{ t('result.code') }}
+            </el-tag>
+            <el-icon
+              class="delete pointer no-select"
+              @click="deleteResult(itm)"
+            >
+              <CloseBold />
+            </el-icon>
+          </span>
+        </div>
+        <div class="row-2 text-ellipsis" :title="formatAuthors(itm.authors)">
+          <template
+            v-for="(author, authorIndex) in itm.authors"
+            :key="authorIndex"
+          >
             <el-link
-              class="title"
-              :href="itm.url ?? undefined"
+              class="author"
               :underline="false"
-              target="_blank"
-              >{{ itm.title }}</el-link
-            >
-          </el-col>
-        </el-row>
-        <el-row class="mb-30">
-          <el-col :span="24">
-            <!-- Author -->
-            <span
-              v-for="(author, authorIndex) in itm.authors"
-              :key="authorIndex"
               @click="searchAuthor(author)"
-              class="mr-10"
             >
-              <el-link class="author">{{ author }}</el-link>
+              {{ author }}
+            </el-link>
+            <span
+              v-if="authorIndex < (itm.authors?.length ?? 0) - 1"
+              class="author-sep"
+            >
+              ·
             </span>
-          </el-col>
-        </el-row>
-        <el-row class="mb-5">
-          <el-col :span="24">
-            <el-space wrap>
-              <!-- Abstract -->
-              <el-popover placement="top-start" :width="400" trigger="click">
-                <template #reference>
-                  <el-tag
-                    class="pointer no-select"
-                    v-show="itm.abstract"
-                    type="success"
-                  >
-                    Abstract
-                  </el-tag>
-                </template>
-                <div>
-                  <h3 class="mb-10">{{ itm.title }}</h3>
-                  <p>{{ itm.abstract }}</p>
-                </div>
-              </el-popover>
-              <!-- Conf -->
-              <el-tag type="warning">{{ itm.conf }}</el-tag>
-              <!-- Year -->
-              <el-tag type="danger">{{ itm.year }}</el-tag>
-              <!-- Code -->
-              <el-tag
-                class="pointer no-select"
-                v-if="itm.code !== '#'"
-                @click="jumpUrl(itm.code)"
-              >
-                CODE
-              </el-tag>
-            </el-space>
-          </el-col>
-        </el-row>
-      </el-card>
-    </el-space>
+          </template>
+        </div>
+      </li>
+    </ul>
+
     <el-empty
       v-show="resultList.length <= 0"
-      description="No Search Result"
-    ></el-empty>
+      :description="t('result.empty')"
+    />
+
     <div class="mt-15" v-show="resultList.length > 0">
       <el-pagination
         class="align-right"
         v-model:current-page="page.current"
         v-model:page-size="page.size"
-        :page-sizes="[10, 20, 30, 50, 100, 150, 200, 300]"
-        layout="sizes, prev, pager, next"
+        :page-sizes="[20, 50, 100, 150, 200]"
+        layout="sizes, prev, pager, next, jumper, total"
         :total="resultList.length"
         @size-change="pageSizeChange"
         @current-change="pageCurrentChange"
@@ -233,18 +247,106 @@ defineExpose({
 </template>
 
 <style scoped>
-.search-result-card {
+.pv-result-card {
+  background: transparent;
 }
-.title {
-  font-size: 18px;
+.pv-result-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: var(--el-fill-color-light, #f5f7fa);
+  border-radius: 6px;
 }
-.author {
-  color: #999;
-  font-size: 16px;
+.pv-result-toolbar .left,
+.pv-result-toolbar .right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.muted {
+  color: var(--el-text-color-secondary, #909399);
+  font-size: 13px;
+}
+.total {
+  font-weight: 600;
+  color: var(--el-color-primary, #409eff);
+}
+
+.pv-paper-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.pv-paper-itm {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+  transition: background-color 0.15s;
+}
+.pv-paper-itm:hover {
+  background: var(--el-fill-color-lighter, #fafafa);
+}
+.row-1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tag-conf,
+.tag-year {
+  flex-shrink: 0;
+}
+.paper-title {
+  font-size: 15px;
+  font-weight: 500;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.paper-title :deep(.el-link__inner) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .delete {
-  top: 10px;
-  right: 10px;
-  color: #999;
+  color: var(--el-text-color-placeholder, #c0c4cc);
+  font-size: 14px;
+  margin-left: 4px;
+}
+.delete:hover {
+  color: var(--el-color-danger, #f56c6c);
+}
+.row-2 {
+  margin-top: 2px;
+  padding-left: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+.author {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+.author:hover {
+  color: var(--el-color-primary, #409eff);
+}
+.author-sep {
+  margin: 0 4px;
+  color: var(--el-border-color, #dcdfe6);
+}
+.abstract-text {
+  max-height: 60vh;
+  overflow-y: auto;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 </style>

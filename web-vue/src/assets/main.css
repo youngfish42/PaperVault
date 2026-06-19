@@ -1,5 +1,10 @@
 @import './base.css';
 
+:root {
+  --pv-max-width: 1600px;
+  --pv-gutter: 16px;
+}
+
 #app {
   width: 100%;
   height: 100%;
@@ -8,6 +13,28 @@
   width: 100%;
   height: 100%;
   position: relative;
+}
+.pv-container {
+  width: 100%;
+  max-width: var(--pv-max-width);
+  margin: 0 auto;
+  padding: 0 var(--pv-gutter);
+  box-sizing: border-box;
+}
+.pv-compact-card .el-card__body {
+  padding: 10px 14px;
+}
+.pv-flat-card.el-card,
+.pv-flat-card .el-card {
+  border: none;
+}
+.pv-flat-card > .el-card__body {
+  padding: 0;
+}
+.text-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .w-100 {
   width: 100%;
@@ -24,7 +51,7 @@
 .pos-relative {
   position: relative !important;
 }
-.pos-absoulte {
+.pos-absolute {
   position: absolute !important;
 }
 .pos-center {

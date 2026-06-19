@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, shallowRef } from 'vue'
+import { onMounted, reactive, ref, shallowRef, computed } from 'vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage, ElLoading } from 'element-plus'
 import AdvancedSettingDlg from '@/components/AdvancedSettingDlg.vue'
@@ -12,6 +12,9 @@ import {
   suggestKeywords,
   type PaperItem
 } from '@/api/paper'
+import { useI18n } from '@/utils/i18n'
+
+const { t, toggle: toggleLang } = useI18n()
 
 const firstEntry = ref(true)
 const availableConfs = shallowRef<string[]>([])
@@ -25,10 +28,10 @@ const searchContent = reactive({
   confs: [] as string[]
 })
 
-const SEARCH_TYPE_LIST = [
-  { label: 'Title', value: 'title' },
-  { label: 'Author', value: 'author' }
-]
+const SEARCH_TYPE_LIST = computed(() => [
+  { label: t('search.type.title'), value: 'title' },
+  { label: t('search.type.author'), value: 'author' }
+])
 
 const queryResult = shallowRef<Record<string, Record<string, PaperItem[]>>>({})
 
@@ -55,7 +58,7 @@ const buildQuery = () => {
     field: searchContent.searchtype,
     sort: '-year',
     page: 1,
-    size: 500
+    size: 200
   }
   if (searchContent.query) params.q = searchContent.query
   if (searchContent.sp_author) params.author = searchContent.sp_author
@@ -77,10 +80,13 @@ const buildQuery = () => {
 
 const search = (): void => {
   if (searchContent.query === '' && searchContent.sp_author === '') {
-    ElMessage.warning('Please input your keywords for search.')
+    ElMessage.warning(t('search.warn.empty'))
     return
   }
-  const loading = ElLoading.service({ lock: true, text: 'Searching...' })
+  const loading = ElLoading.service({
+    lock: true,
+    text: t('search.button') + '...'
+  })
   queryResult.value = {}
   guessList.value = []
 
@@ -123,6 +129,19 @@ const handleSearchGuess = (data: string): void => {
   search()
 }
 
+const handleUpdateForm = (data: {
+  query: string
+  searchtype: string
+  year: string
+  sp_year: string
+  sp_author: string
+  confs: string[]
+}): void => {
+  Object.assign(searchContent, data, {
+    searchtype: data.searchtype as 'title' | 'author'
+  })
+}
+
 const handleTreeClick = (data: {
   level: number
   key?: string
@@ -158,16 +177,15 @@ onMounted(async () => {
 
 <template>
   <main class="full pos-relative">
-    <el-row
-      justify="center"
-      :class="['mb-15 pos-absolute', firstEntry ? 'first-entry' : 'normal']"
-    >
-      <el-col class="gutter-20" :xs="24" :sm="16" :md="14" :lg="10" :xl="8">
-        <h1 class="title mb-15"><a href="/">PaperVault</a></h1>
-        <!-- Search Bar -->
+    <!-- 首屏：搜索框居中 -->
+    <section v-if="firstEntry" class="pv-hero">
+      <div class="pv-container pv-hero-inner">
+        <h1 class="title mb-15">
+          <a href="/">{{ t('app.title') }}</a>
+        </h1>
         <el-input
           v-model="searchContent.query"
-          placeholder="Input your keywords"
+          :placeholder="t('search.placeholder')"
           clearable
           @keyup.enter="search"
           size="large"
@@ -176,8 +194,7 @@ onMounted(async () => {
           <template #prepend>
             <el-select
               v-model="searchContent.searchtype"
-              placeholder="Select"
-              style="width: 100px"
+              style="width: 110px"
               size="large"
             >
               <el-option
@@ -189,20 +206,24 @@ onMounted(async () => {
             </el-select>
           </template>
           <template #append>
-            <el-button icon="Search" @click="search" />
+            <el-button icon="Search" @click="search">
+              {{ t('search.button') }}
+            </el-button>
           </template>
         </el-input>
-        <!-- Toolbar -->
         <div class="toolbar mb-15">
           <el-link type="primary" icon="Setting" @click="showSetting">
-            &nbsp;Advanced setting
+            &nbsp;{{ t('toolbar.advanced') }}
           </el-link>
           <el-link
             type="primary"
             :icon="isDark ? 'Sunny' : 'Moon'"
             @click="toggleDark()"
           >
-            &nbsp;{{ `${isDark ? 'Light' : 'Dark'}Mode` }}
+            &nbsp;{{ isDark ? t('toolbar.light') : t('toolbar.dark') }}
+          </el-link>
+          <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
+            &nbsp;{{ t('toolbar.lang') }}
           </el-link>
           <el-link
             type="primary"
@@ -210,110 +231,211 @@ onMounted(async () => {
             href="https://github.com/youngfish42/PaperVault"
             target="_blank"
           >
-            &nbsp;GitHub
+            &nbsp;{{ t('toolbar.github') }}
           </el-link>
         </div>
-        <!-- Tips -->
         <el-alert
-          title="Tips!"
+          :title="t('tips.title')"
           type="info"
           :center="true"
-          description="You can get more precise results by using advanced setting. If this project is helpful to you, please give us a ⭐star!"
+          :description="t('tips.desc')"
+          :closable="false"
         />
-      </el-col>
-    </el-row>
-    <el-row justify="center" v-show="!firstEntry">
-      <el-col class="gutter-20" :xs="24" :sm="16" :md="5" :lg="4" :xl="3">
-        <!-- Select tree -->
-        <ConfsTree :data="queryResult" @click="handleTreeClick" />
-      </el-col>
-      <el-col class="gutter-20" :xs="24" :sm="16" :md="14" :lg="10" :xl="8">
-        <!-- Search result list -->
-        <SearchResultList
-          ref="searchResult"
-          @search-author="handleSearchAuthor"
-        />
-      </el-col>
-      <el-col class="gutter-20" :xs="24" :sm="16" :md="5" :lg="4" :xl="3">
-        <GuessYourLike
-          :loading="guessLoading"
-          :result="guessList"
-          @search-guess="handleSearchGuess"
-        />
-      </el-col>
-    </el-row>
+      </div>
+    </section>
 
-    <!-- Advanced setting dialog -->
+    <!-- 已搜索：紧凑顶栏 + 三栏 -->
+    <template v-else>
+      <header class="pv-topbar">
+        <div class="pv-container pv-topbar-inner">
+          <a class="brand" href="/">{{ t('app.title') }}</a>
+          <el-input
+            v-model="searchContent.query"
+            :placeholder="t('search.placeholder')"
+            clearable
+            @keyup.enter="search"
+            size="default"
+            class="pv-topbar-input"
+          >
+            <template #prepend>
+              <el-select
+                v-model="searchContent.searchtype"
+                style="width: 100px"
+                size="default"
+              >
+                <el-option
+                  v-for="(itm, index) in SEARCH_TYPE_LIST"
+                  :key="index"
+                  :label="itm.label"
+                  :value="itm.value"
+                />
+              </el-select>
+            </template>
+            <template #append>
+              <el-button icon="Search" @click="search" />
+            </template>
+          </el-input>
+          <div class="pv-topbar-actions">
+            <el-link type="primary" icon="Setting" @click="showSetting">
+              {{ t('toolbar.advanced') }}
+            </el-link>
+            <el-link
+              type="primary"
+              :icon="isDark ? 'Sunny' : 'Moon'"
+              @click="toggleDark()"
+            >
+              {{ isDark ? t('toolbar.light') : t('toolbar.dark') }}
+            </el-link>
+            <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
+              {{ t('toolbar.lang') }}
+            </el-link>
+            <el-link
+              type="primary"
+              icon="Link"
+              href="https://github.com/youngfish42/PaperVault"
+              target="_blank"
+            >
+              {{ t('toolbar.github') }}
+            </el-link>
+          </div>
+        </div>
+      </header>
+
+      <section class="pv-container pv-main">
+        <aside class="pv-side pv-side-left">
+          <ConfsTree :data="queryResult" @click="handleTreeClick" />
+        </aside>
+        <div class="pv-center">
+          <SearchResultList
+            ref="searchResult"
+            @search-author="handleSearchAuthor"
+          />
+        </div>
+        <aside class="pv-side pv-side-right">
+          <GuessYourLike
+            :loading="guessLoading"
+            :result="guessList"
+            @search-guess="handleSearchGuess"
+          />
+        </aside>
+      </section>
+    </template>
+
     <AdvancedSettingDlg
       ref="settingDlg"
-      v-model:data="searchContent"
+      :data="searchContent"
       :confs="availableConfs"
+      @update:data="handleUpdateForm"
     />
-    <!-- Back to top -->
     <el-backtop :right="50" :bottom="50" />
-    <!-- Copy right -->
-    <div :class="['copy-right mb-15', firstEntry ? 'copy-first-entry' : '']">
-      <a href="https://beian.miit.gov.cn/" target="_blank">
-        <img src="@/assets/beian.png" />浙ICP备2023002681号-1
-      </a>
-    </div>
   </main>
 </template>
 
 <style scoped>
+/* 首屏 hero */
+.pv-hero {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  box-sizing: border-box;
+}
+.pv-hero-inner {
+  max-width: 760px;
+}
 .title {
-  font-size: 60px;
+  font-size: 56px;
   text-align: center;
   user-select: none;
+  letter-spacing: 1px;
 }
-
 .title a {
   text-decoration: none;
-  color: #333;
+  color: var(--el-text-color-primary, #333);
 }
-
 .title a:hover {
   text-decoration: underline;
 }
 .toolbar {
   text-align: center;
   user-select: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
 }
-.toolbar a + a {
-  margin-left: 20px;
-}
-.gutter-20 {
-  padding: 0 20px;
-}
-.copy-right {
-  text-align: center;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 16px;
-}
-.copy-right a {
-  text-decoration: none;
-  color: #999;
-}
-.copy-right a > * {
-  vertical-align: middle;
-}
-.copy-right a img {
-  width: 14px;
-  margin-right: 5px;
-}
-.first-entry {
-  top: calc(50% - 80px);
-  transform: translateY(-50%);
-}
-.normal {
+
+/* 搜索后顶栏 */
+.pv-topbar {
+  position: sticky;
   top: 0;
-  transform: translateY(0);
+  z-index: 100;
+  background: var(--el-bg-color, #fff);
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
 }
-.copy-first-entry {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+.pv-topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--el-text-color-primary, #333);
+  white-space: nowrap;
+}
+.pv-topbar-input {
+  flex: 1 1 auto;
+  min-width: 320px;
+  max-width: 720px;
+}
+.pv-topbar-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* 三栏主区 */
+.pv-main {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 260px;
+  gap: 16px;
+  padding-top: 16px;
+  padding-bottom: 24px;
+  align-items: start;
+}
+.pv-side {
+  position: sticky;
+  top: 70px;
+}
+@media (max-width: 1200px) {
+  .pv-main {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .pv-side-right {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .pv-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pv-side {
+    position: static;
+    display: none;
+  }
+  .pv-topbar-inner {
+    flex-wrap: wrap;
+  }
+  .pv-topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>

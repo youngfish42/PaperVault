@@ -8,6 +8,9 @@
 -->
 <script setup lang="ts">
 import { ref, shallowRef, watch } from 'vue'
+import { useI18n } from '@/utils/i18n'
+
+const { t, lang } = useI18n()
 
 const props = defineProps<{
   data: Record<string, Record<string, unknown[]>> | unknown
@@ -22,7 +25,9 @@ interface Tree {
 }
 
 const total = ref(0)
-const tree = shallowRef<Tree[]>([{ label: 'All (0)', children: [] }])
+const tree = shallowRef<Tree[]>([
+  { label: `${t('tree.all')} (0)`, children: [] }
+])
 
 const defaultProps = {
   children: 'children',
@@ -32,7 +37,7 @@ const defaultProps = {
 const formatData = (treeData: any, target: Tree): number => {
   if (Array.isArray(treeData)) {
     total.value += treeData.length
-    tree.value[0].label = `All (${total.value})`
+    tree.value[0].label = `${t('tree.all')} (${total.value})`
     target.label = `${target.label} (${treeData.length})`
     return treeData.length
   }
@@ -42,10 +47,17 @@ const formatData = (treeData: any, target: Tree): number => {
     target.children?.push(itm)
     level2Total += Number(formatData(treeData[k], itm)) || 0
   }
-  if (!target.label.startsWith('All')) {
+  if (!target.label.startsWith(t('tree.all'))) {
     target.label = `${target.label} (${level2Total})`
   }
   return level2Total
+}
+
+const rebuild = (v: unknown): void => {
+  total.value = 0
+  const root: Tree = { label: `${t('tree.all')} (0)`, children: [] }
+  formatData(v, root)
+  tree.value = [root]
 }
 
 const treeNodeClick = (_objData: Tree, node: any) => {
@@ -62,21 +74,18 @@ const treeNodeClick = (_objData: Tree, node: any) => {
 
 watch(
   () => props.data,
-  v => {
-    total.value = 0
-    const root: Tree = { label: 'All (0)', children: [] }
-    formatData(v, root)
-    tree.value = [root]
-  },
+  v => rebuild(v),
   {
     immediate: true,
     deep: true
   }
 )
+
+watch(lang, () => rebuild(props.data))
 </script>
 <template>
-  <el-card class="tree-card mb-15" shadow="never">
-    <el-scrollbar height="260px">
+  <el-card class="tree-card pv-compact-card" shadow="never">
+    <el-scrollbar height="320px">
       <el-tree
         :data="tree"
         :props="defaultProps"
@@ -92,6 +101,8 @@ watch(
 <style scoped>
 .tree-card {
   user-select: none;
-  height: 300px;
+}
+.tree-card :deep(.el-tree-node__label) {
+  font-size: 13px;
 }
 </style>
