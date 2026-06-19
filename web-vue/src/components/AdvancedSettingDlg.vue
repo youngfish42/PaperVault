@@ -8,6 +8,9 @@
 -->
 <script lang="ts" setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from '@/utils/i18n'
+
+const { t } = useI18n()
 
 type FORMDATA = {
   query: string
@@ -28,12 +31,21 @@ const emits = defineEmits<{
 
 const isVisible = ref(false)
 const CURRENT_YEAR = new Date().getFullYear()
-const SPECIFIC_YEAR_LIST = [
-  { label: `Since ${CURRENT_YEAR}`, value: `${String(CURRENT_YEAR)}` },
-  { label: `Since ${CURRENT_YEAR - 3}`, value: `${String(CURRENT_YEAR - 3)}` },
-  { label: `Since ${CURRENT_YEAR - 5}`, value: `${String(CURRENT_YEAR - 5)}` },
-  { label: 'All', value: '' }
-]
+const SPECIFIC_YEAR_LIST = computed(() => [
+  {
+    label: t('year.since', { year: CURRENT_YEAR }),
+    value: `${String(CURRENT_YEAR)}`
+  },
+  {
+    label: t('year.since', { year: CURRENT_YEAR - 3 }),
+    value: `${String(CURRENT_YEAR - 3)}`
+  },
+  {
+    label: t('year.since', { year: CURRENT_YEAR - 5 }),
+    value: `${String(CURRENT_YEAR - 5)}`
+  },
+  { label: t('year.all'), value: '' }
+])
 
 const confsList = computed(() => props.confs ?? [])
 
@@ -89,10 +101,10 @@ defineExpose({
   <el-dialog
     class="dialog-advancedSetting"
     v-model="isVisible"
-    title="Advanced Setting"
+    :title="t('dlg.title')"
   >
     <el-form :model="formData" label-width="120px">
-      <el-form-item label="Years" prop="year">
+      <el-form-item :label="t('dlg.years')" prop="year">
         <el-select class="w-100" v-model="formData.year">
           <el-option
             v-for="(itm, index) in SPECIFIC_YEAR_LIST"
@@ -103,31 +115,31 @@ defineExpose({
           </el-option>
         </el-select>
       </el-form-item>
-      <el-form-item label="Specific Year" prop="sp_year">
+      <el-form-item :label="t('dlg.specificYear')" prop="sp_year">
         <el-input
           v-model="formData.sp_year"
-          placeholder="Input a specific year"
+          :placeholder="t('dlg.specificYearPh')"
           clearable
         />
       </el-form-item>
-      <el-form-item label="Specific Author" prop="sp_author">
+      <el-form-item :label="t('dlg.specificAuthor')" prop="sp_author">
         <el-input
           v-model="formData.sp_author"
-          placeholder="Input a specific author"
+          :placeholder="t('dlg.specificAuthorPh')"
           clearable
         />
       </el-form-item>
-      <el-form-item label="Confs" prop="confs">
+      <el-form-item :label="t('dlg.confs')" prop="confs">
         <el-row class="w-100" :gutter="20">
           <el-col :span="12" :offset="0">
-            <el-link type="primary" @click="checkMethod('all')"
-              >Check All</el-link
-            >
+            <el-link type="primary" @click="checkMethod('all')">{{
+              t('dlg.checkAll')
+            }}</el-link>
           </el-col>
           <el-col :span="12" :offset="0">
-            <el-link type="primary" @click="checkMethod('invert')"
-              >Check Invert</el-link
-            >
+            <el-link type="primary" @click="checkMethod('invert')">{{
+              t('dlg.checkInvert')
+            }}</el-link>
           </el-col>
         </el-row>
 
@@ -152,8 +164,10 @@ defineExpose({
     </el-form>
     <template #footer>
       <span class="dialog-footer">
-        <el-button @click="resetForm">Reset</el-button>
-        <el-button type="primary" @click="confirmForm">Done</el-button>
+        <el-button @click="resetForm">{{ t('dlg.reset') }}</el-button>
+        <el-button type="primary" @click="confirmForm">{{
+          t('dlg.done')
+        }}</el-button>
       </span>
     </template>
   </el-dialog>
@@ -162,27 +176,27 @@ defineExpose({
 <style>
 @media (min-width: 1920px) {
   .dialog-advancedSetting {
-    width: 30%;
+    width: 45%;
   }
 }
 @media (max-width: 1920px) {
   .dialog-advancedSetting {
-    width: 35%;
+    width: 50%;
   }
 }
 @media (max-width: 1200px) {
   .dialog-advancedSetting {
-    width: 50%;
+    width: 65%;
   }
 }
 @media (max-width: 992px) {
   .dialog-advancedSetting {
-    width: 55%;
+    width: 75%;
   }
 }
 @media (max-width: 768px) {
   .dialog-advancedSetting {
-    width: 90%;
+    width: 92%;
   }
 }
 </style>
