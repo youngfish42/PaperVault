@@ -200,7 +200,8 @@ test('splitForBackend: top-level OR cannot be hoisted → stays in residual', ()
 
 const samplePaper = {
   title: 'Federated Learning with Differential Privacy',
-  abstract: 'We study privacy and utility trade-offs in federated optimisation.',
+  abstract:
+    'We study privacy and utility trade-offs in federated optimisation.',
   authors: ['Xiaowen Jiang', 'Alice Example'],
   conf: 'ICLR',
   year: 2025
@@ -241,10 +242,7 @@ test('evaluateDsl: NOT excludes matching papers', () => {
     evaluateDsl(samplePaper, parseDsl('federated NOT privacy')),
     false
   )
-  assert.equal(
-    evaluateDsl(samplePaper, parseDsl('federated NOT survey')),
-    true
-  )
+  assert.equal(evaluateDsl(samplePaper, parseDsl('federated NOT survey')), true)
 })
 
 test('evaluateDsl: empty AST is permissive (matches everything)', () => {
