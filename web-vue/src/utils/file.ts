@@ -1,14 +1,22 @@
 type PaperLike = {
-  title?: string
-  url?: string
-  authors?: string[] | string
-  abstract?: string
-  code?: string
-  conf?: string
-  year?: string | number
+  title?: string | null
+  url?: string | null
+  authors?: string[] | string | null
+  abstract?: string | null
+  code?: string | null
+  conf?: string | null
+  year?: string | number | null
 }
 
-const CSV_HEADER = ['title', 'url', 'authors', 'abstract', 'code', 'conf', 'year'] as const
+const CSV_HEADER = [
+  'title',
+  'url',
+  'authors',
+  'abstract',
+  'code',
+  'conf',
+  'year'
+] as const
 
 function escapeCsvCell(value: unknown): string {
   if (Array.isArray(value)) {
@@ -34,7 +42,9 @@ export default {
     if (!jsonData || jsonData.length === 0) return
     const lines: string[] = [CSV_HEADER.join(',')]
     for (const row of jsonData) {
-      lines.push(CSV_HEADER.map(key => escapeCsvCell((row as any)[key])).join(','))
+      lines.push(
+        CSV_HEADER.map(key => escapeCsvCell((row as any)[key])).join(',')
+      )
     }
     const text = '\ufeff' + lines.join('\n')
     downloadBlob(new Blob([text], { type: 'text/csv;charset=utf-8' }), fileName)
@@ -45,6 +55,9 @@ export default {
     const text = jsonData
       .map(v => `[${(v.conf ?? '') + (v.year ?? '')}]\t${v.title ?? ''}`)
       .join('\r\n')
-    downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), fileName)
+    downloadBlob(
+      new Blob([text], { type: 'text/plain;charset=utf-8' }),
+      fileName
+    )
   }
 }

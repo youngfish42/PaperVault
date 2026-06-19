@@ -61,20 +61,24 @@ export const searchPapers = (params: PaperSearchQuery) =>
     url: '/v1/papers',
     method: 'get',
     params,
+    // Backend ``PaperSearchParams._split_conf`` accepts both repeated query
+    // parameters (``?conf=A&conf=B``) and a single comma-separated value.
+    // We emit repeated params here so callers can pass ``conf: ['A', 'B']``
+    // directly without having to pre-join.
     paramsSerializer: {
       indexes: null
     }
-  }) as unknown as Promise<PaperSearchResponse>
+  })
 
 export const listConfs = () =>
   request<ConfListResponse>({
     url: '/v1/confs',
     method: 'get'
-  }) as unknown as Promise<ConfListResponse>
+  })
 
 export const suggestKeywords = (query: string) =>
   request<SuggestResponse>({
     url: '/v1/suggest',
     method: 'post',
     data: { query }
-  }) as unknown as Promise<SuggestResponse>
+  })

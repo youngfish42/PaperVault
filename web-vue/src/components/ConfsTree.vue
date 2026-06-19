@@ -9,7 +9,9 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch } from 'vue'
 
-const props = defineProps<{ data: Record<string, Record<string, unknown[]>> | unknown }>()
+const props = defineProps<{
+  data: Record<string, Record<string, unknown[]>> | unknown
+}>()
 const emits = defineEmits<{
   (e: 'click', val: { level: number; key?: string; parent?: string }): void
 }>()
@@ -20,9 +22,7 @@ interface Tree {
 }
 
 const total = ref(0)
-const tree = shallowRef<Tree[]>([
-  { label: 'All (0)', children: [] }
-])
+const tree = shallowRef<Tree[]>([{ label: 'All (0)', children: [] }])
 
 const defaultProps = {
   children: 'children',

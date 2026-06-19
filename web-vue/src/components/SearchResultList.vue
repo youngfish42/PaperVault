@@ -34,8 +34,8 @@ const deleteResult = (item: PaperItem): void => {
   }
 }
 
-const jumpUrl = (url: string) => {
-  url && window.open(url)
+const jumpUrl = (url?: string | null) => {
+  if (url) window.open(url)
 }
 
 const searchAuthor = (author: string): void => {
@@ -72,9 +72,9 @@ const collectAll = (target: any): PaperItem[] => {
 
 const changeSortMethod = (method: any): void => {
   if (method === 'Year') {
-    resultList.value = resultList.value.slice().sort(
-      (a, b) => Number(b.year) - Number(a.year)
-    )
+    resultList.value = resultList.value
+      .slice()
+      .sort((a, b) => Number(b.year) - Number(a.year))
   } else if (method === 'Conf') {
     resultList.value = resultList.value.slice().sort((a, b) => {
       const a1 = (a.conf || '').toUpperCase()
@@ -132,10 +132,7 @@ defineExpose({
       </el-col>
     </el-row>
     <el-divider v-show="resultList.length > 0" />
-    <el-row
-      class="mb-10 flex flex-align-center"
-      v-show="resultList.length > 0"
-    >
+    <el-row class="mb-10 flex flex-align-center" v-show="resultList.length > 0">
       <span style="padding-right: 10px">Sort By:</span>
       <el-radio-group v-model="sortMethod" @change="changeSortMethod">
         <el-radio :value="'Year'" label="Year" />
@@ -160,7 +157,7 @@ defineExpose({
             <!-- Title -->
             <el-link
               class="title"
-              :href="itm.url"
+              :href="itm.url ?? undefined"
               :underline="false"
               target="_blank"
               >{{ itm.title }}</el-link

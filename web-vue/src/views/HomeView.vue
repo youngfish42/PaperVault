@@ -70,7 +70,7 @@ const buildQuery = () => {
     if (!Number.isNaN(y)) params.since = y
   }
   if (searchContent.confs.length > 0) {
-    params.conf = searchContent.confs.join(',')
+    params.conf = [...searchContent.confs]
   }
   return params
 }
@@ -123,7 +123,11 @@ const handleSearchGuess = (data: string): void => {
   search()
 }
 
-const handleTreeClick = (data: { level: number; key?: string; parent?: string }): void => {
+const handleTreeClick = (data: {
+  level: number
+  key?: string
+  parent?: string
+}): void => {
   if (searchResult.value) {
     ;(searchResult.value as any).filterResult(queryResult.value, data)
   }
