@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="./pics/screenshot/web.jpg" alt="PaperVault web search UI" width="850" />
+  <img src="./pics/screenshot/web.en.jpg" alt="PaperVault web search UI" width="850" />
 </p>
 
 ## :jack_o_lantern: Project Introduction
