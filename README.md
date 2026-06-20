@@ -16,7 +16,7 @@ PaperVault 把分散在 ACL Anthology、OpenReview、CVF Open Access、NeurIPS P
 ### 论文元数据库现状
 - 覆盖自然语言处理、计算机视觉、机器学习、数据挖掘、数据库、语音、系统、网络、安全、理论计算机科学、人机交互、计算机图形学与多媒体等方向的顶级会议与期刊。
 - 全量条目持续由 GitHub Actions 周期性增量执行：会议自动发现、论文增量采集、摘要回填、GitHub 代码链接抽取四条流水线相互衔接，避免人工干预。
-- 最新覆盖范围、数据库规模与本次更新内容请参考下文的「[最近更新简报](#open_file_folder-论文元数据状态)」「[数据统计](#bar_chart-数据统计)」以及「[收录会议范围](#open_book-收录会议范围)」三个段落，相关数字均由 `maintain.py` 自动渲染，无需人工编辑。
+- 最新数据规模与收录范围详见下文「[数据统计](#bar_chart-数据统计)」与「[收录会议范围](#open_book-收录会议范围)」。
 
 ### 元数据库获取方法
 - 数据以 gzip 压缩的 JSON Lines 形式持续发布于 Hugging Face Dataset：[`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault)。
@@ -29,7 +29,7 @@ PaperVault 把分散在 ACL Anthology、OpenReview、CVF Open Access、NeurIPS P
 - 结果页支持按研究领域 / 会议系列 / 年份进行多维筛选，并可一键导出 CSV / TXT。
 - 后端以 `/api/v1/*` REST 接口暴露检索、建议、配置等能力，方便二次集成或独立部署。
 
-## :open_file_folder: 论文元数据状态
+## :bar_chart: 数据统计
 
 ### 最近更新简报
 
@@ -41,15 +41,6 @@ PaperVault 把分散在 ACL Anthology、OpenReview、CVF Open Access、NeurIPS P
 - 📊 **数据库规模**: 666,444 篇论文 / 120 个刊物系列 / 181,855 篇含摘要 / 29,954 篇含开源代码
 
 <!-- recent-update-end -->
-
-### 当前阶段
-<!-- auto-summary-start -->
-
-- 数据库已收录 **660,000+** 篇论文，覆盖 NLP、CV、ML、DM、DB、Speech 等 120+ 个顶级会议与期刊。
-
-<!-- auto-summary-end -->
-
-## :bar_chart: 数据统计
 
 <!-- stats-start -->
 

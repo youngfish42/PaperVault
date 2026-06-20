@@ -16,7 +16,7 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 ### Paper metadata corpus
 - Covers top-tier venues across NLP, CV, ML, DM, DB, Speech, systems, networking, security, theoretical CS, HCI and graphics & multimedia.
 - The corpus is kept current by four interlocked GitHub Actions pipelines — venue auto-discovery, incremental paper collection, abstract backfill, and GitHub code-link extraction — running on schedule without manual intervention.
-- For the latest coverage, corpus scale and what changed in the current update, refer to the [Recent Update Brief](#open_file_folder-paper-metadata-status), [Data Statistics](#bar_chart-data-statistics) and [Coverage](#open_book-coverage) sections below; all numbers there are auto-rendered by `maintain.py` and are never edited by hand.
+- For the latest corpus scale and coverage, see [Data Statistics](#bar_chart-data-statistics) and [Coverage](#open_book-coverage) below.
 
 ### How to access the corpus
 - Data is continuously published as gzip-compressed JSON Lines on the Hugging Face Dataset [`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault).
@@ -29,7 +29,7 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 - Result pages support faceted refinement by research field / venue series / year, and one-click CSV / TXT export.
 - The backend exposes search, suggestion and configuration capabilities through `/api/v1/*` REST endpoints, making integration or independent deployment straightforward.
 
-## :open_file_folder: Paper Metadata Status
+## :bar_chart: Data Statistics
 
 ### Recent Update Brief
 
@@ -41,15 +41,6 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 - 📊 **Database Scale**: 666,444 papers / 120 publication series / 181,855 with abstracts / 29,954 with code
 
 <!-- recent-update-end -->
-
-### Current Phase
-<!-- auto-summary-start -->
-
-- The database contains **660,000+** papers spanning 120+ top-tier conferences and journals across NLP, CV, ML, DM, DB, and Speech.
-
-<!-- auto-summary-end -->
-
-## :bar_chart: Data Statistics
 
 <!-- stats-start -->
 

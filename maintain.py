@@ -27,8 +27,6 @@ COMMENT_STATS_START = "<!-- stats-start -->"
 COMMENT_STATS_END = "<!-- stats-end -->"
 COMMENT_RECENT_UPDATE_START = "<!-- recent-update-start -->"
 COMMENT_RECENT_UPDATE_END = "<!-- recent-update-end -->"
-COMMENT_AUTO_SUMMARY_START = "<!-- auto-summary-start -->"
-COMMENT_AUTO_SUMMARY_END = "<!-- auto-summary-end -->"
 
 cache_path = os.path.join(os.path.dirname(__file__), "cache", "cache.jsonl.gz")
 readme_path = "README.md"
@@ -822,22 +820,6 @@ def _write_meta(meta):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
 
-def _round_down_to_ten_thousand(n: int) -> int:
-    return (n // 10000) * 10000
-
-
-def build_auto_summary(stats: dict):
-    total_rounded = _round_down_to_ten_thousand(stats["total_papers"])
-    line = f"- 数据库已收录 **{total_rounded:,}+** 篇论文，覆盖 NLP、CV、ML、DM、DB、Speech 等 {stats['total_series']}+ 个顶级会议与期刊。"
-    return line
-
-
-def build_auto_summary_en(stats: dict):
-    total_rounded = _round_down_to_ten_thousand(stats["total_papers"])
-    line = f"- The database contains **{total_rounded:,}+** papers spanning {stats['total_series']}+ top-tier conferences and journals across NLP, CV, ML, DM, DB, and Speech."
-    return line
-
-
 def build_recent_update_brief(meta: dict, stats: dict):
     """Build the recent update brief markdown."""
     last_date = meta.get("last_update", datetime.now().strftime("%Y-%m-%d"))
@@ -924,13 +906,6 @@ def _update_single_readme(path: str, lang: str, stats: dict, meta: dict):
     """Update a single README file (zh or en)."""
     with open(path, "r", encoding="utf-8") as f:
         src = f.read()
-
-    # Update auto-summary
-    if lang == "zh":
-        summary_md = build_auto_summary(stats)
-    else:
-        summary_md = build_auto_summary_en(stats)
-    src = generate_new_readme(src, summary_md, COMMENT_AUTO_SUMMARY_START, COMMENT_AUTO_SUMMARY_END)
 
     # Update recent update section
     if lang == "zh":
