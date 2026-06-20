@@ -5,13 +5,31 @@
   <a href="README.en.md">English</a> | <strong>简体中文</strong>
 </p>
 
+<p align="center">
+  <img src="./pics/screenshot/web.jpg" alt="PaperVault Web 检索界面" width="850" />
+</p>
+
 ## :jack_o_lantern: 项目简介
 
-PaperVault 是一个用于收集和检索人工智能领域学术论文的全自动化工具，覆盖自然语言处理、计算机视觉、机器学习、数据挖掘、数据库、语音、系统、安全、网络、理论计算机科学等多个方向的顶级学术会议与期刊。
+PaperVault 把分散在 ACL Anthology、OpenReview、CVF Open Access、NeurIPS Proceedings、DBLP 等渠道的顶级会议与期刊论文元数据，汇总成一份**持续自动更新**的统一数据库，并在其上提供一个开箱即用的 Web 检索网站。你可以把它当作研究用的论文数据集直接下载，也可以作为论文检索网站的参考实现进行二次开发。
 
-## 🚧 项目状态
+### 论文元数据库现状
+- 覆盖自然语言处理、计算机视觉、机器学习、数据挖掘、数据库、语音、系统、网络、安全、理论计算机科学、人机交互、计算机图形学与多媒体等方向的顶级会议与期刊。
+- 全量条目持续由 GitHub Actions 周期性增量执行：会议自动发现、论文增量采集、摘要回填、GitHub 代码链接抽取四条流水线相互衔接，避免人工干预。
+- 最新覆盖范围、数据库规模与本次更新内容请参考下文的「[最近更新简报](#open_file_folder-论文元数据状态)」「[数据统计](#bar_chart-数据统计)」以及「[收录会议范围](#open_book-收录会议范围)」三个段落，相关数字均由 `maintain.py` 自动渲染，无需人工编辑。
 
-> **本项目仍在积极施工中。**
+### 元数据库获取方法
+- 数据以 gzip 压缩的 JSON Lines 形式持续发布于 Hugging Face Dataset：[`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault)。
+- 仅消费数据：可通过 `huggingface-cli` 下载 `cache/cache.jsonl.gz`，或直接使用 Hugging Face 自动生成的 Parquet 视图按需读取，不必克隆本仓库。
+- 在本项目内使用：所有入口脚本启动时会自动从 Hugging Face 拉取最新缓存并写回，开发者只需配置 `HF_TOKEN` 与 `PAPERVAULT_HF_REPO_ID` 两个环境变量即可。
+- 详细命令、代码示例与离线模式请见下文「[数据集获取](#inbox_tray-数据集获取)」章节。
+
+### 检索服务概要
+- 提供「智能搜索」与「高级搜索」双模式：前者面向关键词与短语，后者提供 Web of Science 风格的查询 DSL 与可视化条件构建器。
+- 结果页支持按研究领域 / 会议系列 / 年份进行多维筛选，并可一键导出 CSV / TXT。
+- 后端以 `/api/v1/*` REST 接口暴露检索、建议、配置等能力，方便二次集成或独立部署。
+
+## :open_file_folder: 论文元数据状态
 
 ### 最近更新简报
 
@@ -30,10 +48,6 @@ PaperVault 是一个用于收集和检索人工智能领域学术论文的全自
 - 数据库已收录 **660,000+** 篇论文，覆盖 NLP、CV、ML、DM、DB、Speech 等 120+ 个顶级会议与期刊。
 
 <!-- auto-summary-end -->
-
-### 下阶段目标
-- 升级前后端技术栈，优化搜索体验与界面设计。
-- 重新部署并上线 Web 搜索服务，支持更高效的论文检索与浏览。
 
 ## :bar_chart: 数据统计
 
@@ -306,8 +320,14 @@ python app.py            # 启动 Web 检索服务
 
 ## :scroll: 致谢
 
-本项目 fork 自 [MLNLP-World/AI-Paper-Collector](https://github.com/MLNLP-World/AI-Paper-Collector)，现已作为 **PaperVault** 独立发展。我们衷心感谢原项目所有作者与贡献者为本项目奠定的基础。本项目继续采用 [GNU General Public License v3.0](LICENSE) 许可。
+本项目的前身是 [MLNLP-World/AI-Paper-Collector](https://github.com/MLNLP-World/AI-Paper-Collector)，现已作为独立项目持续演进。衷心感谢原项目为本项目奠定的基础，本项目继续采用 [GNU General Public License v3.0](LICENSE) 许可。
 
----
+## :rocket: 项目路线图
 
-📄 [技术细节](TECHNICAL.md)
+- 持续完善高级检索式（字段、运算符与邻近匹配）的覆盖度与提示交互。
+- 扩展前端的领域 / 会议 / 年份多维筛选体验，并补充更多导出与分享形式。
+- 重新部署并上线 Web 搜索服务，支持更高效的论文检索与浏览。
+
+## :hammer_and_wrench: 面向开发者
+
+实现层细节（架构分层、REST API、检索 DSL、前端组件、CI 工作流、缓存同步等）请参阅 [TECHNICAL.md](TECHNICAL.md) 与 [AGENTS.md](AGENTS.md)。

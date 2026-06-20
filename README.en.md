@@ -5,13 +5,31 @@
   <strong>English</strong> | <a href="README.md">简体中文</a>
 </p>
 
+<p align="center">
+  <img src="./pics/screenshot/web.jpg" alt="PaperVault web search UI" width="850" />
+</p>
+
 ## :jack_o_lantern: Project Introduction
 
-PaperVault is a fully automated tool for collecting and retrieving academic papers in artificial intelligence, covering top-tier conferences and journals across natural language processing, computer vision, machine learning, data mining, databases, speech, systems, security, networking, and theoretical computer science.
+PaperVault aggregates paper metadata from top-tier conferences and journals scattered across ACL Anthology, OpenReview, CVF Open Access, NeurIPS Proceedings, DBLP and other venues into a single, **continuously and automatically updated** corpus, and ships a ready-to-use web search site on top of it. You can use it as a research-grade paper dataset to download directly, or as a reference implementation to fork your own paper search site from.
 
-## 🚧 Project Status
+### Paper metadata corpus
+- Covers top-tier venues across NLP, CV, ML, DM, DB, Speech, systems, networking, security, theoretical CS, HCI and graphics & multimedia.
+- The corpus is kept current by four interlocked GitHub Actions pipelines — venue auto-discovery, incremental paper collection, abstract backfill, and GitHub code-link extraction — running on schedule without manual intervention.
+- For the latest coverage, corpus scale and what changed in the current update, refer to the [Recent Update Brief](#open_file_folder-paper-metadata-status), [Data Statistics](#bar_chart-data-statistics) and [Coverage](#open_book-coverage) sections below; all numbers there are auto-rendered by `maintain.py` and are never edited by hand.
 
-> **This project is actively under construction.**
+### How to access the corpus
+- Data is continuously published as gzip-compressed JSON Lines on the Hugging Face Dataset [`youngfish42/PaperVault`](https://huggingface.co/datasets/youngfish42/PaperVault).
+- Data-only consumption: download `cache/cache.jsonl.gz` via `huggingface-cli`, or read it directly through Hugging Face's auto-generated Parquet view — no need to clone this repository.
+- In-project usage: every entry script fetches the latest cache from Hugging Face on startup and writes back when finished; developers only need to set `HF_TOKEN` and `PAPERVAULT_HF_REPO_ID`.
+- Full commands, code samples and offline mode are documented in the [Dataset Access](#inbox_tray-dataset-access) section below.
+
+### Search service at a glance
+- Dual-mode search: "smart search" for keywords and phrases, and "advanced search" backed by a Web of Science style query DSL plus a visual condition builder.
+- Result pages support faceted refinement by research field / venue series / year, and one-click CSV / TXT export.
+- The backend exposes search, suggestion and configuration capabilities through `/api/v1/*` REST endpoints, making integration or independent deployment straightforward.
+
+## :open_file_folder: Paper Metadata Status
 
 ### Recent Update Brief
 
@@ -30,10 +48,6 @@ PaperVault is a fully automated tool for collecting and retrieving academic pape
 - The database contains **660,000+** papers spanning 120+ top-tier conferences and journals across NLP, CV, ML, DM, DB, and Speech.
 
 <!-- auto-summary-end -->
-
-### Next Steps
-- Upgrade the frontend and backend stack for a better search experience and UI.
-- Redeploy and relaunch the web search service.
 
 ## :bar_chart: Data Statistics
 
@@ -306,8 +320,14 @@ Due to limitations in data sources and retrieval mechanisms, we can not guarante
 
 ## :scroll: Acknowledgements
 
-This project is forked from [MLNLP-World/AI-Paper-Collector](https://github.com/MLNLP-World/AI-Paper-Collector) and is now developed independently as **PaperVault**. We sincerely thank the original authors and contributors for laying the foundation. This project continues under the [GNU General Public License v3.0](LICENSE).
+This project originated from [MLNLP-World/AI-Paper-Collector](https://github.com/MLNLP-World/AI-Paper-Collector) and has since evolved into an independent project. We sincerely thank the original project for laying the foundation, and continue to release under the [GNU General Public License v3.0](LICENSE).
 
----
+## :rocket: Roadmap
 
-📄 [Technical Details](TECHNICAL.md)
+- Keep expanding the advanced query DSL (fields, operators and proximity) and its inline help.
+- Enrich the frontend refine bar (field / venue / year facets) and add more export / sharing formats.
+- Redeploy and relaunch the web search service.
+
+## :hammer_and_wrench: For Developers
+
+For implementation details — architecture layering, REST API, query DSL, frontend components, CI workflows and cache synchronization — see [TECHNICAL.md](TECHNICAL.md) and [AGENTS.md](AGENTS.md).

@@ -4,73 +4,85 @@
 
 PaperVault 采用**前后端分离**架构：
 
-- **后端**：Python Flask 提供 REST API，启动时加载本地 JSON 缓存，所有检索均在内存中完成，不依赖数据库。
-- **前端**：Vue 3 + Vite + TypeScript 构建的单页应用（SPA），打包后输出为静态文件，由 Flask 直接托管。
+- **后端**：Python Flask 3.x，基于 `papervault.create_app` **应用工厂** 装配；通过 `/api/v1/*` 蓝图对外暴露 RESTful 接口（Pydantic v2 校验 + 统一错误信封 + request-id 日志），启动时一次性加载本地 JSON 缓存，所有检索均在内存中完成，不依赖数据库。
+- **前端**：Vue 3.5 + Vite 8 + TypeScript 5 构建的单页应用（SPA），提供「智能搜索」与「高级搜索」两条路由，打包后输出为静态文件，由 Flask 直接托管。检索表达式遵循 **Web of Science 风格的 DSL**（详见 §3.4）。
 - **数据层**：`cache/cache.jsonl.gz` 是原始论文目录缓存（JSON Lines + gzip），**权威副本托管于 Hugging Face Dataset**（由 `PAPERVAULT_HF_REPO_ID` 指定），本地副本由 `data_artifacts.ensure_cache_local()` 在每个入口启动时同步拉取，并通过 `parent_commit` 乐观锁回写；`conf/*.json` 定义需要采集的会议列表。
 
 ```
 conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
                                          ▲
                                          │
-                                    app.py (Flask)
+                              papervault.create_app() (Flask)
                                          │
-                              ┌──────────┴──────────┐
-                              │   /api/search       │
-                              │   /api/get_guess... │
-                              └──────────┬──────────┘
+                              ┌──────────┴──────────────┐
+                              │   /api/v1/papers        │
+                              │   /api/v1/confs         │
+                              │   /api/v1/suggest       │
+                              │   /api/v1/healthz       │
+                              └──────────┬──────────────┘
                                          │
-                                    web-vue (Vue 3)
+                              web-vue (Vue 3 + WoS DSL)
+                              ├─ /#/        智能搜索
+                              └─ /#/advanced 高级搜索
 ```
 
 ---
 
 ## 2. 后端设计
 
-### 2.1 主要文件
+### 2.1 主要文件 / 模块
 
-| 文件 | 职责 |
+| 路径 | 职责 |
 |------|------|
-| `app.py` | Flask 服务入口，加载缓存、暴露 API |
+| `app.py` | WSGI 入口；调用 `papervault.create_app(get_settings())` 装配应用 |
+| `papervault/app.py` | 应用工厂；注册蓝图、错误处理、SPA 历史回退 |
+| `papervault/config.py` | `Settings` dataclass，所有运行参数从环境变量读取 |
+| `papervault/api/v1/{papers,confs,suggest,health}.py` | 各 v1 接口蓝图 |
+| `papervault/services/papers.py` | `PaperRepository` 缓存加载 + `search_papers` 内存检索 |
+| `papervault/services/suggest.py` | LLM 关键词推荐（DeepSeek 兼容 / OpenAI） |
+| `papervault/schemas.py` | Pydantic v2 请求/响应模型 |
+| `papervault/errors.py` / `logging.py` | 统一错误信封、request-id 日志 |
 | `collector.py` | 多源论文采集器 |
 | `maintain.py` | README 会议列表自动更新工具 |
 | `data_artifacts.py` | 同步 `cache/cache.jsonl.gz` 至 Hugging Face Dataset（含 `parent_commit` 乐观锁与重试） |
 
-### 2.2 API 接口
+### 2.2 API 接口（v1）
+
+> 旧版 `/api/search` 与 `/api/get_guess_you_like` 已**移除**，请统一迁移至 `/api/v1/*`（详见 `docs/refactor-plan.md`）。
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/` | GET | 返回前端构建产物 `static/index.html` |
-| `/api/search` | GET / POST | 论文检索接口 |
-| `/api/get_guess_you_like` | GET / POST | 基于 GPT-3.5 的关键词推荐接口 |
+| `/` | GET | 返回前端构建产物 `static/dist/index.html`；其余非 `/api/` 的 GET 404 也回退到 SPA |
+| `/api/v1/healthz` | GET | 健康检查，返回 `{status, papers, confs}` |
+| `/api/v1/papers` | GET | 论文检索 + 分页 |
+| `/api/v1/confs` | GET | 已收录会议列表及各年份篇数 |
+| `/api/v1/suggest` | POST | LLM 关键词推荐（默认 DeepSeek） |
 
-#### `/api/search` 请求参数
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `query` | string | 检索词。支持特殊值 `#`（返回全部）和 `findall`（单会议全部返回） |
-| `year` | int | 起始年份，仅返回该年份之后的论文 |
-| `sp_year` | int | 指定年份，精确匹配 |
-| `sp_author` | string | 指定作者，精确/模糊匹配 |
-| `confs` | string | 会议列表，逗号分隔，如 `ACL,EMNLP,CVPR` |
-| `searchtype` | string | `title`（按标题检索）或 `author`（按作者检索） |
-
-**检索逻辑**：
-- 先将查询词统一小写，去除多余空格与连字符；
-- 在 `title_format`（已归一化的小写标题）中进行子串匹配；
-- 支持按会议、年份、作者多重过滤；
-- 默认最多返回 **5000** 条结果。
-
-#### `/api/get_guess_you_like` 请求参数
+#### `/api/v1/papers` 请求参数
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `query` | string | 用户输入的检索词 |
+| `q` | string | 自由文本检索词；后端做小写子串匹配（可由前端 DSL 解析后下推） |
+| `field` | enum | `title` / `author` / `any`，默认 `title` |
+| `conf` | string\|string[] | 会议名，单值/多值（重复 `?conf=A&conf=B` 或 `?conf=A,B` 均可） |
+| `since` / `until` | int | 年份区间（闭区间） |
+| `author` | string | 作者精确/模糊匹配 |
+| `sort` | string | `-year` / `year` / `conf` / `-conf` / `title` / `-title` |
+| `page` / `size` | int | 分页参数；`size` 上限由 `PAPERVAULT_MAX_PAGE_SIZE`（默认 200）控制 |
 
-该接口调用 OpenAI GPT-3.5-turbo，要求模型返回与输入词相关的 Top-10 论文关键词，供用户扩展检索。
+响应：`{ "items": [...], "meta": { "page", "size", "total" } }`，每条 `PaperOut` 包含稳定 `id`、`conf`、`year`、`title`、`url`、`authors`、`abstract`、`code`。
+
+#### `/api/v1/suggest` 请求体
+
+```json
+{ "query": "federated learning", "model": "deepseek-chat", "max_keywords": 10 }
+```
+
+后端会按 `PAPERVAULT_SUGGEST_PROVIDER` 选择 DeepSeek 兼容接口或 OpenAI；前端在调用前会先用 `queryDsl.ts` 把 WoS 风格语法清洗为纯关键词，再请求 LLM。
 
 ### 2.3 缓存加载机制
 
-`app.py` 在模块导入时即执行 `load_data()`，将 `cache/cache.jsonl.gz` 流式读入内存，按会议和年份组织为嵌套字典 `cache_data`。此后所有搜索均在内存中进行，无磁盘 I/O。
+`papervault/services/papers.py` 中的 `PaperRepository` 在 `create_app(eager_load=True)` 时即流式读入 `cache/cache.jsonl.gz`，按会议/年份组织为内存索引；之后所有搜索均零磁盘 I/O。`/api/v1/healthz`、`/api/v1/confs` 等接口在请求阶段调用 `ensure_loaded()` 进行幂等保护，避免冷启动失败导致首次请求 500。
 
 `cache/cache.jsonl.gz` 被重新生成或更新后，`data_artifacts.py` 会在配置 Hugging Face 环境变量时将其上传到对应的 Dataset 仓库。Hugging Face 会自动将 JSON Lines 数据集转换为 Parquet 视图，因此本仓库不再在本地生成或维护 Parquet 文件。
 
@@ -82,32 +94,74 @@ conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| Vue | 3.x | 渐进式框架 |
-| Vite | 4.x | 构建工具与开发服务器 |
-| TypeScript | ~4.7 | 类型安全 |
-| Element Plus | 2.2.x | UI 组件库 |
-| Axios | 1.3.x | HTTP 客户端 |
-| @vueuse/core | 9.x | 暗黑模式等组合式工具 |
+| Vue | 3.5 | 渐进式框架（Composition API + `<script setup>`） |
+| Vite | 8.x | 构建工具与开发服务器，启用 `vite-plugin-compression2` 输出 gzip |
+| TypeScript | 5.9 | 类型安全 |
+| Element Plus | 2.14 | UI 组件库（`unplugin-vue-components` 自动按需引入） |
+| Vue Router | 4.6 | Hash 路由，两条路由：`/`（智能搜索）、`/advanced`（高级搜索） |
+| Axios | 1.16 | HTTP 客户端，封装为返回 `Promise<T>` 的类型化 wrapper |
+| @vueuse/core | 13.x | 暗黑模式、剪贴板等组合式工具 |
 
 ### 3.2 组件结构
 
 ```
 src/
-├── api/paper.ts              # 封装 /search 和 /get_guess_you_like 请求
-├── views/HomeView.vue        # 主搜索页：搜索栏、结果区、侧边栏
+├── api/paper.ts               # /v1/papers /v1/confs /v1/suggest 类型化请求
+├── router/index.ts            # 路由：/ 与 /advanced
+├── views/
+│   ├── HomeView.vue           # 智能搜索：统一搜索框、语法速查、结果区
+│   ├── AdvancedSearchView.vue # 高级搜索：行式条件构建器 + DSL 预览
+│   └── AboutView.vue          # 关于（暂未启用）
 ├── components/
-│   ├── SearchResultList.vue  # 结果分页展示、排序、CSV/TXT 导出
-│   ├── ConfsTree.vue         # 会议-年份树形筛选
-│   ├── GuessYourLike.vue     # AI 推荐关键词面板
-│   └── AdvancedSettingDlg.vue # 高级筛选弹窗（年份、作者、会议）
-└── utils/
-    ├── axios.ts              # Axios 实例与代理配置
-    └── file.ts               # 文件导出工具
+│   ├── SearchResultList.vue   # 结果分页 / 排序 / 研究领域·会议·年份 facet / 摘要折叠 / 导出
+│   ├── ConfsTree.vue          # 会议-年份树形筛选
+│   └── GuessYourLike.vue      # LLM 关键词推荐面板
+├── utils/
+│   ├── queryDsl.ts            # WoS 风格 DSL 解析 / 求值 / 拆分 / 构建（含单元测试）
+│   ├── fields.ts              # 研究领域归类（与 README 会议分类对齐）
+│   ├── i18n.ts                # 轻量级 zh/en 双语模块（localStorage 持久化）
+│   ├── axios.ts               # 类型化 Axios 实例
+│   └── file.ts                # CSV / TXT 导出
+└── icons/element-icons.ts     # Element Plus 图标注册
 ```
 
 ### 3.3 代理配置
 
 开发模式下，Vite 将 `/api` 请求代理到后端服务（通过 `VUE_APP_BASE_URL` 环境变量配置），实现前后端联调。生产环境则由 Flask 统一托管静态资源与 API。
+
+### 3.4 Web of Science 风格检索 DSL
+
+`web-vue/src/utils/queryDsl.ts` 提供完整的 DSL 工具链，由 `HomeView` 与 `AdvancedSearchView` 共同消费：
+
+| 能力 | 说明 |
+|------|------|
+| 字段标签 | `TS`（主题，默认）、`TI` 标题、`AB` 摘要、`AU` 作者、`SO` 会议、`PY` 年份、`AK` 作者关键词；支持 `=` 或 `:` 连接，大小写不敏感；额外接受 `topic/title/abstract/author/conf/venue/year/keywords` 长别名 |
+| 布尔运算 | `AND` / `OR` / `NOT` / 前缀 `-`；相邻 token 默认隐式 AND |
+| 邻近匹配 | `NEAR/x`（缺省距离 15），按词级 token 距离判定 |
+| 短语 | 双引号包裹的精确短语，evaluator 用大小写不敏感子串匹配 |
+| 多值列表 | `SO=ICLR,NeurIPS`，任一匹配 |
+| 范围 | `PY=2023-2026` / `PY=2023..2026` |
+| 分组 | `( ... )` 改变优先级，字段标签可作用于整个子表达式 |
+| CJK 标点 | `normalizeQueryInput` 自动将 `（）：，；。"“ ”` 等全角符号映射为 ASCII，避免中文输入即崩溃 |
+
+优先级：`NEAR` > `NOT` > `AND` > `OR`（与 WoS Core Collection 一致）。
+
+DSL 模块对外导出四个核心函数：
+
+| 函数 | 用途 |
+|------|------|
+| `parseDsl(text) → AstNode` | 将输入解析为 AST |
+| `evaluateDsl(paper, ast) → boolean` | 在 `SearchResultList` 中对已加载结果做客户端再过滤 |
+| `splitForBackend(ast) → { q, author, conf, since, until, residual }` | 把顶层 AND 子句中可下推的字段（会议、年份、作者、自由文本）摘出来送给 `/api/v1/papers`，其余复杂结构（OR / NOT / NEAR / 嵌套 / 非默认字段）保留在 `residual` 由客户端二次评估 |
+| `buildDsl(rows)` | 高级搜索页的行式条件 → DSL 串（自动加 `TS/TI/AB/AU/SO/PY` 前缀、按需用引号或括号包裹） |
+
+回归测试位于 `web-vue/src/utils/__tests__/queryDsl.test.mjs`，由 CI（`.github/workflows/ci.yml`）的前端任务执行。
+
+### 3.5 双语 i18n、深色模式与领域 facet
+
+- `utils/i18n.ts` 是一个零依赖的轻量 i18n 模块，按 `navigator.language` 默认判定 zh/en，并把用户选择持久化到 `localStorage`；所有界面文案、检索语法速查、提示条均走 `t('key')` 调用。
+- 顶部工具栏支持深色 / 浅色切换（基于 `@vueuse/core` 的 `useDark`）。
+- `components/SearchResultList.vue` 的 refine bar 支持：结果内关键词二次过滤、仅看含摘要 / 仅看含代码、年份范围、**研究领域 facet**（按 `utils/fields.ts` 与 README 会议分类一致）、按会议筛选等，全部在客户端基于已加载结果进行，无需重新请求后端。
 
 ---
 
@@ -191,8 +245,16 @@ cache_conf = [name for name in cache_res.keys()]
 
 | 变量 | 用途 |
 |------|------|
-| `OPENAI_API_KEY` | GPT-3.5 关键词推荐功能 |
+| `OPENAI_API_KEY` | OpenAI 兼容的关键词推荐密钥（当 `PAPERVAULT_SUGGEST_PROVIDER=openai` 时必填） |
 | `OPENAI_API_BASE` | OpenAI API 代理地址（可选） |
+| `PAPERVAULT_SUGGEST_PROVIDER` | 关键词推荐提供方，默认 `deepseek`；可选 `openai` |
+| `PAPERVAULT_DEEPSEEK_MODEL` | DeepSeek 模型名，默认 `deepseek-chat` |
+| `PAPERVAULT_DEEPSEEK_BASE_URL` | DeepSeek 兼容服务地址，默认 `https://api.deepseek.com` |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key（`provider=deepseek` 时必填） |
+| `PAPERVAULT_OPENAI_MODEL` / `PAPERVAULT_OPENAI_TEMPERATURE` / `PAPERVAULT_OPENAI_MAX_KEYWORDS` | LLM 调用参数 |
+| `PAPERVAULT_MAX_PAGE_SIZE` / `PAPERVAULT_DEFAULT_PAGE_SIZE` | `/api/v1/papers` 分页上限（默认 200 / 50） |
+| `PAPERVAULT_CORS_ORIGINS` | 允许的跨域来源（逗号分隔），不设置则关闭 CORS |
+| `HOST` / `PORT` | Flask 监听地址（默认 `127.0.0.1:5001`） |
 | `HF_TOKEN` | Hugging Face 写入 token，用于上传数据产物 |
 | `PAPERVAULT_HF_REPO_ID` | Hugging Face Dataset 仓库 ID，如 `youngfish42/PaperVault`；未设置时跳过上传 |
 | `PAPERVAULT_HF_REPO_TYPE` | Hugging Face 仓库类型，默认 `dataset` |
