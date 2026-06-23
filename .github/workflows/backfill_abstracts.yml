@@ -36,6 +36,15 @@ jobs:
       # protocol has been observed to stall on some networks and there is no
       # benefit to it for our single ~250MB cache file.
       HF_HUB_DISABLE_XET: "1"
+      # cache/cache.jsonl.gz is no longer maintained via Git LFS (it now lives
+      # on Hugging Face). However, cache/abstract_backfill_progress.json is
+      # still tracked by LFS in .gitattributes, and the in-progress restore
+      # step below performs `git checkout origin/<branch> -- <file>` against
+      # exactly that file. Without this flag the LFS smudge filter would run
+      # and fail once the repository's LFS bandwidth budget is exhausted.
+      # Setting it at job scope also covers peter-evans/create-pull-request's
+      # internal `git checkout`.
+      GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
       pull-requests: write
@@ -43,6 +52,8 @@ jobs:
     steps:
       - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
         uses: actions/checkout@v4
+        with:
+          lfs: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -264,8 +275,6 @@ jobs:
       - name: Create Pull Request
         if: steps.check_changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
-        env:
-          GIT_LFS_SKIP_SMUDGE: 1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(auto): backfill abstracts"
