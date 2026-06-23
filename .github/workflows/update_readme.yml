@@ -128,3 +128,11 @@ jobs:
             pics/stats/papers_by_year.svg
             pics/stats/wordcloud.svg
             docs/stats.html
+
+      - name: Sync Hugging Face dataset README
+        # Render docs/HF_README.md with the just-updated cache stats and push
+        # it to the HF dataset repo root as README.md. Always-run so the HF
+        # landing page is refreshed even when no GitHub-side diff is produced
+        # (e.g. README-only mode with no statistical movement).
+        if: always()
+        run: python scripts/sync_hf_readme.py --skip-cache-refresh
