@@ -24,12 +24,22 @@ jobs:
     timeout-minutes: 330
     env:
       TZ: Asia/Shanghai
+      # cache/cache.jsonl.gz is no longer maintained via Git LFS (it now lives
+      # on Hugging Face). However, historical commits on auto-created branches
+      # such as auto-discover-confs may still contain LFS pointers. Without
+      # this flag, peter-evans/create-pull-request's internal `git checkout`
+      # would invoke the LFS smudge filter and fail once the repository's LFS
+      # bandwidth budget is exhausted.
+      GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
       pull-requests: write
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
+        uses: actions/checkout@v4
+        with:
+          lfs: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
