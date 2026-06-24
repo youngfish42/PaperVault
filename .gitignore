@@ -8,6 +8,13 @@ cache/*.parquet.tmp
 # committed to git.
 cache/cache.jsonl.gz
 cache/cache.jsonl.gz.tmp
+# abstract_backfill_progress.jsonl.gz follows the same workflow: it is pulled
+# / pushed via data_artifacts.ensure_progress_local() and never committed.
+# The legacy .json variant is also ignored to prevent re-introducing the
+# 14 MB pretty-printed blob.
+cache/abstract_backfill_progress.jsonl.gz
+cache/abstract_backfill_progress.jsonl.gz.tmp
+cache/abstract_backfill_progress.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

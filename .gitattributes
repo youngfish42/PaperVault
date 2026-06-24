@@ -3,4 +3,9 @@
 # in AGENTS.md / data_artifacts.py) and is synchronised locally by
 # data_artifacts.ensure_cache_local(). Keep this file present so existing
 # clones still resolve the historical LFS pointers gracefully.
-cache/abstract_backfill_progress.json filter=lfs diff=lfs merge=lfs -text
+#
+# abstract_backfill_progress was previously tracked with Git LFS as a single
+# pretty-printed JSON blob (~14 MB). It is now stored as
+# cache/abstract_backfill_progress.jsonl.gz (~1 MB) and synchronised via the
+# same Hugging Face dataset, so the LFS rule has been removed. The historical
+# .json file is .gitignored to avoid re-introducing it.

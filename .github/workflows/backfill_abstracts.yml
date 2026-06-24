@@ -3,9 +3,10 @@ name: Backfill Abstracts
 env:
   PYTHON_VERSION: "3.10"
   AUTO_BACKFILL_BRANCH: "auto-backfill-abstracts"
-  # cache/cache.jsonl.gz is intentionally excluded: it lives on Hugging Face
-  # (PAPERVAULT_HF_REPO_ID) and is synced via data_artifacts.ensure_cache_local.
-  AUTO_BACKFILL_FILES: "cache/abstract_backfill_progress.json docs/abstract_backfill_progress.md pics/stats/stats_overview.svg"
+  # cache/cache.jsonl.gz AND cache/abstract_backfill_progress.jsonl.gz are
+  # intentionally excluded from the auto-PR: both live on Hugging Face
+  # (PAPERVAULT_HF_REPO_ID) and are pushed via data_artifacts.sync_cache_artifacts.
+  AUTO_BACKFILL_FILES: "docs/abstract_backfill_progress.md pics/stats/stats_overview.svg"
 
 on:
   schedule:
@@ -36,14 +37,11 @@ jobs:
       # protocol has been observed to stall on some networks and there is no
       # benefit to it for our single ~250MB cache file.
       HF_HUB_DISABLE_XET: "1"
-      # cache/cache.jsonl.gz is no longer maintained via Git LFS (it now lives
-      # on Hugging Face). However, cache/abstract_backfill_progress.json is
-      # still tracked by LFS in .gitattributes, and the in-progress restore
-      # step below performs `git checkout origin/<branch> -- <file>` against
-      # exactly that file. Without this flag the LFS smudge filter would run
-      # and fail once the repository's LFS bandwidth budget is exhausted.
-      # Setting it at job scope also covers peter-evans/create-pull-request's
-      # internal `git checkout`.
+      # cache/cache.jsonl.gz and cache/abstract_backfill_progress.jsonl.gz
+      # are no longer maintained via Git LFS (they live on Hugging Face).
+      # GIT_LFS_SKIP_SMUDGE remains set as a safety belt: if a residual LFS
+      # rule sneaks back in, the smudge filter would otherwise consume our
+      # exhausted LFS bandwidth budget.
       GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
@@ -178,7 +176,7 @@ jobs:
         #      (i.e. the backfill actually merged in at least one new abstract),
         #   2. At least one tracked progress/stats file changed.
         # Gate (1) prevents the bandwidth-wasting "ghost PR" pattern where
-        # only timestamps inside cache/abstract_backfill_progress.json moved
+        # only timestamps inside the progress ledger moved
         # while no new abstract content was added to the authoritative
         # cache.jsonl.gz on Hugging Face.
         run: |
@@ -296,7 +294,6 @@ jobs:
           branch: ${{ env.AUTO_BACKFILL_BRANCH }}
           delete-branch: false
           add-paths: |
-            cache/abstract_backfill_progress.json
             docs/abstract_backfill_progress.md
             pics/stats/stats_overview.svg
 
