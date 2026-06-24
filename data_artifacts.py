@@ -22,6 +22,7 @@ HF_UPLOAD_RETRY_BACKOFF = float(os.getenv("PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF", 
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_CACHE_PATH = ROOT / "cache" / "cache.jsonl.gz"
+DEFAULT_PROGRESS_PATH = ROOT / "cache" / "abstract_backfill_progress.jsonl.gz"
 PathLike = Union[str, Path]
 
 
@@ -229,6 +230,24 @@ def open_cache(cache_path: Path):
             yield handle
 
 
+def ensure_progress_local(
+    progress_path: PathLike = DEFAULT_PROGRESS_PATH,
+    refresh: bool = True,
+    allow_missing_remote: bool = True,
+) -> Tuple[Path, Optional[str]]:
+    """与 ``ensure_cache_local`` 同语义，但作用于进度文件。
+
+    复用同一套 HF 同步 + 乐观锁机制，使 ``abstract_backfill_progress.jsonl.gz``
+    与 ``cache.jsonl.gz`` 在远端 dataset 仓库里并列管理。多机协作时也能通过
+    parent_commit 机制避免互相覆盖。
+    """
+    return ensure_cache_local(
+        cache_path=progress_path,
+        refresh=refresh,
+        allow_missing_remote=allow_missing_remote,
+    )
+
+
 def upload_to_huggingface(paths: Iterable[PathLike], commit_message: str) -> List[str]:
     repo_id = _hf_repo_id()
     if not repo_id:
@@ -334,13 +353,25 @@ def sync_cache_artifacts(
     cache_path: PathLike = DEFAULT_CACHE_PATH,
     upload: bool = True,
     commit_message: str = "Update PaperVault data artifacts",
+    progress_path: Optional[PathLike] = DEFAULT_PROGRESS_PATH,
 ) -> None:
+    """同步缓存制品到 HF。
+
+    ``cache_path`` 一定上传；``progress_path`` 若存在则一并上传，使
+    abstract backfill 进度文件与主缓存保持同一次提交语义。传入 ``None``
+    可显式关闭进度文件上传（例如只想推主缓存）。
+    """
     cache_path = Path(cache_path)
+    targets: List[Path] = [cache_path]
+    if progress_path is not None:
+        progress_path = Path(progress_path)
+        if progress_path.exists():
+            targets.append(progress_path)
 
     if upload:
         try:
             upload_to_huggingface(
-                [cache_path],
+                targets,
                 commit_message=commit_message,
             )
         except Exception as exc:
