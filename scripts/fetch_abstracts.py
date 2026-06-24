@@ -34,7 +34,7 @@ from requests.adapters import HTTPAdapter
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from data_artifacts import sync_cache_artifacts, ensure_cache_local
+from data_artifacts import sync_cache_artifacts, ensure_cache_local, ensure_progress_local
 
 # Windows 控制台 UTF-8 编码修复
 if sys.platform == "win32":
@@ -61,8 +61,18 @@ HEADERS = {
 
 CACHE_DIR = Path("cache")
 CACHE_FILE = CACHE_DIR / "cache.jsonl.gz"
-PROGRESS_FILE = CACHE_DIR / "abstract_backfill_progress.json"
+PROGRESS_FILE = CACHE_DIR / "abstract_backfill_progress.jsonl.gz"
+LEGACY_PROGRESS_FILE = CACHE_DIR / "abstract_backfill_progress.json"
 BACKUP_FILE = CACHE_DIR / "cache.jsonl.gz.bak"
+
+PROGRESS_SCHEMA = "abstract_backfill_progress/v3"
+PROGRESS_SCHEMA_VERSION = 3
+# 当物理行数 > 活跃 url 数 * COMPACTION_RATIO 时，触发整文件 compaction
+PROGRESS_COMPACTION_RATIO = 2.0
+# 用于 append 写入时跟踪"自上次落盘以来的脏行数"，配合活跃 key 数判断 compaction 时机
+_progress_runtime: Dict[str, int] = {"physical_lines": 0}
+# 进程内缓存的"磁盘上 progress 文件最新一次反映出来的快照"，用于增量 save diff
+_last_saved_snapshot: Dict[str, dict] = {}
 
 # 核心会议（用于 Phase 2/3 划分）
 CORE_CONFS = {
@@ -468,25 +478,192 @@ def fetch_abstract_for_paper(
     return abstract, last_time, source
 
 
-# ---------- 进度管理（v2 格式，兼容旧版） ----------
-def load_progress() -> Dict[str, dict]:
-    """加载进度文件，返回 {url: {"status": ..., ...}} 字典。"""
-    if not PROGRESS_FILE.exists():
-        return {}
-    with open(PROGRESS_FILE, "r", encoding="utf-8") as f:
+# ---------- 进度管理（v3 JSONL.gz 格式，兼容旧 JSON / 旧 v2 格式） ----------
+#
+# 新格式：cache/abstract_backfill_progress.jsonl.gz
+#   - 首行：meta，例如 {"_meta": true, "schema": "abstract_backfill_progress/v3",
+#                       "version": 3, "generated_at": "..."}
+#   - 其余每行：record，例如
+#       {"url": "...", "status": "success", "source": "openalex", "chars": 1764, "ts": "..."}
+#       {"url": "...", "status": "failed", "attempts": 2, "ts": "..."}
+#   - 同一 url 后写覆盖前写（event-sourcing 风格）。加载时归并到 {url: latest_record}。
+#
+# 写入策略：
+#   - 增量 save 走 append（避免每次重写 ~1 MB 文件）。
+#   - 物理行数膨胀到 live_keys * COMPACTION_RATIO 时，自动 compact 整文件。
+#   - compact 使用 .tmp + os.replace，原子替换防止半成品损坏。
+#
+# 兼容回退：
+#   - 若 .jsonl.gz 不存在但旧 .json 存在，自动迁移一次（或单次读取兼容）。
+
+
+def _meta_line() -> dict:
+    return {
+        "_meta": True,
+        "schema": PROGRESS_SCHEMA,
+        "version": PROGRESS_SCHEMA_VERSION,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+
+
+def _record_to_meta(rec: dict) -> dict:
+    """从 jsonl record 提取出 load_progress 期望的 meta dict（去掉 url 主键）。"""
+    return {k: v for k, v in rec.items() if k != "url"}
+
+
+def _meta_to_record(url: str, meta: dict) -> dict:
+    """把 (url, meta) 装回 jsonl record（添加 url 字段）。"""
+    rec = {"url": url}
+    rec.update({k: v for k, v in meta.items() if k != "url"})
+    return rec
+
+
+def _load_legacy_json(path: Path) -> Dict[str, dict]:
+    """兼容加载旧 abstract_backfill_progress.json（v1 列表式 / v2 字典式）。"""
+    with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # 兼容旧版格式 {"processed_urls": [...]}
     if "processed_urls" in data:
-        old_urls = data["processed_urls"]
-        return {url: {"status": "unknown", "ts": ""} for url in old_urls}
-    # 新版格式 {"processed": {...}}
-    return data.get("processed", {})
+        return {url: {"status": "unknown", "ts": ""} for url in data["processed_urls"]}
+    return data.get("processed", {}) if isinstance(data, dict) else {}
 
 
-def save_progress(processed: Dict[str, dict]):
+def _load_jsonl_gz(path: Path) -> Tuple[Dict[str, dict], int]:
+    """读取 jsonl.gz 进度文件，返回 ({url: latest_meta}, physical_record_lines)。
+
+    physical_record_lines 不包含 meta 行，仅统计 record 行数；用于估算
+    compaction 时机（与 live url 数比较）。
+    """
+    progress: Dict[str, dict] = {}
+    physical = 0
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        for i, raw in enumerate(f):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"[!] Skipping malformed progress line {i + 1} in {path.name}")
+                continue
+            if obj.get("_meta"):
+                continue
+            url = obj.get("url")
+            if not url:
+                continue
+            physical += 1
+            # 后写覆盖前写：天然实现事件溯源式去重
+            progress[url] = _record_to_meta(obj)
+    return progress, physical
+
+
+def load_progress() -> Dict[str, dict]:
+    """加载进度文件，返回 {url: {"status": ..., ...}} 字典。
+
+    优先级：新 .jsonl.gz > 旧 .json。两者都不存在时返回空。
+    同时初始化 _last_saved_snapshot，使后续 save 的 diff 计算可参照磁盘真实状态。
+    """
+    global _last_saved_snapshot
+    if PROGRESS_FILE.exists():
+        progress, physical = _load_jsonl_gz(PROGRESS_FILE)
+        _progress_runtime["physical_lines"] = physical
+        _last_saved_snapshot = {k: dict(v) for k, v in progress.items()}
+        return progress
+    if LEGACY_PROGRESS_FILE.exists():
+        print(
+            f"[*] Legacy progress file detected ({LEGACY_PROGRESS_FILE.name}); "
+            f"loading and will write back to {PROGRESS_FILE.name} on next save."
+        )
+        legacy = _load_legacy_json(LEGACY_PROGRESS_FILE)
+        # PROGRESS_FILE 还不存在；snapshot 留空，首次 save 会触发 compact 把全量写入
+        _progress_runtime["physical_lines"] = 0
+        _last_saved_snapshot = {}
+        return legacy
+    _progress_runtime["physical_lines"] = 0
+    _last_saved_snapshot = {}
+    return {}
+
+
+def _compact_progress(progress: Dict[str, dict]) -> None:
+    """整文件原子重写：丢弃历史 append，只保留每个 url 的最新状态。"""
     PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
-        json.dump({"version": 2, "processed": processed}, f, ensure_ascii=False, indent=2)
+    tmp = PROGRESS_FILE.with_suffix(PROGRESS_FILE.suffix + ".tmp")
+    try:
+        with gzip.open(tmp, "wt", encoding="utf-8") as f:
+            meta = _meta_line()
+            meta["record_count"] = len(progress)
+            f.write(json.dumps(meta, ensure_ascii=False) + "\n")
+            for url, rec_meta in progress.items():
+                rec = _meta_to_record(url, rec_meta)
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        os.replace(tmp, PROGRESS_FILE)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+    _progress_runtime["physical_lines"] = len(progress)
+
+
+def _append_progress(records: List[dict]) -> None:
+    """把若干 record append 到 jsonl.gz 末尾。gzip 模块支持多流串联，read 端透明可读。"""
+    if not records:
+        return
+    PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    new_file = not PROGRESS_FILE.exists()
+    with gzip.open(PROGRESS_FILE, "ab") as raw:
+        # gzip.open ab 不直接接受 text；自己手工编码以保证可控
+        buf_lines = []
+        if new_file:
+            buf_lines.append(json.dumps(_meta_line(), ensure_ascii=False))
+        for rec in records:
+            buf_lines.append(json.dumps(rec, ensure_ascii=False))
+        payload = ("\n".join(buf_lines) + "\n").encode("utf-8")
+        raw.write(payload)
+        try:
+            raw.flush()
+        except Exception:
+            pass
+    _progress_runtime["physical_lines"] += len(records) + (1 if new_file else 0)
+
+
+def save_progress(processed: Dict[str, dict]) -> None:
+    """保存进度。
+
+    策略：
+      - 首次调用或文件不存在：整文件 compact 写入（含 meta 行）。
+      - 增量调用：append 自上次 save 以来发生变化（新增或 meta 变化）的 url。
+      - 当物理行数膨胀至 live_keys * COMPACTION_RATIO 时，自动 compact。
+    """
+    global _last_saved_snapshot
+
+    if not PROGRESS_FILE.exists():
+        _compact_progress(processed)
+        _last_saved_snapshot = {k: dict(v) for k, v in processed.items()}
+        return
+
+    # 计算 diff（新增 + 修改）。删除场景在本工作流中不存在，无需处理。
+    dirty: List[dict] = []
+    for url, meta in processed.items():
+        snap = _last_saved_snapshot.get(url)
+        if snap is None or snap != meta:
+            dirty.append(_meta_to_record(url, meta))
+
+    if not dirty:
+        return
+
+    _append_progress(dirty)
+
+    physical = _progress_runtime.get("physical_lines", 0)
+    live = len(processed)
+    if live > 0 and physical > live * PROGRESS_COMPACTION_RATIO:
+        print(
+            f"[*] Compacting progress file: physical_lines={physical}, live_keys={live} "
+            f"(ratio={physical / live:.2f} > {PROGRESS_COMPACTION_RATIO})"
+        )
+        _compact_progress(processed)
+
+    _last_saved_snapshot = {k: dict(v) for k, v in processed.items()}
 
 
 # ---------- 预检统计 ----------
@@ -778,6 +955,9 @@ def run(
     # Pull the latest cache from Hugging Face before reading/writing anything.
     # This is the canonical source of truth across all workflows.
     ensure_cache_local(CACHE_FILE, refresh=True)
+    # Progress file lives on the same HF dataset. Pull it too so multi-machine
+    # / multi-day runs share a single coherent progress ledger.
+    ensure_progress_local(PROGRESS_FILE, refresh=True)
     print(f"[*] Phase: {phase}, conf: {target_conf or 'all'}, chunk_size: {chunk_size}, max_papers: {max_papers or 'unlimited'}")
     if query_doi_by_title:
         print("[*] DOI query by title: ENABLED (slower, use with caution)")
