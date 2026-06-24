@@ -16,6 +16,12 @@ tags:
 pretty_name: PaperVault
 size_categories:
   - 100K<n<1M
+configs:
+  - config_name: papers
+    data_files: "cache/cache.jsonl.gz"
+    default: true
+  - config_name: abstract_backfill_progress
+    data_files: "cache/abstract_backfill_progress.jsonl.gz"
 ---
 
 # PaperVault Dataset · 论文元数据库
@@ -61,11 +67,14 @@ PaperVault 是一份**持续自动更新**的统一论文元数据库，覆盖�
 
 ## 📦 数据集内容 · What's in this dataset
 
-| 路径 Path | 格式 Format | 说明 Description |
-|---|---|---|
-| `cache/cache.jsonl.gz` | gzip-compressed JSON Lines (UTF-8) | 每行一篇论文 · One paper per line; one JSON object per line |
+| 路径 Path | 子集 Subset | 格式 Format | 说明 Description |
+|---|---|---|---|
+| `cache/cache.jsonl.gz` | `papers`（默认 / default） | gzip-compressed JSON Lines (UTF-8) | 每行一篇论文 · One paper per line; one JSON object per line |
+| `cache/abstract_backfill_progress.jsonl.gz` | `abstract_backfill_progress` | gzip-compressed JSON Lines (UTF-8) | 摘要回填流水线的进度/断点记录，**不是论文元数据**；仅供工作流恢复使用 · Append-only progress log of the abstract-backfill pipeline (**not paper records**); used by the workflow to resume between runs |
 
 Hugging Face 会自动为 `cache.jsonl.gz` 生成 Parquet 视图，也可直接用 `datasets.load_dataset(...)` 读取，无需手动解压。Hugging Face also exposes an auto-generated Parquet view, so `datasets.load_dataset(...)` works out of the box.
+
+> 💡 Dataset Viewer 与 `datasets.load_dataset("youngfish42/PaperVault")` 默认展示/加载的都是 `papers` 子集（即 `cache/cache.jsonl.gz`）。如需查看回填进度，请在 Viewer 顶部下拉框切换到 `abstract_backfill_progress`，或调用 `load_dataset("youngfish42/PaperVault", name="abstract_backfill_progress")`。The Dataset Viewer and `datasets.load_dataset("youngfish42/PaperVault")` both default to the `papers` subset (`cache/cache.jsonl.gz`). To inspect backfill progress, switch the Viewer's subset dropdown to `abstract_backfill_progress` or call `load_dataset("youngfish42/PaperVault", name="abstract_backfill_progress")`.
 
 ### 📐 字段 Schema
 
