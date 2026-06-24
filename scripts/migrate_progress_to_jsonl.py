@@ -117,12 +117,13 @@ def migrate(source: Path, target: Path, dry_run: bool = False) -> Dict[str, int]
     verify_records = 0
     seen_urls = set()
     with gzip.open(target, "rt", encoding="utf-8") as f:
-        for i, line in enumerate(f):
+        for line in f:
             line = line.strip()
             if not line:
                 continue
             obj = json.loads(line)
-            if i == 0 and obj.get("_meta"):
+            # 用对象自身的 _meta 标记判定 meta 行，避免假设它一定出现在第 0 行。
+            if obj.get("_meta"):
                 continue
             verify_records += 1
             verify_counter[obj.get("status", "unknown")] += 1

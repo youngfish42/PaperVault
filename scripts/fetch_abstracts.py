@@ -73,6 +73,13 @@ PROGRESS_COMPACTION_RATIO = 2.0
 _progress_runtime: Dict[str, int] = {"physical_lines": 0}
 # 进程内缓存的"磁盘上 progress 文件最新一次反映出来的快照"，用于增量 save diff
 _last_saved_snapshot: Dict[str, dict] = {}
+# 保护 _progress_runtime / _last_saved_snapshot / PROGRESS_FILE 写入的串行锁。
+# fetch_abstracts.py 内有 ThreadPoolExecutor 并发改写 processed，且 save_progress
+# 可能在主线程周期性触发；加锁防止：
+#   1. dict diff 时对 processed 的迭代与 worker 写入冲突；
+#   2. _progress_runtime 计数与 append/compact 的非原子叠加；
+#   3. 同一进程内并行 _append_progress 写 gzip 流。
+_progress_lock = threading.Lock()
 
 # 核心会议（用于 Phase 2/3 划分）
 CORE_CONFS = {
@@ -512,7 +519,25 @@ def _record_to_meta(rec: dict) -> dict:
 
 
 def _meta_to_record(url: str, meta: dict) -> dict:
-    """把 (url, meta) 装回 jsonl record（添加 url 字段）。"""
+    """把 (url, meta) 装回 jsonl record（添加 url 字段）。
+
+    业务不变量：``meta`` 不应携带 ``url`` 字段——url 是外层主键。如果调用方
+    误把 url 也塞进了 meta，这里给出一次性告警（避免静默丢失数据）；当
+    meta 内的 url 与外层 url 不一致时，以外层为准并打印 WARNING。
+    """
+    if "url" in meta:
+        inner = meta.get("url")
+        if inner != url:
+            print(
+                f"[!] _meta_to_record: meta carries url={inner!r} but outer url={url!r}; "
+                "outer wins, inner value will be dropped."
+            )
+        else:
+            # 通常意味着上游构造时把主键也复制进了 meta；功能上无害，仅提示。
+            print(
+                f"[!] _meta_to_record: meta unexpectedly contains 'url' field for {url!r}; "
+                "dropping it to keep schema clean."
+            )
     rec = {"url": url}
     rec.update({k: v for k, v in meta.items() if k != "url"})
     return rec
@@ -532,27 +557,46 @@ def _load_jsonl_gz(path: Path) -> Tuple[Dict[str, dict], int]:
 
     physical_record_lines 不包含 meta 行，仅统计 record 行数；用于估算
     compaction 时机（与 live url 数比较）。
+
+    若 gzip 流损坏（例如上一次 append 被强杀，写入了不完整的 gzip 段），
+    则把损坏文件改名为 ``<path>.broken-<ts>`` 备份后返回 ({}, 0)，让上层
+    回退到 legacy 或空状态而不是直接抛异常拒绝启动。
     """
     progress: Dict[str, dict] = {}
     physical = 0
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        for i, raw in enumerate(f):
-            line = raw.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                print(f"[!] Skipping malformed progress line {i + 1} in {path.name}")
-                continue
-            if obj.get("_meta"):
-                continue
-            url = obj.get("url")
-            if not url:
-                continue
-            physical += 1
-            # 后写覆盖前写：天然实现事件溯源式去重
-            progress[url] = _record_to_meta(obj)
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            for i, raw in enumerate(f):
+                line = raw.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    print(f"[!] Skipping malformed progress line {i + 1} in {path.name}")
+                    continue
+                if obj.get("_meta"):
+                    continue
+                url = obj.get("url")
+                if not url:
+                    continue
+                physical += 1
+                # 后写覆盖前写：天然实现事件溯源式去重
+                progress[url] = _record_to_meta(obj)
+    except (OSError, EOFError, gzip.BadGzipFile) as exc:
+        backup = path.with_name(f"{path.name}.broken-{int(time.time())}")
+        try:
+            os.replace(path, backup)
+            print(
+                f"[!] Progress file appears corrupted ({exc!r}); "
+                f"moved to {backup.name} and starting from empty state."
+            )
+        except OSError as move_exc:
+            print(
+                f"[!] Progress file appears corrupted ({exc!r}) and could not be "
+                f"renamed for backup ({move_exc!r}); starting from empty state."
+            )
+        return {}, 0
     return progress, physical
 
 
@@ -606,16 +650,28 @@ def _compact_progress(progress: Dict[str, dict]) -> None:
 
 
 def _append_progress(records: List[dict]) -> None:
-    """把若干 record append 到 jsonl.gz 末尾。gzip 模块支持多流串联，read 端透明可读。"""
+    """把若干 record append 到 jsonl.gz 末尾。gzip 模块支持多流串联，read 端透明可读。
+
+    特殊情况：若 PROGRESS_FILE 还不存在，则改走 ``_compact_progress`` 的原子
+    路径（``.tmp + os.replace``）而不是直接 ``gzip.open("ab")``——后者在写到
+    一半被打断时会留下一个 *只含半段 gzip 流* 的文件，导致下次启动加载失败。
+    """
     if not records:
         return
     PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    new_file = not PROGRESS_FILE.exists()
+    if not PROGRESS_FILE.exists():
+        # 首文件改走 compact 路径，享受原子替换语义。
+        seed: Dict[str, dict] = {}
+        for rec in records:
+            url = rec.get("url")
+            if not url:
+                continue
+            seed[url] = _record_to_meta(rec)
+        _compact_progress(seed)
+        return
     with gzip.open(PROGRESS_FILE, "ab") as raw:
         # gzip.open ab 不直接接受 text；自己手工编码以保证可控
         buf_lines = []
-        if new_file:
-            buf_lines.append(json.dumps(_meta_line(), ensure_ascii=False))
         for rec in records:
             buf_lines.append(json.dumps(rec, ensure_ascii=False))
         payload = ("\n".join(buf_lines) + "\n").encode("utf-8")
@@ -624,7 +680,7 @@ def _append_progress(records: List[dict]) -> None:
             raw.flush()
         except Exception:
             pass
-    _progress_runtime["physical_lines"] += len(records) + (1 if new_file else 0)
+    _progress_runtime["physical_lines"] += len(records)
 
 
 def save_progress(processed: Dict[str, dict]) -> None:
@@ -634,36 +690,46 @@ def save_progress(processed: Dict[str, dict]) -> None:
       - 首次调用或文件不存在：整文件 compact 写入（含 meta 行）。
       - 增量调用：append 自上次 save 以来发生变化（新增或 meta 变化）的 url。
       - 当物理行数膨胀至 live_keys * COMPACTION_RATIO 时，自动 compact。
+
+    并发：整个临界区受 ``_progress_lock`` 保护；入口处先对 ``processed`` 拍
+    一个浅快照（``list(processed.items())``），避免 diff 阶段被 worker 线程
+    并发改写 dict 时触发 ``RuntimeError: dictionary changed size``。
     """
     global _last_saved_snapshot
 
-    if not PROGRESS_FILE.exists():
-        _compact_progress(processed)
-        _last_saved_snapshot = {k: dict(v) for k, v in processed.items()}
-        return
+    with _progress_lock:
+        # 浅快照：dict 顶层 keys/values 在锁内不再变化；meta dict 是只读消费，
+        # worker 线程后续写入只会"替换 processed[url]"而不会原地改这里捕获到的 meta 对象。
+        snapshot_items = list(processed.items())
 
-    # 计算 diff（新增 + 修改）。删除场景在本工作流中不存在，无需处理。
-    dirty: List[dict] = []
-    for url, meta in processed.items():
-        snap = _last_saved_snapshot.get(url)
-        if snap is None or snap != meta:
-            dirty.append(_meta_to_record(url, meta))
+        if not PROGRESS_FILE.exists():
+            seed_dict = {url: meta for url, meta in snapshot_items}
+            _compact_progress(seed_dict)
+            _last_saved_snapshot = {k: dict(v) for k, v in seed_dict.items()}
+            return
 
-    if not dirty:
-        return
+        # 计算 diff（新增 + 修改）。删除场景在本工作流中不存在，无需处理。
+        dirty: List[dict] = []
+        for url, meta in snapshot_items:
+            snap = _last_saved_snapshot.get(url)
+            if snap is None or snap != meta:
+                dirty.append(_meta_to_record(url, meta))
 
-    _append_progress(dirty)
+        if not dirty:
+            return
 
-    physical = _progress_runtime.get("physical_lines", 0)
-    live = len(processed)
-    if live > 0 and physical > live * PROGRESS_COMPACTION_RATIO:
-        print(
-            f"[*] Compacting progress file: physical_lines={physical}, live_keys={live} "
-            f"(ratio={physical / live:.2f} > {PROGRESS_COMPACTION_RATIO})"
-        )
-        _compact_progress(processed)
+        _append_progress(dirty)
 
-    _last_saved_snapshot = {k: dict(v) for k, v in processed.items()}
+        physical = _progress_runtime.get("physical_lines", 0)
+        live = len(snapshot_items)
+        if live > 0 and physical > live * PROGRESS_COMPACTION_RATIO:
+            print(
+                f"[*] Compacting progress file: physical_lines={physical}, live_keys={live} "
+                f"(ratio={physical / live:.2f} > {PROGRESS_COMPACTION_RATIO})"
+            )
+            _compact_progress({url: meta for url, meta in snapshot_items})
+
+        _last_saved_snapshot = {url: dict(meta) for url, meta in snapshot_items}
 
 
 # ---------- 预检统计 ----------
