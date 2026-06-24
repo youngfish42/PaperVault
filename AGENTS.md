@@ -62,7 +62,7 @@ PaperVault/
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
-│   ├── abstract_backfill_progress.json  # Abstract backfill progress tracking
+│   ├── abstract_backfill_progress.jsonl.gz  # Abstract backfill progress (JSONL.gz on Hugging Face; git-ignored locally)
 │   └── readme_meta.json          # README rendering metadata snapshot
 ├── conf/                         # Conference source configurations
 │   ├── acl_conf.json             # ACL Anthology sources (NLP)
@@ -189,10 +189,34 @@ python maintain.py       # README + stats rebuild
 
 How synchronisation works:
 
-1. Every entry point (`app.py`, `collector.do_collect`, `maintain.*`, `scripts/fetch_*`) calls `data_artifacts.ensure_cache_local()` before reading or writing the cache. This downloads the latest revision from HF (if missing or stale) and records the current HF head as the `parent_commit` for the upcoming write.
-2. `data_artifacts.upload_to_huggingface()` performs an atomic upload using that `parent_commit`. If another workflow pushed in between, HF rejects with HTTP 412 / "stale parent_commit"; we then re-fetch the new head, rebase locally, and retry up to `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS` times (with exponential `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF`).
+1. Every entry point (`app.py`, `collector.do_collect`, `maintain.*`, `scripts/fetch_*`) calls `data_artifacts.ensure_cache_local()` before reading or writing the cache. This downloads the latest revision from HF (if missing or stale) and records the current HF head as the `parent_commit` for the upcoming write. `scripts/fetch_abstracts.py` additionally calls `data_artifacts.ensure_progress_local()` to mirror `cache/abstract_backfill_progress.jsonl.gz` from the same HF dataset, so the backfill ledger is shared across machines and runs.
+2. `data_artifacts.upload_to_huggingface()` performs an atomic upload using that `parent_commit`. If another workflow pushed in between, HF rejects with HTTP 412 / "stale parent_commit"; we then re-fetch the new head, rebase locally, and retry up to `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS` times (with exponential `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF`). `sync_cache_artifacts()` now bundles both `cache.jsonl.gz` and the progress file in a single batch so they advance together.
 3. All cache-mutating GitHub Actions workflows (`collect_papers.yml`, `backfill_abstracts.yml`, `update_readme.yml`) share a single concurrency group `papervault-cache` so they run strictly serially. `cancel-in-progress: false` ensures an in-flight job is allowed to finish its HF push.
-4. PRs created by these workflows **exclude** `cache/cache.jsonl.gz` (`AUTO_*_FILES` / `add-paths`) and only commit progress / metadata files (`cache/collect_progress.json`, `cache/abstract_backfill_progress.json`, `docs/...`, `pics/...`, `README.md`).
+4. PRs created by these workflows **exclude** `cache/cache.jsonl.gz` and `cache/abstract_backfill_progress.jsonl.gz` (`AUTO_*_FILES` / `add-paths`) and only commit small progress / metadata files (`cache/collect_progress.json`, `docs/...`, `pics/...`, `README.md`).
+
+### Abstract backfill progress (JSONL.gz, append-friendly)
+
+`cache/abstract_backfill_progress.jsonl.gz` replaces the legacy
+`cache/abstract_backfill_progress.json` (which was a ~14 MB pretty-printed JSON
+tracked via Git LFS). The new format:
+
+- First line is a metadata header (`{"_meta": true, "schema": "abstract_backfill_progress/v3", ...}`).
+- Each subsequent line is one record: `{"url": ..., "status": ..., "source": ..., "chars": ..., "attempts": ..., "ts": ...}`.
+- Same `url` written multiple times — the latest write wins (event-sourcing).
+  `load_progress()` collapses to `{url: latest_record}` in memory.
+- `save_progress()` appends only diffs since the previous save (cheap on hot
+  loops). When the physical line count grows past `live * COMPACTION_RATIO`
+  (default 2.0), the file is atomically rewritten via `.tmp` + `os.replace`,
+  trimming history back to one line per live URL.
+- The file is synchronised to / from Hugging Face exactly like `cache.jsonl.gz`
+  (same `parent_commit` optimistic-lock contract).
+
+A one-shot migrator is provided:
+
+```bash
+python scripts/migrate_progress_to_jsonl.py            # cache/*.json -> cache/*.jsonl.gz
+python scripts/migrate_progress_to_jsonl.py --dry-run  # just report counts
+```
 
 ### One-time migration from Git LFS
 

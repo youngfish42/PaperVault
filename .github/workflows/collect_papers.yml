@@ -43,14 +43,14 @@ jobs:
       # protocol has been observed to stall on some networks and there is no
       # benefit to it for our single ~250MB cache file.
       HF_HUB_DISABLE_XET: "1"
-      # cache/cache.jsonl.gz is no longer maintained via Git LFS (it now lives
-      # on Hugging Face). However, historical commits on auto-created branches
-      # such as auto-collect-papers may still contain LFS pointers, and
-      # cache/abstract_backfill_progress.json is still tracked by LFS in
-      # .gitattributes. Without this flag any internal `git checkout` (either
-      # in the in-progress restore step or inside peter-evans/create-pull-request)
-      # would invoke the LFS smudge filter and fail once the repository's LFS
-      # bandwidth budget is exhausted.
+      # cache/cache.jsonl.gz and cache/abstract_backfill_progress.jsonl.gz
+      # are no longer maintained via Git LFS (both live on Hugging Face).
+      # However, historical commits on auto-created branches may still contain
+      # LFS pointers, so we keep this flag to be safe: any internal
+      # `git checkout` (either in the in-progress restore step or inside
+      # peter-evans/create-pull-request) would otherwise invoke the LFS
+      # smudge filter and fail once the repository's LFS bandwidth budget
+      # is exhausted.
       GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
