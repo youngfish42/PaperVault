@@ -136,6 +136,63 @@ def _fetch_openreview_abstract(forum_id: str) -> str:
     return ""
 
 
+def _better_str(prev: str, new: str) -> str:
+    """Return whichever string carries more information.
+
+    Used during in-batch and cache-merge dedupe: when two records describe the
+    same paper, prefer the longer non-empty value so we never silently drop an
+    abstract that was filled by a later collector pass or by a backfill
+    workflow.
+    """
+    prev = prev or ""
+    new = new or ""
+    if not prev:
+        return new
+    if not new:
+        return prev
+    return new if len(new) > len(prev) else prev
+
+
+def _better_list(prev, new):
+    """Same intent as ``_better_str`` but for author lists."""
+    prev = prev or []
+    new = new or []
+    if not prev:
+        return new
+    if not new:
+        return prev
+    return new if len(new) > len(prev) else prev
+
+
+def _better_code(prev: str, new: str) -> str:
+    """Prefer a real code link over the ``'#'`` placeholder."""
+    prev = (prev or "").strip()
+    new = (new or "").strip()
+    if prev and prev != "#":
+        return prev
+    if new and new != "#":
+        return new
+    return prev or new or "#"
+
+
+def _merge_paper_record(existing: dict, incoming: dict) -> None:
+    """Field-level merge of two paper dicts that share the same dedupe key.
+
+    The caller has already decided ``existing`` and ``incoming`` describe the
+    same paper. We enrich ``existing`` in place by taking the longer abstract,
+    the longer author list, and any non-placeholder code link.
+    """
+    existing["paper_abstract"] = _better_str(
+        existing.get("paper_abstract"), incoming.get("paper_abstract")
+    )
+    existing["paper_authors"] = _better_list(
+        existing.get("paper_authors"), incoming.get("paper_authors")
+    )
+    existing["paper_code"] = _better_code(
+        existing.get("paper_code"), incoming.get("paper_code")
+    )
+
+
 def _url_targets_rejected_venue(url: str) -> bool:
     """快速判断一条 OpenReview 抓取 URL 是否指向「未接收」venue。
 
@@ -167,6 +224,19 @@ def search_from_iclr_openreview(url, name, res):
     """
     if name not in res:
         res[name] = []
+
+    # In-batch dedupe by OpenReview forum_id. The same forum_id can be returned
+    # more than once when (a) the v1 endpoint partially succeeds before we fall
+    # back to v2, (b) the API duplicates a note across offset boundaries, or
+    # (c) a previous run already appended the same paper to ``res[name]``.
+    # We track existing forum_ids on entry so re-invocations of the same
+    # (url, name) pair are idempotent and we merge late-arriving abstracts
+    # instead of silently dropping them.
+    seen_ids: dict = {}
+    for existing in res[name]:
+        fid = _extract_forum_id(existing.get("paper_url") or "")
+        if fid:
+            seen_ids[fid] = existing
 
     # 源头过滤：若 URL 本身指向 Submitted/Withdrawn/Rejected 等未接收 venue，
     # 直接跳过，避免拉取大量必然被 _is_openreview_accepted 丢弃的论文。
@@ -213,15 +283,24 @@ def search_from_iclr_openreview(url, name, res):
                     paper_authors = []
                 abstract = _or_field(content, "abstract") or ""
 
-                res[name].append(
-                    {
-                        "paper_name": title,
-                        "paper_url": "https://openreview.net/pdf?id=" + item["id"],
-                        "paper_authors": paper_authors,
-                        "paper_abstract": abstract,
-                        "paper_code": "#",
-                    }
-                )
+                forum_id = item.get("id") or ""
+                record = {
+                    "paper_name": title,
+                    "paper_url": "https://openreview.net/pdf?id=" + forum_id,
+                    "paper_authors": paper_authors,
+                    "paper_abstract": abstract,
+                    "paper_code": "#",
+                }
+                prior = seen_ids.get(forum_id) if forum_id else None
+                if prior is not None:
+                    # Same forum_id reappeared (offset boundary, v1->v2
+                    # fallback or re-run). Merge enriched fields into the
+                    # already-stored record and skip the duplicate append.
+                    _merge_paper_record(prior, record)
+                    continue
+                res[name].append(record)
+                if forum_id:
+                    seen_ids[forum_id] = record
                 got_in_this_variant += 1
 
             if len(notes) < limit:
@@ -307,6 +386,15 @@ def search_from_iclr_official(url, name, res):
     if name not in res:
         res[name] = []
 
+    # In-batch dedupe: keep one record per OpenReview forum_id, even if the
+    # schedule page (or a previous run that already appended into ``res[name]``)
+    # lists the same paper twice.
+    seen_ids: dict = {}
+    for existing in res[name]:
+        fid = _extract_forum_id(existing.get("paper_url") or "")
+        if fid:
+            seen_ids[fid] = existing
+
     r = SESSION.get(url, headers=HEADERS)
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -343,8 +431,20 @@ def search_from_iclr_official(url, name, res):
             "paper_abstract": "",  # 占位，稍后批量回填
             "paper_code": "#",
         }
+        forum_id = _extract_forum_id(paper_url)
+        prior = seen_ids.get(forum_id) if forum_id else None
+        if prior is not None:
+            # Same paper already collected (page duplication or prior run).
+            # Merge any non-empty fields we just parsed into the stored record
+            # and queue *that* one for the abstract backfill so the merged
+            # record gets enriched.
+            _merge_paper_record(prior, item)
+            new_items.append(prior)
+            continue
         res[name].append(item)
         new_items.append(item)
+        if forum_id:
+            seen_ids[forum_id] = item
 
     # 从源头批量回填 abstract，避免遗留给 fetch_abstracts.py
     forum_ids = []
@@ -400,6 +500,10 @@ def search_from_nips(url, name, res):
     soup = BeautifulSoup(r.text, "html.parser")
     if name not in res:
         res[name] = []
+    # In-batch dedupe by absolute paper URL. NeurIPS proceedings pages are
+    # single-volume so this mainly catches the "we already ran for this conf
+    # earlier in the session" case.
+    seen_urls: dict = {p["paper_url"]: p for p in res[name] if p.get("paper_url")}
     url_prefix = "https://" + url[8:].split("/")[0]
     col = soup.find(class_="col")
     if not col or not col.ul:
@@ -428,15 +532,19 @@ def search_from_nips(url, name, res):
             paper_abstract = ""
 
         paper_name = a_tag.string if a_tag.string else a_tag.get_text(strip=True)
-        res[name].append(
-            {
-                "paper_name": paper_name,
-                "paper_url": paper_url,
-                "paper_authors": paper_author,
-                "paper_abstract": paper_abstract,
-                "paper_code": "#",
-            }
-        )
+        record = {
+            "paper_name": paper_name,
+            "paper_url": paper_url,
+            "paper_authors": paper_author,
+            "paper_abstract": paper_abstract,
+            "paper_code": "#",
+        }
+        prior = seen_urls.get(paper_url)
+        if prior is not None:
+            _merge_paper_record(prior, record)
+            continue
+        res[name].append(record)
+        seen_urls[paper_url] = record
     return res
 
 
@@ -444,6 +552,11 @@ def _parse_acl_volume(volume_url: str, tag: str, name: str, res: dict):
     """解析 ACL Anthology 单个 volume 页面"""
     if name not in res:
         res[name] = []
+    # In-batch dedupe by anthology paper URL. ACL events span multiple
+    # volumes (main / findings / short / long ...) and ``search_from_acl``
+    # may invoke us once per volume; the same volume should never produce
+    # duplicates but a re-run after a partial failure can.
+    seen_urls: dict = {p["paper_url"]: p for p in res[name] if p.get("paper_url")}
     r = SESSION.get(volume_url, headers=HEADERS)
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -485,15 +598,19 @@ def _parse_acl_volume(volume_url: str, tag: str, name: str, res: dict):
         abstract_div = soup.find(id=f"abstract-{paper_id}")
         paper_abstract = abstract_div.text.strip() if abstract_div else ""
 
-        res[name].append(
-            {
-                "paper_name": paper,
-                "paper_url": paper_url,
-                "paper_authors": paper_authors,
-                "paper_abstract": paper_abstract,
-                "paper_code": "#",
-            }
-        )
+        record = {
+            "paper_name": paper,
+            "paper_url": paper_url,
+            "paper_authors": paper_authors,
+            "paper_abstract": paper_abstract,
+            "paper_code": "#",
+        }
+        prior = seen_urls.get(paper_url)
+        if prior is not None:
+            _merge_paper_record(prior, record)
+            continue
+        res[name].append(record)
+        seen_urls[paper_url] = record
     return res
 
 
@@ -593,6 +710,11 @@ def search_from_dblp(url, name, res):
     if name not in res:
         res[name] = []
 
+    # In-batch dedupe by external paper URL. DBLP multi-volume conferences
+    # (ECCV/AAAI/IJCAI ...) call this function once per volume, and the same
+    # entry can occasionally surface in more than one listing page.
+    seen_urls: dict = {p["paper_url"]: p for p in res[name] if p.get("paper_url")}
+
     for paper_item in soup.find_all("li", class_="entry"):
         drop_down = paper_item.find("li", class_="drop-down")
         if not drop_down or not drop_down.div or not drop_down.div.a:
@@ -619,15 +741,19 @@ def search_from_dblp(url, name, res):
             paper_abstract = ""
         if paper and paper[-1] == ".":
             paper = paper[:-1]
-        res[name].append(
-            {
-                "paper_name": paper, 
-                "paper_url": paper_url,
-                "paper_authors": paper_authors,
-                "paper_abstract": paper_abstract,
-                "paper_code": "#",
-            }
-        )
+        record = {
+            "paper_name": paper,
+            "paper_url": paper_url,
+            "paper_authors": paper_authors,
+            "paper_abstract": paper_abstract,
+            "paper_code": "#",
+        }
+        prior = seen_urls.get(paper_url)
+        if prior is not None:
+            _merge_paper_record(prior, record)
+            continue
+        res[name].append(record)
+        seen_urls[paper_url] = record
     return res
 
 
@@ -644,7 +770,12 @@ def search_from_thecvf(url, name, res):
     soup = BeautifulSoup(r.text, "html.parser")
     if name not in res:
         res[name] = []
-        
+
+    # In-batch dedupe by absolute paper URL. theCVF day-split pages
+    # (day1.py / day2.py / ALL.py) historically share entries, so the same
+    # paper may appear on more than one collected URL within a run.
+    seen_urls: dict = {p["paper_url"]: p for p in res[name] if p.get("paper_url")}
+
     for paper_item in soup.find_all("dt", class_="ptitle"):
         a_tag = paper_item.a
         if a_tag is None:
@@ -657,28 +788,32 @@ def search_from_thecvf(url, name, res):
             url_postfix = url_postfix[1:]
         paper_url = "https://openaccess.thecvf.com/" + href
         paper = a_tag.string if a_tag.string else a_tag.get_text(strip=True)
-        
+
         authors = []
         ns = paper_item.next_sibling
         if ns:
             ns2 = ns.next_sibling
             if ns2:
                 authors = [author.string for author in ns2.find_all('a', href='#') if author.string]
-        
+
         try:
             paper_abstract = search_abs_from_thecvf(paper_url)
         except:
             print(f"Skip url:{paper_url}")
             paper_abstract = ""
-        res[name].append(
-            {
-                "paper_name": paper, 
-                "paper_url": paper_url,
-                "paper_authors": authors,
-                "paper_abstract": paper_abstract,
-                "paper_code": "#",
-            }
-        )
+        record = {
+            "paper_name": paper,
+            "paper_url": paper_url,
+            "paper_authors": authors,
+            "paper_abstract": paper_abstract,
+            "paper_code": "#",
+        }
+        prior = seen_urls.get(paper_url)
+        if prior is not None:
+            _merge_paper_record(prior, record)
+            continue
+        res[name].append(record)
+        seen_urls[paper_url] = record
     return res
 
 
@@ -739,15 +874,36 @@ def save_collect_progress(progress):
 
 
 def _merge_with_cache(new_res, cache_res, multi_volume_names, collected_dblp_names):
+    """Merge ``cache_res`` (loaded from cache.jsonl.gz) into ``new_res``.
+
+    Historically this function only deduped URLs for multi-volume DBLP confs,
+    which let non-DBLP venues silently accumulate the same paper across reruns.
+    We now:
+
+    * Keep the old "drop the cache entirely if we did not recollect this conf"
+      branch (``conf_name not in result``) — used to copy untouched cache
+      records straight through.
+    * For every conf we *did* recollect, URL-dedupe the cache against the new
+      records and field-merge (longer abstract / authors / non-placeholder
+      code) so cache abstracts survive a fresh source run.
+    """
     result = dict(new_res)
     for conf_name, papers in cache_res.items():
         if conf_name not in result:
             result[conf_name] = papers
-        elif conf_name in multi_volume_names and conf_name in collected_dblp_names:
-            existing_urls = {p["paper_url"] for p in result[conf_name]}
-            for p in papers:
-                if p["paper_url"] not in existing_urls:
-                    result[conf_name].append(p)
+            continue
+        url_index: dict = {p["paper_url"]: p for p in result[conf_name] if p.get("paper_url")}
+        for p in papers:
+            paper_url = p.get("paper_url")
+            if not paper_url:
+                result[conf_name].append(p)
+                continue
+            prior = url_index.get(paper_url)
+            if prior is None:
+                result[conf_name].append(p)
+                url_index[paper_url] = p
+            else:
+                _merge_paper_record(prior, p)
     return result
 
 
