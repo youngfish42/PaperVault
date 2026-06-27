@@ -38,7 +38,7 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 - 📅 **Last Updated**: 2026-06-13
 - 🆕 **New Papers This Update**: 30,986
 - 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 666,444 papers / 120 publication series / 181,855 with abstracts / 29,954 with code
+- 📊 **Database Scale**: 634,975 papers / 120 publication series / 156,109 with abstracts / 25,573 with code
 
 <!-- recent-update-end -->
 
@@ -248,7 +248,7 @@ python app.py            # Start the web search server
 <summary><b>Artificial Intelligence</b> (23 series)</summary>
 
 - **AAAI** 2000-2026 (24 editions)
-- **ACL** 2000-2025 (26 editions)
+- **ACL** 2000-2026 (27 editions)
 - **AI** 2000-2026 (27 editions)
 - **AISTATS** 2001-2025 (16 editions)
 - **COLING** 2000-2025 (14 editions)
