@@ -68,6 +68,12 @@ class PaperRepository:
         ensure_cache_local(str(self.cache_path), refresh=self.refresh_on_load)
         raw = load_cache(str(self.cache_path))
 
+        # cache.jsonl.gz 由 collector 持续追加写入，历史版本从未去重。
+        # Paper.id 由 (conf, year, title) 决定，所以重复行会产生相同的 id。
+        # 在构建索引前丢弃重复行，避免搜索结果与 UI 出现同一篇论文多次。
+        seen_ids: set = set()
+        dropped = 0
+
         for conf_key, papers in raw.items():
             year_match = _YEAR_RE.search(conf_key)
             if year_match is None:
@@ -81,6 +87,10 @@ class PaperRepository:
                 pid = hashlib.sha1(
                     f"{conf_name}|{year}|{title}".encode("utf-8")
                 ).hexdigest()[:16]
+                if pid in seen_ids:
+                    dropped += 1
+                    continue
+                seen_ids.add(pid)
                 authors = paper.get("paper_authors") or []
                 if not isinstance(authors, list):
                     authors = [str(authors)]
@@ -100,7 +110,10 @@ class PaperRepository:
                 self._by_conf.setdefault(conf_name, []).append(rec)
 
         logger.info(
-            "Loaded %d papers across %d conferences", len(self._papers), len(self._by_conf)
+            "Loaded %d papers across %d conferences (%d duplicate rows dropped)",
+            len(self._papers),
+            len(self._by_conf),
+            dropped,
         )
 
     def all_papers(self) -> List[Paper]:
