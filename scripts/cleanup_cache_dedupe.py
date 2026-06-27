@@ -2,16 +2,27 @@
 
 设计要点
 --------
-- pid 规则与 collector._merge_with_cache 在 PR A 的去重键对齐：
+- 去重语义与 collector._merge_with_cache (PR A) 对齐：按 (conf, paper_url)
+  双键唯一化。collector 端实现为「先按 conf_name 分桶，桶内 dict[paper_url]
+  字符串字面去重」(collector.py 第 895 行附近)，本脚本则把 conf 与 url 一并
+  拼进 sha1 哈希 key 做全局桶——结果等价，pid 仅作内部桶键，不与 collector
+  共用具体字节。具体 key 形态：
     * paper_url 非空时:  sha1("{conf}|url|{paper_url}")[:16]
     * paper_url 为空时:  sha1("{conf}|name|{paper_name_lower}")[:16]
-  这样清洗结果在 collector 下天然幂等——再跑一次 collector 不会再合并
-  任何东西。
+- 注意：collector 对 paper_url 为空的 cache 行是直接 append（不去重），本
+  脚本则用 (conf, paper_name_lower) 兜底。这是个有意的偏离——比 collector
+  更严，用于清掉历史无 URL 的脏重复，且因 conf 同时参与桶键，不会把不同
+  论文错合。代价是「跑完 cleanup 再跑 collector」时，collector 若重新抓到
+  同一篇空 URL 的论文，仍可能再生成一行新 cache（因为 collector 不合并空
+  URL）——这不是 cleanup 的 bug，而是 collector 端的已知行为。
 - 合并逻辑直接复用 collector._merge_paper_record，避免脚本与 collector 之间
   产生第二套实现导致语义漂移。
 - 流式读取 cache.jsonl.gz；用 dict 保存 pid -> 合并后的 record 引用，合并
   时原地 mutate，输出按首次出现顺序写回。一遍扫描完成。
-- 写入采用 .tmp 文件 + 回读校验 + os.replace 原子替换；可选 .bak 备份。
+  内存预算：当前 cache (~666k 行) 解析后整体常驻 dict，需要 ~6 GB 可用
+  RAM。若未来 cache 翻倍，需改外排 / 分桶落盘方案。
+- 写入采用 .tmp 文件 + 回读校验 + os.replace 原子替换；可选 .bak 备份
+  (始终只保留最近一次清洗前的镜像，旧 .bak 会被覆盖)。
 - 支持 --dry-run（只统计，不落盘）与 --report（把审计明细写入 .txt）。
 
 用法
@@ -51,10 +62,14 @@ DEFAULT_CACHE = ROOT / "cache" / "cache.jsonl.gz"
 
 
 def _pid_of(rec: dict) -> str:
-    """与 collector._merge_with_cache 的去重键对齐。
+    """计算一条 record 的内部去重桶键。
 
-    paper_url 非空时按 URL 桶；为空时按 conf|name 兜底，避免没有 URL 的
-    历史记录被错误合并。
+    与 collector._merge_with_cache 的去重语义对齐——按 (conf, paper_url)
+    双键唯一化，conf 与 url 一并拼进 sha1 哈希 key。
+
+    paper_url 为空时按 (conf, paper_name_lower) 兜底，这是相对 collector
+    更严的偏离（collector 对空 url 直接 append 不去重），仅用于清掉历史
+    无 URL 的脏重复；conf 同时参与桶键，不会把不同会议下的同名论文错合。
     """
     conf = (rec.get("conf") or "").strip()
     url = (rec.get("paper_url") or "").strip()
