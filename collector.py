@@ -1063,14 +1063,14 @@ def collect(cache_file=None, force=False, soft_timeout=None):
 
     res = add_code_links(final_res)
 
-    if failures:
-        failures_path = os.path.join(os.path.dirname(cache_file) if cache_file else ".", "collect_failures.json")
-        try:
-            with open(failures_path, "w", encoding="utf-8") as f:
-                json.dump(failures, f, ensure_ascii=False, indent=2)
+    failures_path = os.path.join(os.path.dirname(cache_file) if cache_file else ".", "collect_failures.json")
+    try:
+        with open(failures_path, "w", encoding="utf-8") as f:
+            json.dump(failures, f, ensure_ascii=False, indent=2)
+        if failures:
             print(f"[!] {len(failures)} conference(s) failed. Details saved to {failures_path}")
-        except Exception as e:
-            print(f"[!] Could not save failure log: {e}")
+    except Exception as e:
+        print(f"[!] Could not save failure log: {e}")
 
     return res
 
