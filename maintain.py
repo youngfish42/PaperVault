@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
-from collector import collect, save_cache, load_cache
+from collector import collect, save_cache, load_cache, COLLECT_FAILURES_FILE
 from data_artifacts import ensure_cache_local, sync_cache_artifacts
 
 try:
@@ -1007,7 +1007,7 @@ def incremental_update(soft_timeout=None):
     if new_confs:
         print(f"    New conferences: {', '.join(sorted(new_confs))}")
 
-    failures_path = os.path.join(os.path.dirname(cache_path), "collect_failures.json")
+    failures_path = COLLECT_FAILURES_FILE
     if os.path.exists(failures_path):
         try:
             with open(failures_path, "r", encoding="utf-8") as f:
