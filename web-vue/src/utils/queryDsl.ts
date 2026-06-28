@@ -490,7 +490,11 @@ export const splitForBackend = (
 
   for (const clause of clauses) {
     if (clause.kind === 'term' && clause.field === null) {
-      qParts.push(clause.phrase ? `"${clause.value}"` : clause.value)
+      // 分词器在到达这里之前已经把 ``clause.value`` 两端的引号剥掉
+      // （例如 ``"time series"`` 变成 ``time series``）。后端的
+      // per-token AND 会把字面 ``"`` 视为 token 的一部分，因此若再
+      // 用引号包裹会把 ``"`` 一起送进检索式，造成匹配失败。
+      qParts.push(clause.value)
       continue
     }
     // Topic / Title / Abstract terms still need free-text matching upstream;
@@ -503,7 +507,7 @@ export const splitForBackend = (
         clause.field === 'abstract' ||
         clause.field === 'keywords')
     ) {
-      qParts.push(clause.phrase ? `"${clause.value}"` : clause.value)
+      qParts.push(clause.value)
       // Title/abstract/keywords still need residual evaluation so we keep
       // them in residual unless the field is the bag-of-words topic.
       if (clause.field !== 'topic') residual.push(clause)
