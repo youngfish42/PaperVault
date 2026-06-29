@@ -243,6 +243,85 @@ def test_call_anthropic_strips_trailing_v1(monkeypatch):
         assert captured["client_kwargs"]["base_url"] == expected, (raw, expected, captured)
 
 
+def test_call_anthropic_passes_thinking_disabled(monkeypatch):
+    """StepFun's default thinking mode eats the entire max_tokens budget.
+    We pass ``extra_body={"thinking": {"type": "disabled"}}`` so StepFun
+    skips thinking; Anthropic's native API treats it as a no-op.
+    """
+
+    import anthropic as anthropic_module
+
+    captured = {}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            block = MagicMock()
+            block.text = "ok"
+            resp = MagicMock()
+            resp.content = [block]
+            resp.model = "m"
+            return resp
+
+    class FakeAnthropic:
+        def __init__(self, **kwargs):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(anthropic_module, "Anthropic", FakeAnthropic)
+
+    ai_clients.call_anthropic(
+        api_key="k",
+        base_url="https://api.stepfun.com/step_plan/v1",
+        model="step-3.7-flash",
+        system="s",
+        user="u",
+        temperature=0.5,
+        max_tokens=512,
+    )
+    assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert captured["max_tokens"] == 512
+
+
+def test_call_anthropic_falls_back_when_extra_body_unsupported(monkeypatch):
+    """Anthropic SDK <0.40 doesn't accept ``extra_body`` on messages.create;
+    we should still issue the call (without the thinking override)."""
+
+    import anthropic as anthropic_module
+
+    captured = {}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            if "extra_body" in kwargs:
+                raise TypeError(
+                    "messages.create() got an unexpected keyword argument 'extra_body'"
+                )
+            captured.update(kwargs)
+            block = MagicMock()
+            block.text = "ok"
+            resp = MagicMock()
+            resp.content = [block]
+            resp.model = "m"
+            return resp
+
+    class FakeAnthropic:
+        def __init__(self, **kwargs):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(anthropic_module, "Anthropic", FakeAnthropic)
+
+    ai_clients.call_anthropic(
+        api_key="k",
+        base_url="https://api.anthropic.com",
+        model="claude-haiku-4-5",
+        system="s",
+        user="u",
+        temperature=0.5,
+    )
+    assert "extra_body" not in captured
+    assert captured["max_tokens"] == 512  # default
+
+
 def test_call_anthropic_missing_sdk(monkeypatch):
     import builtins
 
