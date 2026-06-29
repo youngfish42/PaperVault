@@ -66,11 +66,30 @@ class PaperSearchParams(BaseModel):
 
 class SuggestRequest(BaseModel):
     query: str = Field(min_length=1, max_length=200)
-    model: Optional[str] = None
+    provider: Optional[str] = Field(default=None, max_length=64)
+    base_url: Optional[str] = Field(default=None, max_length=512)
+    model: Optional[str] = Field(default=None, max_length=128)
+    api_key: Optional[str] = Field(default=None, max_length=512)
+    protocol: Optional[str] = Field(default=None, max_length=32)
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     max_keywords: Optional[int] = Field(default=None, ge=1, le=50)
+    max_tokens: Optional[int] = Field(default=None, ge=1, le=4096)
+
+    @field_validator("provider", "protocol", mode="before")
+    @classmethod
+    def _strip_lower(cls, value: Any):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = value.strip()
+        if value == "":
+            return None
+        return value.lower() if isinstance(value, str) else value
 
 
 class SuggestResponse(BaseModel):
     keywords: List[str]
     timecost_ms: float
     model: str
+    provider: str
+    protocol: str

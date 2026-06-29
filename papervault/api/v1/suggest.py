@@ -5,7 +5,8 @@ from pydantic import ValidationError
 
 from ...errors import ApiError
 from ...schemas import SuggestRequest, SuggestResponse
-from ...services.suggest import suggest_keywords
+from ...services.ai_providers import get_all_presets
+from ...services.suggest import SuggestionRequest, suggest_keywords
 
 bp = Blueprint("suggest_v1", __name__)
 
@@ -27,22 +28,38 @@ def post_suggest():
         )
 
     settings = current_app.extensions["settings"]
-    provider = (getattr(settings, "suggest_provider", "") or "").lower()
-    if provider == "openai":
-        default_model = settings.openai_model
-    else:
-        default_model = getattr(settings, "deepseek_model", None) or settings.openai_model
-
-    result = suggest_keywords(
-        req.query,
-        model=req.model or default_model,
-        temperature=settings.openai_temperature,
-        max_keywords=req.max_keywords or settings.openai_max_keywords,
+    temperature = (
+        req.temperature
+        if req.temperature is not None
+        else getattr(settings, "openai_temperature", 0.5)
     )
+    max_keywords = req.max_keywords or getattr(settings, "openai_max_keywords", 10)
+    max_tokens = req.max_tokens or getattr(settings, "anthropic_max_tokens", 512)
+
+    internal = SuggestionRequest(
+        query=req.query,
+        provider=req.provider,
+        base_url=req.base_url,
+        model=req.model,
+        api_key=req.api_key,
+        protocol=req.protocol,
+        temperature=temperature,
+        max_keywords=max_keywords,
+        max_tokens=max_tokens,
+    )
+
+    result = suggest_keywords(internal)
 
     body = SuggestResponse(
         keywords=result.keywords,
         timecost_ms=round(result.elapsed_ms, 1),
         model=result.model,
+        provider=result.provider,
+        protocol=result.protocol,
     )
     return jsonify(body.model_dump())
+
+
+@bp.get("/ai/providers")
+def list_providers():
+    return jsonify({"items": [p.as_dict() for p in get_all_presets()]})

@@ -63,7 +63,7 @@ class Settings:
     )
 
     openai_model: str = field(
-        default_factory=lambda: _env_str("PAPERVAULT_OPENAI_MODEL", "gpt-3.5-turbo")
+        default_factory=lambda: _env_str("PAPERVAULT_OPENAI_MODEL", "gpt-4o-mini")
     )
     openai_temperature: float = field(
         default_factory=lambda: _env_float("PAPERVAULT_OPENAI_TEMPERATURE", 0.5)
@@ -72,8 +72,12 @@ class Settings:
         default_factory=lambda: _env_int("PAPERVAULT_OPENAI_MAX_KEYWORDS", 10)
     )
 
+    # ``suggest_provider`` is intentionally empty by default in P2: empty
+    # means "let the request set it or fall back to legacy DeepSeek / OpenAI
+    # detection". Existing deployments set PAPERVAULT_SUGGEST_PROVIDER to
+    # keep their old behaviour; new callers override per request instead.
     suggest_provider: str = field(
-        default_factory=lambda: _env_str("PAPERVAULT_SUGGEST_PROVIDER", "deepseek").lower()
+        default_factory=lambda: _env_str("PAPERVAULT_SUGGEST_PROVIDER", "").lower()
     )
     deepseek_model: str = field(
         default_factory=lambda: _env_str("PAPERVAULT_DEEPSEEK_MODEL", "deepseek-chat")
@@ -82,6 +86,13 @@ class Settings:
         default_factory=lambda: _env_str(
             "PAPERVAULT_DEEPSEEK_BASE_URL", "https://api.deepseek.com"
         )
+    )
+
+    anthropic_max_tokens: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_ANTHROPIC_MAX_TOKENS", 512)
+    )
+    anthropic_model: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_ANTHROPIC_MODEL", "claude-haiku-4-5")
     )
 
     cors_origins: str = field(
