@@ -36,6 +36,17 @@ class Paper:
     authors: List[str]
     abstract: Optional[str]
     code: Optional[str]
+    # 以下两个字段在加载期一次性算好，专供 search_papers 内的打分函数
+    # 复用，避免每次查询都对每篇论文重新调用 ``str.lower`` / ``join``。
+    # 语料规模在万级以上时，把这些 O(语料 * 查询) 的常量开销下沉到
+    # O(语料) 是一次显著的吞吐优化（参见服务监控里搜索 P95）。
+    #
+    # * ``abstract_lower``：``abstract.lower()``；无摘要时为 ``None``，
+    #   避免对 ~73% 没有摘要的论文徒占内存。
+    # * ``authors_joined_lower``：作者列表小写、去连字符后再 ``" ".join``
+    #   的结果，与 ``_normalize`` 的处理对齐，可直接用 ``in`` 子串匹配。
+    abstract_lower: Optional[str] = None
+    authors_joined_lower: str = ""
 
 
 @dataclass
@@ -84,7 +95,16 @@ class PaperRepository:
                 authors = paper.get("paper_authors") or []
                 if not isinstance(authors, list):
                     authors = [str(authors)]
+                authors_list = [str(a) for a in authors]
                 normalized_title = _WS_RE.sub(" ", title).strip().lower().replace("-", " ")
+                abstract = paper.get("paper_abstract")
+                # 在加载期一次性算好供搜索打分使用的派生字段。``abstract_lower``
+                # 为 ``None`` 表示原文就没有摘要，保留 ``None`` 而不是 ``""``
+                # 以便上游沿用 ``if not abstract`` 的快速判空习惯。
+                abstract_lower = abstract.lower() if abstract else None
+                authors_joined_lower = " ".join(
+                    a.lower().replace("-", " ") for a in authors_list
+                )
                 rec = Paper(
                     id=pid,
                     conf=conf_name,
@@ -92,9 +112,11 @@ class PaperRepository:
                     title=title,
                     title_format=normalized_title,
                     url=paper.get("paper_url"),
-                    authors=[str(a) for a in authors],
-                    abstract=paper.get("paper_abstract"),
+                    authors=authors_list,
+                    abstract=abstract,
                     code=paper.get("paper_code"),
+                    abstract_lower=abstract_lower,
+                    authors_joined_lower=authors_joined_lower,
                 )
                 self._papers.append(rec)
                 self._by_conf.setdefault(conf_name, []).append(rec)
@@ -134,52 +156,60 @@ def _normalize(s: Optional[str]) -> str:
     return _WS_RE.sub(" ", s).strip().lower().replace("-", " ")
 
 
-def _author_score(authors: Iterable[str], needle: str) -> int:
-    """返回 ``needle`` token 在作者列表里命中了多少个。
+# ---------------------------------------------------------------------------
+# 打分函数
+# ---------------------------------------------------------------------------
+#
+# 所有 ``_*_score`` 函数都接收已经 *预先切分* 的 ``tokens: List[str]``，
+# 调用方在 ``search_papers`` 入口算一次即可——避免对每篇论文都重复
+# 执行 ``query.split()``。空 token 列表统一返回 0，调用方据此判空。
+#
+# 评分语义保持不变：每个 token 独立判断是否作为子串出现在目标字段里，
+# 单 token 命中为 1，多 token 取命中数之和（区间 ``[0, len(tokens)]``）。
+# 这条规则跨标题 / 摘要 / 作者三个字段统一，便于 ``search_papers`` 的
+# per-token AND 判定直接用 ``hits == len(tokens)`` 表达。
 
-    得分区间 ``[0, len(needle.split())]``：每个 token 独立判断是否在拼接、
-    去连字符、小写化的作者列表里出现，允许任意顺序、允许部分命中（用于
-    排序，不用于入选）。
+
+def _count_token_hits(haystack: str, tokens: List[str]) -> int:
+    """共享的子串命中计数。``haystack`` 已被调用方小写化。"""
+    if not tokens or not haystack:
+        return 0
+    return sum(1 for tok in tokens if tok in haystack)
+
+
+def _author_score_joined(joined_lower: str, tokens: List[str]) -> int:
+    """对已经预算好的作者拼接串计数 token 命中数。
+
+    ``joined_lower`` 应当是 ``Paper.authors_joined_lower``（加载期算好）
+    或调用方临时算的等价字符串。这样可以让 ``search_papers`` 在热路径
+    上零额外字符串构造。
+    """
+    return _count_token_hits(joined_lower, tokens)
+
+
+def _author_score(authors: Iterable[str], needle: str) -> int:
+    """兼容旧接口：传入原始作者列表 + 字符串 ``needle``。
+
+    保留供 ``_author_matches`` 兼容 wrapper 以及外部脚本调用。内部热
+    路径已改走 ``_author_score_joined``，不再触发这条 ``join``。
     """
     if not needle:
         return 0
-    normalized = [a.lower().replace("-", " ") for a in authors]
-    joined = " ".join(normalized)
-    tokens = needle.split()
-    if len(tokens) == 1:
-        return 1 if tokens[0] in joined else 0
-    return sum(1 for tok in tokens if tok in joined)
+    joined = " ".join(a.lower().replace("-", " ") for a in authors)
+    return _count_token_hits(joined, needle.split())
 
 
-def _title_score(paper: Paper, query: str) -> int:
-    """返回 ``query`` token 在 ``paper.title_format`` 里命中了多少个。
+def _title_score(paper: Paper, tokens: List[str]) -> int:
+    """``paper.title_format`` 已在加载期完成小写与去连字符。"""
+    return _count_token_hits(paper.title_format, tokens)
 
-    ``title_format`` 在加载时已经做过小写与去连字符处理，可以直接子串匹配。
-    Token 顺序无关——例如查询 ``"time series agent"`` 会对标题为
-    ``"Agent for Time Series Forecasting"`` 的论文得分 3。
-    """
-    if not query:
+
+def _abstract_score(paper: Paper, tokens: List[str]) -> int:
+    """优先用加载期预算的 ``abstract_lower``；无摘要直接返回 0。"""
+    abs_lower = paper.abstract_lower
+    if not abs_lower:
         return 0
-    tokens = query.split()
-    if len(tokens) == 1:
-        return 1 if tokens[0] in paper.title_format else 0
-    return sum(1 for tok in tokens if tok in paper.title_format)
-
-
-def _abstract_score(paper: Paper, query: str) -> int:
-    """返回 ``query`` token 在 ``paper.abstract`` 里命中了多少个。
-
-    当论文没有摘要时返回 0（语料中约 73% 的论文没有摘要，按需小写避免
-    加载时白白浪费内存）。
-    """
-    abstract = paper.abstract
-    if not query or not abstract:
-        return 0
-    abs_lower = abstract.lower()
-    tokens = query.split()
-    if len(tokens) == 1:
-        return 1 if tokens[0] in abs_lower else 0
-    return sum(1 for tok in tokens if tok in abs_lower)
+    return _count_token_hits(abs_lower, tokens)
 
 
 # 向后兼容的旧谓词。历史外部调用方只关心布尔结果，这里把 _title_matches
@@ -192,7 +222,9 @@ def _author_matches(authors: Iterable[str], needle: str) -> bool:
 
 
 def _title_matches(paper: Paper, query: str) -> bool:
-    return _title_score(paper, query) > 0
+    if not query:
+        return False
+    return _title_score(paper, query.split()) > 0
 
 
 def _sort_key(sort: str):
@@ -230,13 +262,22 @@ def search_papers(repo: PaperRepository, criteria: SearchCriteria) -> Tuple[List
     # 当 ``field`` 是 ``"title"``（默认）或 ``"any"`` 时同时扫描摘要做
     # 模糊加成——单看标题会漏掉很多摘要里讨论该主题的论文。``field="author"``
     # 保持严格：用户既然查作者，摘要内容无关。
-    use_abstract = criteria.field in ("title", "any") and query_value != ""
+    #
+    # 摘要的启用条件与标题完全一致（``title`` 与 ``any`` 都开启）。直接
+    # 复用 ``use_title`` 而不是再写一遍同样的布尔表达式，避免日后只改
+    # 一处导致行为错位。
+    use_abstract = use_title
 
     # 各字段在相关性打分里的权重。标题证据最强、其次作者、最后摘要。
     # 只有当某字段达到 *完整* per-token AND 命中（见下面的 ``has_full``）
     # 时才把它的命中数计入分数；部分命中仍会加分，但不足以单独入选。
     W_TITLE, W_AUTHOR, W_ABSTRACT = 3, 2, 1
-    n_query_tokens = len(query_value.split())
+    # 把 split 提到循环外：N 篇论文不再重复执行 ``query.split()``。
+    # ``author_needle_tokens`` 同理——``criteria.author`` 是一次性输入，
+    # 切分一次即可服务于过滤阶段对每篇论文的判定。
+    query_tokens = query_value.split() if query_value else []
+    author_needle_tokens = author_needle.split() if author_needle else []
+    n_query_tokens = len(query_tokens)
 
     # 累计 ``(paper, score)``。在单次遍历里同时打分，避免后续再走一遍语料。
     scored: List[Tuple[Paper, int]] = []
@@ -251,14 +292,23 @@ def search_papers(repo: PaperRepository, criteria: SearchCriteria) -> Tuple[List
             continue
         if criteria.until is not None and year_int > criteria.until:
             continue
-        if author_needle and _author_score(paper.authors, author_needle) == 0:
+        if author_needle_tokens and _author_score_joined(
+            paper.authors_joined_lower, author_needle_tokens
+        ) == 0:
             continue
 
         if query_value:
-            # 各字段命中数（允许部分命中用于排序，但不用于入选）
-            t_hits = _title_score(paper, query_value) if use_title else 0
-            a_hits = _abstract_score(paper, query_value) if use_abstract else 0
-            auth_hits = _author_score(paper.authors, query_value) if use_author else 0
+            # 各字段命中数（允许部分命中用于排序，但不用于入选）。三个
+            # 字段都消费 *同一份* ``query_tokens``，且作者打分走预算好的
+            # ``authors_joined_lower``——本循环内 0 次 ``str.lower`` /
+            # ``str.split`` / ``" ".join``。
+            t_hits = _title_score(paper, query_tokens) if use_title else 0
+            a_hits = _abstract_score(paper, query_tokens) if use_abstract else 0
+            auth_hits = (
+                _author_score_joined(paper.authors_joined_lower, query_tokens)
+                if use_author
+                else 0
+            )
 
             # 入选条件：至少一个被搜索字段达到完整 per-token AND。
             # 即上游 UI 说的"per-token AND"——每个 token 都至少落进 *某个*
@@ -282,10 +332,16 @@ def search_papers(repo: PaperRepository, criteria: SearchCriteria) -> Tuple[List
     extractor, desc = _sort_key(criteria.sort)
     if query_value:
         # 主键：相关性（分数越高 = 越多 token 在越多字段里命中）。副键：
-        # 调用方指定的排序键。这样 ``sort=-year`` 之类的预设仍然让较新
-        # 的论文排在同分桶里靠前，单 token 查询的默认顺序也保持稳定，
-        # 只有多 token 查询时分数才会真正改变顺序。
-        scored.sort(key=lambda ps: (ps[1], extractor(ps[0])), reverse=True)
+        # 调用方指定的排序键，且 *必须* 尊重其 ``desc`` 方向——否则
+        # ``sort=year`` (升序) 之类预设在有 query 时会被悄悄反向，
+        # 违反 "默认 sort 作为副键保留原有行为" 的契约。
+        #
+        # 利用 Python sort 的稳定性做两遍排序：先按副键以正确方向稳定排
+        # 一遍，再按相关性分数降序稳定排一遍。相同分数的论文会保留第一
+        # 遍确定的副键顺序，不同分数的论文按主键排好；这样可以在一行里
+        # 同时表达 "主键降序、副键各自方向" 而无需把方向编码进 key。
+        scored.sort(key=lambda ps: extractor(ps[0]), reverse=desc)
+        scored.sort(key=lambda ps: ps[1], reverse=True)
     else:
         scored.sort(key=lambda ps: extractor(ps[0]), reverse=desc)
 

@@ -114,3 +114,63 @@ def test_weighted_ranking_prefers_title_evidence(
     titles = [p.title for p in items]
     assert "Attention Is All You Need Revisited" in titles
     assert "Vision Transformers Revisited" in titles
+
+
+# ----------------------------------------------------------------------
+# 副键排序方向（回归 #1）
+# ----------------------------------------------------------------------
+#
+# 两篇 ``revisited`` 命中的论文相关性分数完全相同（各自标题命中 1 个
+# token，``revisited`` 并不出现在 ACL 2023 的摘要里——摘要里只有词根
+# ``revisit``）。这是测试 "主键并列时副键方向是否被尊重" 的理想样本。
+#
+# 历史 bug：``search_papers`` 在有 query 时用 ``reverse=True`` 同时压
+# 覆主键与副键，导致 ``sort=year`` / ``sort=title`` 等升序预设被悄悄
+# 反向。这里逐项锁死 4 种方向，防止再次回归。
+
+_ATTENTION = "Attention Is All You Need Revisited"   # ACL 2023
+_VISION = "Vision Transformers Revisited"            # CVPR 2024
+
+
+def test_sort_year_ascending_is_honoured_with_query(
+    repository_with_sample: PaperRepository,
+):
+    items, _ = search_papers(
+        repository_with_sample,
+        _criteria(query="revisited", field="title", sort="year"),
+    )
+    # 同分桶内 year 升序：2023 在前。
+    assert [p.title for p in items] == [_ATTENTION, _VISION]
+
+
+def test_sort_year_descending_is_honoured_with_query(
+    repository_with_sample: PaperRepository,
+):
+    items, _ = search_papers(
+        repository_with_sample,
+        _criteria(query="revisited", field="title", sort="-year"),
+    )
+    # 同分桶内 year 降序：2024 在前。
+    assert [p.title for p in items] == [_VISION, _ATTENTION]
+
+
+def test_sort_title_ascending_is_honoured_with_query(
+    repository_with_sample: PaperRepository,
+):
+    items, _ = search_papers(
+        repository_with_sample,
+        _criteria(query="revisited", field="title", sort="title"),
+    )
+    # 标题升序：'Attention...' < 'Vision...'。
+    assert [p.title for p in items] == [_ATTENTION, _VISION]
+
+
+def test_sort_conf_ascending_is_honoured_with_query(
+    repository_with_sample: PaperRepository,
+):
+    items, _ = search_papers(
+        repository_with_sample,
+        _criteria(query="revisited", field="title", sort="conf"),
+    )
+    # conf 升序：'ACL 2023' < 'CVPR 2024'。
+    assert [p.title for p in items] == [_ATTENTION, _VISION]
