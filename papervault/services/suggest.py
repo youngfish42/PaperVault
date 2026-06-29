@@ -61,7 +61,10 @@ class SuggestionRequest:
     protocol: Optional[str] = None
     temperature: float = 0.5
     max_keywords: int = 10
-    max_tokens: int = 512
+    # ``None`` means "let the protocol decide": OpenAI-compatible omits the
+    # cap entirely (preserves the pre-P2 contract); Anthropic falls back to
+    # its mandatory default of 512 inside ``call_anthropic``.
+    max_tokens: Optional[int] = None
 
 
 @dataclass(slots=True)
@@ -199,7 +202,19 @@ def _resolve_provider(req: SuggestionRequest) -> _ResolvedProvider:
         base_url=base_url,
         model=model,
         protocol=protocol,
-        source="request" if req.api_key else "env",
+        source=(
+            "request"
+            if any(
+                (
+                    req.api_key,
+                    req.base_url,
+                    req.model,
+                    req.provider,
+                    req.protocol,
+                )
+            )
+            else "env"
+        ),
     )
 
 
@@ -248,6 +263,16 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
 
     start = time.time()
     if resolved.protocol == PROTOCOL_ANTHROPIC:
+        # Anthropic Messages API requires ``max_tokens``; fall back to
+        # ``settings.anthropic_max_tokens`` when the caller didn't specify
+        # one, then to a hard-coded safe default.
+        if req.max_tokens is not None:
+            anthropic_max_tokens = req.max_tokens
+        else:
+            settings = _settings_or_none()
+            anthropic_max_tokens = int(
+                getattr(settings, "anthropic_max_tokens", 0) or 512
+            )
         result: ChatResult = call_anthropic(
             api_key=resolved.api_key,
             base_url=resolved.base_url,
@@ -255,9 +280,12 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
             system=system,
             user=user,
             temperature=req.temperature,
-            max_tokens=req.max_tokens,
+            max_tokens=anthropic_max_tokens,
         )
     else:
+        # OpenAI-compatible providers historically ran without a cap.
+        # Only forward ``max_tokens`` when the caller explicitly set one,
+        # so default keyword suggestions are not silently truncated.
         result = call_openai_compatible(
             api_key=resolved.api_key,
             base_url=resolved.base_url,
@@ -269,17 +297,17 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
         )
 
     elapsed_ms = (time.time() - start) * 1000.0
-    keywords, raw_model = _extract_keywords(result.content, req.max_keywords)
+    keywords = _extract_keywords(result.content, req.max_keywords)
     return SuggestionResult(
         keywords=keywords,
-        model=raw_model or resolved.model,
+        model=result.raw_model or resolved.model,
         elapsed_ms=elapsed_ms,
         provider=resolved.preset.key,
         protocol=resolved.protocol,
     )
 
 
-def _extract_keywords(content: str, max_keywords: int) -> Tuple[List[str], str]:
+def _extract_keywords(content: str, max_keywords: int) -> List[str]:
     fenced = _FENCED_RE.search(content)
     payload = fenced.group(1) if fenced else content
     try:
@@ -297,4 +325,4 @@ def _extract_keywords(content: str, max_keywords: int) -> Tuple[List[str], str]:
             "Suggestion provider returned no keywords.",
             code="LLM_NO_KEYWORDS",
         )
-    return [str(k) for k in keywords][:max_keywords], ""
+    return [str(k) for k in keywords][:max_keywords]

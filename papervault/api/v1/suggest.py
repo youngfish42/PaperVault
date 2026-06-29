@@ -34,7 +34,15 @@ def post_suggest():
         else getattr(settings, "openai_temperature", 0.5)
     )
     max_keywords = req.max_keywords or getattr(settings, "openai_max_keywords", 10)
-    max_tokens = req.max_tokens or getattr(settings, "anthropic_max_tokens", 512)
+    # Forward ``max_tokens`` only when the caller explicitly set one.
+    # ``None`` means "let ``suggest_keywords`` pick a per-protocol default":
+    # OpenAI-compatible providers then omit the cap (preserving the pre-P2
+    # contract so default keyword JSON isn't silently truncated), while the
+    # Anthropic Messages API uses its own mandatory fallback inside the
+    # service. ``settings.anthropic_max_tokens`` is intentionally NOT mixed
+    # in here because it would re-introduce the cap for OpenAI-compatible
+    # providers; it can be wired through later as a per-protocol setting.
+    max_tokens = req.max_tokens
 
     internal = SuggestionRequest(
         query=req.query,
