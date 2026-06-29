@@ -66,11 +66,47 @@ class PaperSearchParams(BaseModel):
 
 class SuggestRequest(BaseModel):
     query: str = Field(min_length=1, max_length=200)
-    model: Optional[str] = None
+    provider: Optional[str] = Field(default=None, max_length=64)
+    base_url: Optional[str] = Field(default=None, max_length=512)
+    model: Optional[str] = Field(default=None, max_length=128)
+    api_key: Optional[str] = Field(default=None, max_length=512)
+    protocol: Optional[str] = Field(default=None, max_length=32)
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     max_keywords: Optional[int] = Field(default=None, ge=1, le=50)
+    max_tokens: Optional[int] = Field(default=None, ge=1, le=4096)
+
+    @field_validator("provider", "protocol", mode="before")
+    @classmethod
+    def _strip_lower(cls, value: Any):
+        return _strip_or_none(value, lower=True)
+
+    @field_validator("base_url", "model", "api_key", mode="before")
+    @classmethod
+    def _strip_normalize(cls, value: Any):
+        return _strip_or_none(value, lower=False)
+
+
+def _strip_or_none(value: Any, *, lower: bool = False) -> Any:
+    """Trim whitespace; turn empty string into ``None``; optionally lowercase.
+
+    Used by ``SuggestRequest`` field validators to keep the request shape
+    consistent across optional string fields. Non-string values pass through
+    unchanged so Pydantic can produce its standard type-error.
+    """
+
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    if value == "":
+        return None
+    return value.lower() if lower else value
 
 
 class SuggestResponse(BaseModel):
     keywords: List[str]
     timecost_ms: float
     model: str
+    provider: str
+    protocol: str
