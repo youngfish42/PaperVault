@@ -491,9 +491,10 @@ export const splitForBackend = (
   for (const clause of clauses) {
     if (clause.kind === 'term' && clause.field === null) {
       // 分词器在到达这里之前已经把 ``clause.value`` 两端的引号剥掉
-      // （例如 ``"time series"`` 变成 ``time series``）。后端的
-      // per-token AND 会把字面 ``"`` 视为 token 的一部分，因此若再
-      // 用引号包裹会把 ``"`` 一起送进检索式，造成匹配失败。
+      // （例如 ``"time series"`` 变成 ``time series``）。后端在归一化
+      // ``q`` 时不会剥除字面 ``"``，又是按整体子串匹配 title/abstract，
+      // 因此若再用引号包裹，``q`` 里会带上 ``"`` 而 title 文本里没有
+      // ``"``，结果必然失配。
       qParts.push(clause.value)
       continue
     }

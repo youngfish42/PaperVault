@@ -194,6 +194,24 @@ test('splitForBackend: top-level OR cannot be hoisted → stays in residual', ()
   assert.equal(split.residual.kind, 'or')
 })
 
+test('splitForBackend: unqualified phrase forwards q WITHOUT literal quotes', () => {
+  // Regression: a previous version of splitForBackend wrapped phrase clauses
+  // back in literal ``"…"`` before forwarding them as ``q``. The backend
+  // does not strip those quotes and matches ``q`` as a single substring
+  // against the normalised title, so the literal ``"`` made every quoted
+  // phrase silently miss. The contract is: ``q`` is the bare phrase value.
+  const split = splitForBackend(parseDsl('"time series"'))
+  assert.equal(split.q, 'time series')
+  assert.equal(split.residual.kind, 'empty')
+})
+
+test('splitForBackend: TS="…" phrase forwards q WITHOUT literal quotes', () => {
+  // Same contract for the explicitly-tagged topic phrase, which is the
+  // canonical entry point users type in the search bar.
+  const split = splitForBackend(parseDsl('TS="time series"'))
+  assert.equal(split.q, 'time series')
+})
+
 // ---------------------------------------------------------------------------
 // evaluateDsl — covers the residual filter contract
 // ---------------------------------------------------------------------------
