@@ -269,3 +269,119 @@ def test_cleanup_writes_report_when_requested(tmp_path):
     text = report.read_text(encoding="utf-8")
     assert "unique_pids: 1" in text
     assert "total_rows: 2" in text
+
+
+# ---------------------------------------------------------------------------
+# 8. Parse-error threshold contract (PR review fix #2)
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_raises_when_parse_errors_exceed_threshold(tmp_path):
+    """坏行存在时，默认阈值 0.0 必须抛 ParseErrorThresholdExceeded。
+
+    回归 PR#94 review #2：模块 docstring 声称「解析异常超过阈值」会以
+    exit 1 终止，但旧实现只累计 parse_errors 不做任何阈值判断，会让
+    坏行被全量重写后静默丢失。
+    """
+    cache = tmp_path / "cache.jsonl.gz"
+    with gzip.open(cache, "wt", encoding="utf-8") as f:
+        f.write(json.dumps({"paper_name": "P", "paper_url": "u1",
+                            "paper_authors": [], "paper_abstract": "",
+                            "paper_code": "#", "conf": "C"}) + "\n")
+        f.write("{not valid json\n")
+    pre_bytes = cache.read_bytes()
+
+    with pytest.raises(cc.ParseErrorThresholdExceeded):
+        cc.cleanup(cache, dry_run=False, backup=False)
+
+    # 原文件未被改写，.tmp / .bak 都不应残留
+    assert cache.read_bytes() == pre_bytes
+    assert not (tmp_path / "cache.jsonl.gz.tmp").exists()
+    assert not (tmp_path / "cache.jsonl.gz.bak").exists()
+
+
+def test_cleanup_allows_parse_errors_when_ratio_relaxed(tmp_path):
+    """显式提高阈值时坏行应被允许丢弃，正常完成清洗。"""
+    cache = tmp_path / "cache.jsonl.gz"
+    with gzip.open(cache, "wt", encoding="utf-8") as f:
+        f.write(json.dumps({"paper_name": "P", "paper_url": "u1",
+                            "paper_authors": [], "paper_abstract": "",
+                            "paper_code": "#", "conf": "C"}) + "\n")
+        f.write("{not valid json\n")
+
+    stats = cc.cleanup(
+        cache, dry_run=False, backup=False, max_parse_error_ratio=1.0
+    )
+    assert stats["parse_errors"] == 1
+    assert stats["total_rows"] == 1
+    assert stats["unique_pids"] == 1
+
+
+def test_main_returns_exit_code_1_on_parse_errors(tmp_path):
+    """CLI 路径同样要遵守契约：解析错误超限以 exit code 1 退出。"""
+    cache = tmp_path / "cache.jsonl.gz"
+    with gzip.open(cache, "wt", encoding="utf-8") as f:
+        f.write("not json at all\n")
+
+    rc = cc.main(["--source", str(cache)])
+    assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# 9. Missing conf field never triggers cross-record merge (PR review fix #3)
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_does_not_merge_records_missing_conf(tmp_path):
+    """两条 conf 缺失但 paper_url 相同的记录绝不能被字段级合并。
+
+    回归 PR#94 review #3：旧实现把缺失的 conf 退化为空串后参与 sha1，
+    导致跨会议同 URL 在 conf 字段缺失时被 `_merge_paper_record` 无声
+    地字段级合并，产生不可逆的数据污染。
+    """
+    cache = tmp_path / "cache.jsonl.gz"
+    records = [
+        # 两条都缺 conf；如果按空串当 conf 参与 hash，会被错合
+        {"paper_name": "X", "paper_url": "https://example.com/p1",
+         "paper_authors": ["A"], "paper_abstract": "abs from source 1",
+         "paper_code": "#"},
+        {"paper_name": "Y different title", "paper_url": "https://example.com/p1",
+         "paper_authors": ["B"], "paper_abstract": "abs from source 2",
+         "paper_code": "https://github.com/x/y"},
+        # conf 不是 str（异常类型）也不应参与合并
+        {"paper_name": "Z", "paper_url": "https://example.com/p1",
+         "paper_authors": ["C"], "paper_abstract": "abs from source 3",
+         "paper_code": "#", "conf": 12345},
+    ]
+    _write_jsonl_gz(cache, records)
+
+    stats = cc.cleanup(cache, dry_run=False, backup=False)
+    rows = _read_jsonl_gz(cache)
+
+    assert stats["skipped_no_conf"] == 3
+    assert stats["merge_events"] == 0
+    assert len(rows) == 3
+    # 字段不能交叉污染
+    abstracts = sorted(r["paper_abstract"] for r in rows)
+    assert abstracts == ["abs from source 1", "abs from source 2", "abs from source 3"]
+    authors_sets = sorted([r["paper_authors"] for r in rows], key=str)
+    assert authors_sets == [["A"], ["B"], ["C"]]
+
+
+def test_cleanup_still_merges_when_conf_present(tmp_path):
+    """有 conf 时仍要正常合并——确认 #3 修复没有破坏正常路径。"""
+    cache = tmp_path / "cache.jsonl.gz"
+    records = [
+        {"paper_name": "P", "paper_url": "u1", "paper_authors": [],
+         "paper_abstract": "", "paper_code": "#", "conf": "ICLR2026"},
+        {"paper_name": "P", "paper_url": "u1", "paper_authors": ["A"],
+         "paper_abstract": "long abs", "paper_code": "#", "conf": "ICLR2026"},
+    ]
+    _write_jsonl_gz(cache, records)
+
+    stats = cc.cleanup(cache, dry_run=False, backup=False)
+    rows = _read_jsonl_gz(cache)
+    assert stats["skipped_no_conf"] == 0
+    assert stats["merge_events"] == 1
+    assert len(rows) == 1
+    assert rows[0]["paper_abstract"] == "long abs"
