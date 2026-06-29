@@ -68,6 +68,24 @@ class PaperRepository:
         ensure_cache_local(str(self.cache_path), refresh=self.refresh_on_load)
         raw = load_cache(str(self.cache_path))
 
+        # cache.jsonl.gz 由 collector 持续追加写入，历史版本从未去重。
+        # Paper.id 由 (conf, year, title) 决定，所以重复行会产生相同的 id。
+        # 在构建索引前丢弃重复行，避免搜索结果与 UI 出现同一篇论文多次。
+        #
+        # 注意：本层为运行时**兜底防御**，采用「先到先得」策略——仅按 pid
+        # 丢弃后续重复行，**不做字段级合并**（不会用后续行的更长 abstract /
+        # 更全 authors / 真实 code 链接升级已记录的 Paper）。
+        # 若 cache 中先一行 abstract 为空、后一行同 paper 的 abstract 非空
+        # （例如 backfill 追加但未及时压缩），加载期会保留空 abstract、
+        # 丢弃真 abstract。
+        # 信息完整性应由上游保证：
+        #   * collector 端 `_merge_paper_record`（PR #93）做字段级合并；
+        #   * `scripts/cleanup_cache_dedupe.py`（PR #94）离线清洗 cache，
+        #     已经做完字段级合并。
+        # 本层只负责保证「同一 Paper.id 不在索引中出现两次」这一最小契约。
+        seen_ids: set = set()
+        dropped = 0
+
         for conf_key, papers in raw.items():
             year_match = _YEAR_RE.search(conf_key)
             if year_match is None:
@@ -81,6 +99,10 @@ class PaperRepository:
                 pid = hashlib.sha1(
                     f"{conf_name}|{year}|{title}".encode("utf-8")
                 ).hexdigest()[:16]
+                if pid in seen_ids:
+                    dropped += 1
+                    continue
+                seen_ids.add(pid)
                 authors = paper.get("paper_authors") or []
                 if not isinstance(authors, list):
                     authors = [str(authors)]
@@ -100,7 +122,10 @@ class PaperRepository:
                 self._by_conf.setdefault(conf_name, []).append(rec)
 
         logger.info(
-            "Loaded %d papers across %d conferences", len(self._papers), len(self._by_conf)
+            "Loaded %d papers across %d conferences (%d duplicate rows dropped)",
+            len(self._papers),
+            len(self._by_conf),
+            dropped,
         )
 
     def all_papers(self) -> List[Paper]:
