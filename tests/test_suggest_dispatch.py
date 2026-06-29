@@ -154,3 +154,123 @@ def test_legacy_env_fallback_for_deepseek_when_provider_unspecified(monkeypatch)
     req = suggest.SuggestionRequest(query="x", max_keywords=5)
     result = suggest.suggest_keywords(req)
     assert result.provider == "deepseek"
+
+
+def test_missing_base_url_raises_bad_request(monkeypatch):
+    """Custom preset without base_url should raise BAD_REQUEST."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    req = suggest.SuggestionRequest(
+        query="x",
+        provider="custom",
+        model="custom-model",
+        base_url="",
+        max_keywords=5,
+    )
+    with pytest.raises(ApiError) as exc:
+        suggest._resolve_provider(req)
+    assert exc.value.code == "BAD_REQUEST"
+    assert "base_url" in exc.value.message.lower()
+
+
+def test_settings_deepseek_base_url_used(monkeypatch, tmp_path):
+    """Settings-based deepseek_base_url should be used when available."""
+    from papervault.config import Settings
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds")
+
+    cache_path = tmp_path / "cache.jsonl.gz"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = Settings(
+        base_dir=tmp_path,
+        cache_path=cache_path,
+        static_folder=tmp_path / "static",
+        deepseek_base_url="https://custom.deepseek.endpoint.com",
+    )
+
+    from papervault import create_app
+    app = create_app(settings, eager_load=False)
+    app.config["TESTING"] = True
+
+    with app.app_context():
+        req = suggest.SuggestionRequest(query="x", provider="deepseek", max_keywords=5)
+        resolved = suggest._resolve_provider(req)
+        assert resolved.base_url == "https://custom.deepseek.endpoint.com"
+
+
+def test_env_overrides_preset_default_base_url(monkeypatch):
+    """OPENAI_API_BASE (env) should override the preset's default base_url
+    when neither req nor settings provides it. This preserves the
+    pre-P2 contract that AGENTS.md documents.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_API_BASE", "https://my-proxy.example.com/v1")
+
+    req = suggest.SuggestionRequest(query="x", provider="openai", max_keywords=5)
+    resolved = suggest._resolve_provider(req)
+
+    assert resolved.base_url == "https://my-proxy.example.com/v1"
+
+
+def test_env_overrides_preset_default_model(monkeypatch):
+    """PAPERVAULT_OPENAI_MODEL (env) should override the preset's default
+    model when neither req nor settings provides it.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("PAPERVAULT_OPENAI_MODEL", "gpt-5-pro")
+
+    req = suggest.SuggestionRequest(query="x", provider="openai", max_keywords=5)
+    resolved = suggest._resolve_provider(req)
+
+    assert resolved.model == "gpt-5-pro"
+
+
+def test_settings_overrides_env_for_deepseek_base_url(monkeypatch, tmp_path):
+    """settings.deepseek_base_url should take precedence over env."""
+    from papervault.config import Settings
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds")
+    monkeypatch.setenv("PAPERVAULT_DEEPSEEK_BASE_URL", "https://env.deepseek.example.com")
+
+    cache_path = tmp_path / "cache.jsonl.gz"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = Settings(
+        base_dir=tmp_path,
+        cache_path=cache_path,
+        static_folder=tmp_path / "static",
+        deepseek_base_url="https://settings.deepseek.example.com",
+    )
+
+    from papervault import create_app
+    app = create_app(settings, eager_load=False)
+    app.config["TESTING"] = True
+
+    with app.app_context():
+        req = suggest.SuggestionRequest(query="x", provider="deepseek", max_keywords=5)
+        resolved = suggest._resolve_provider(req)
+        assert resolved.base_url == "https://settings.deepseek.example.com"
+
+
+def test_settings_deepseek_model_overrides_preset(monkeypatch, tmp_path):
+    """settings.deepseek_model should override preset's default model."""
+    from papervault.config import Settings
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds")
+
+    cache_path = tmp_path / "cache.jsonl.gz"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = Settings(
+        base_dir=tmp_path,
+        cache_path=cache_path,
+        static_folder=tmp_path / "static",
+        deepseek_model="deepseek-reasoner",
+    )
+
+    from papervault import create_app
+    app = create_app(settings, eager_load=False)
+    app.config["TESTING"] = True
+
+    with app.app_context():
+        req = suggest.SuggestionRequest(query="x", provider="deepseek", max_keywords=5)
+        resolved = suggest._resolve_provider(req)
+        assert resolved.model == "deepseek-reasoner"

@@ -35,9 +35,15 @@ def call_openai_compatible(
     system: str,
     user: str,
     temperature: float,
+    max_tokens: Optional[int] = None,
     timeout: float = 30.0,
 ) -> ChatResult:
-    """Issue a Chat Completions request via the official ``openai`` SDK."""
+    """Issue a Chat Completions request via the official ``openai`` SDK.
+
+    Args:
+        max_tokens: Optional maximum tokens for the response.
+            Not all OpenAI-compatible providers support this parameter.
+    """
 
     if not api_key:
         raise UpstreamError(
@@ -48,15 +54,19 @@ def call_openai_compatible(
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    create_kwargs = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": temperature,
+    }
+    if max_tokens is not None and max_tokens > 0:
+        create_kwargs["max_tokens"] = max_tokens
+
     try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=temperature,
-        )
+        response = client.chat.completions.create(**create_kwargs)
     except Exception as exc:
         logger.exception("OpenAI-compatible call failed: %s", exc)
         raise UpstreamError(

@@ -78,13 +78,30 @@ class SuggestRequest(BaseModel):
     @field_validator("provider", "protocol", mode="before")
     @classmethod
     def _strip_lower(cls, value: Any):
-        if value is None:
-            return None
-        if isinstance(value, str):
-            value = value.strip()
-        if value == "":
-            return None
-        return value.lower() if isinstance(value, str) else value
+        return _strip_or_none(value, lower=True)
+
+    @field_validator("base_url", "model", "api_key", mode="before")
+    @classmethod
+    def _strip_normalize(cls, value: Any):
+        return _strip_or_none(value, lower=False)
+
+
+def _strip_or_none(value: Any, *, lower: bool = False) -> Any:
+    """Trim whitespace; turn empty string into ``None``; optionally lowercase.
+
+    Used by ``SuggestRequest`` field validators to keep the request shape
+    consistent across optional string fields. Non-string values pass through
+    unchanged so Pydantic can produce its standard type-error.
+    """
+
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    if value == "":
+        return None
+    return value.lower() if lower else value
 
 
 class SuggestResponse(BaseModel):

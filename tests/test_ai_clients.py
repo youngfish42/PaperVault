@@ -85,6 +85,72 @@ def test_call_openai_compatible_missing_key_raises():
     assert exc.value.code == "LLM_NOT_CONFIGURED"
 
 
+def test_call_openai_compatible_with_max_tokens(fake_openai_response, monkeypatch):
+    """max_tokens should be passed to the API when provided."""
+    import openai as openai_module
+
+    captured = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return fake_openai_response
+
+    fake_chat = MagicMock()
+    fake_chat.completions = FakeCompletions()
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured["client_kwargs"] = kwargs
+            self.chat = fake_chat
+
+    monkeypatch.setattr(openai_module, "OpenAI", FakeOpenAI)
+
+    result = ai_clients.call_openai_compatible(
+        api_key="sk-test",
+        base_url="https://example.com/v1",
+        model="gpt-test",
+        system="sys",
+        user="hi",
+        temperature=0.3,
+        max_tokens=256,
+    )
+    assert "max_tokens" in captured
+    assert captured["max_tokens"] == 256
+
+
+def test_call_openai_compatible_without_max_tokens(fake_openai_response, monkeypatch):
+    """max_tokens should not be passed when not provided."""
+    import openai as openai_module
+
+    captured = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return fake_openai_response
+
+    fake_chat = MagicMock()
+    fake_chat.completions = FakeCompletions()
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured["client_kwargs"] = kwargs
+            self.chat = fake_chat
+
+    monkeypatch.setattr(openai_module, "OpenAI", FakeOpenAI)
+
+    result = ai_clients.call_openai_compatible(
+        api_key="sk-test",
+        base_url="https://example.com/v1",
+        model="gpt-test",
+        system="sys",
+        user="hi",
+        temperature=0.3,
+    )
+    assert "max_tokens" not in captured
+
+
 def test_call_anthropic_returns_content_and_model(
     fake_anthropic_response, monkeypatch
 ):

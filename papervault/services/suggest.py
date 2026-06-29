@@ -81,14 +81,50 @@ def _settings_or_none():
         return None
 
 
+_SETTINGS_BASE_URL_ATTRS: dict[str, str] = {
+    "deepseek": "deepseek_base_url",
+}
+
+_SETTINGS_MODEL_ATTRS: dict[str, str] = {
+    "deepseek": "deepseek_model",
+    "anthropic": "anthropic_model",
+}
+
+
+def _settings_attr(settings, preset_key: str, mapping: dict[str, str]) -> str:
+    """Return ``settings.<attr>`` for the given preset, or ``""`` if missing."""
+
+    if settings is None:
+        return ""
+    attr = mapping.get(preset_key)
+    if not attr:
+        return ""
+    return (getattr(settings, attr, "") or "").strip()
+
+
+def _first_non_empty(*values: Optional[str]) -> str:
+    """Return the first non-empty trimmed value, or ``""`` if none."""
+
+    for v in values:
+        if v is None:
+            continue
+        if not isinstance(v, str):
+            v = str(v)
+        v = v.strip()
+        if v:
+            return v
+    return ""
+
+
 def _resolve_provider(req: SuggestionRequest) -> _ResolvedProvider:
     """Pick the preset and resolve all dispatch fields.
 
     Priority for each field (highest first):
 
     1. ``req`` — explicit value passed by the API handler.
-    2. ``settings.<key>`` — Flask app settings (env-driven).
-    3. ``os.environ[<env_key_var>]`` / legacy DeepSeek↔OpenAI fallback.
+    2. ``settings.<attr>`` — Flask app settings (env-driven).
+    3. ``os.environ[<env_*_var>]`` from the preset — vendor-specific env.
+    4. ``preset`` — catalog defaults (never used for the ``custom`` preset).
 
     ``api_key`` *only* falls back to env vars — it is never read from
     global Flask settings to avoid leaking into templates.
@@ -98,26 +134,24 @@ def _resolve_provider(req: SuggestionRequest) -> _ResolvedProvider:
     explicit_provider = req.provider or getattr(settings, "suggest_provider", None)
     preset = get_preset(explicit_provider)
 
-    # If the caller did not pin a provider, fall back to whichever of the
-    # long-standing legacy keys (DeepSeek / OpenAI) is set. This keeps
-    # pre-P2 deployments working without forcing operators to rename env
-    # vars the day they upgrade.
     if not explicit_provider and preset.key == "custom":
         legacy = _legacy_provider()
         if legacy is not None:
             preset = get_preset(legacy)
 
-    base_url = (
-        req.base_url
-        or (preset.base_url if preset.key != "custom" else "")
-        or os.environ.get(preset.env_base_var, "").strip()
-    ).strip().rstrip("/") or None
+    base_url = _first_non_empty(
+        req.base_url,
+        _settings_attr(settings, preset.key, _SETTINGS_BASE_URL_ATTRS),
+        os.environ.get(preset.env_base_var, "") if preset.env_base_var else "",
+        preset.base_url if preset.key != "custom" else "",
+    ).rstrip("/")
 
-    model = (
-        req.model
-        or os.environ.get(preset.env_model_var, "").strip()
-        or (preset.model if preset.key != "custom" else "")
-    ).strip()
+    model = _first_non_empty(
+        req.model,
+        _settings_attr(settings, preset.key, _SETTINGS_MODEL_ATTRS),
+        os.environ.get(preset.env_model_var, "") if preset.env_model_var else "",
+        preset.model if preset.key != "custom" else "",
+    )
 
     protocol = (req.protocol or preset.protocol).strip().lower()
     if protocol not in {PROTOCOL_OPENAI, PROTOCOL_ANTHROPIC}:
@@ -152,10 +186,17 @@ def _resolve_provider(req: SuggestionRequest) -> _ResolvedProvider:
             code="LLM_NOT_CONFIGURED",
         )
 
+    if not base_url:
+        raise ApiError(
+            "Provider requires a `base_url`.",
+            status_code=400,
+            code="BAD_REQUEST",
+        )
+
     return _ResolvedProvider(
         preset=preset,
         api_key=api_key,
-        base_url=base_url or preset.base_url,
+        base_url=base_url,
         model=model,
         protocol=protocol,
         source="request" if req.api_key else "env",
@@ -224,6 +265,7 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
             system=system,
             user=user,
             temperature=req.temperature,
+            max_tokens=req.max_tokens,
         )
 
     elapsed_ms = (time.time() - start) * 1000.0
