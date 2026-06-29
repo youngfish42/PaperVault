@@ -39,7 +39,7 @@
 退出码
 ------
     0 成功
-    1 输入校验失败（cache 缺失 / 解析异常超过阈值）
+    1 输入校验失败（cache 缺失 / 解析异常占比超过 --max-parse-error-ratio）
     2 写入后回读校验失败（已回滚，原文件未变）
 """
 
@@ -61,7 +61,11 @@ from collector import _merge_paper_record  # noqa: E402
 DEFAULT_CACHE = ROOT / "cache" / "cache.jsonl.gz"
 
 
-def _pid_of(rec: dict) -> str:
+class ParseErrorThresholdExceeded(RuntimeError):
+    """解析错误占比超过阈值：契约上 main() 应以 exit code 1 退出。"""
+
+
+def _pid_of(rec: dict) -> "str | None":
     """计算一条 record 的内部去重桶键。
 
     与 collector._merge_with_cache 的去重语义对齐——按 (conf, paper_url)
@@ -70,8 +74,18 @@ def _pid_of(rec: dict) -> str:
     paper_url 为空时按 (conf, paper_name_lower) 兜底，这是相对 collector
     更严的偏离（collector 对空 url 直接 append 不去重），仅用于清掉历史
     无 URL 的脏重复；conf 同时参与桶键，不会把不同会议下的同名论文错合。
+
+    若 ``rec`` 的 ``conf`` 字段缺失、为空或不是 ``str`` 类型，返回 ``None``
+    表示「拒绝参与任何跨记录合并」——调用方应把这种行直接放到一个唯一桶里
+    （用 ``id(rec)`` 之类的唯一键），避免跨会议同 URL 在 conf 字段缺失时被
+    `_merge_paper_record` 无声地字段级合并、产生不可逆的数据污染。
     """
-    conf = (rec.get("conf") or "").strip()
+    conf_raw = rec.get("conf")
+    if not isinstance(conf_raw, str):
+        return None
+    conf = conf_raw.strip()
+    if not conf:
+        return None
     url = (rec.get("paper_url") or "").strip()
     if url:
         key = f"{conf}|url|{url}"
@@ -87,17 +101,25 @@ def cleanup(
     dry_run: bool = False,
     backup: bool = True,
     report_path: Path | None = None,
+    max_parse_error_ratio: float = 0.0,
 ) -> dict:
-    """读取 ``source``、去重、（除非 dry-run）写回 ``source``，返回统计字典。"""
+    """读取 ``source``、去重、（除非 dry-run）写回 ``source``，返回统计字典。
+
+    ``max_parse_error_ratio`` 控制坏行容忍度：若 ``parse_errors / total_lines``
+    严格大于该比例，则抛 ``RuntimeError`` 并拒绝写回（dry-run 模式也会抛）。
+    默认 ``0.0`` —— 任何一条 JSON 解析失败都视为契约违反，避免坏行被全量
+    重写后静默丢失。设 ``1.0`` 可显式关闭该检查（不推荐）。
+    """
 
     if not source.exists():
         raise FileNotFoundError(f"cache file not found: {source}")
 
-    pid_to_record: "dict[str, dict]" = {}
-    order: "list[str]" = []  # 保留首次出现顺序，输出更稳定
+    pid_to_record: "dict[object, dict]" = {}
+    order: "list[object]" = []  # 保留首次出现顺序，输出更稳定
     total = 0
     parse_errors = 0
     merge_events = 0
+    skipped_no_conf = 0  # conf 缺失/类型异常，直接放唯一桶不参与合并
     abstract_rescued = 0  # 原 record abstract 为空、合并后非空
     abstract_upgraded = 0  # 原 record abstract 非空但被换成更长的
     code_upgraded = 0  # 原 record code 是 '#' 或空、被换成真实链接
@@ -113,7 +135,15 @@ def cleanup(
                 parse_errors += 1
                 continue
             total += 1
-            pid = _pid_of(rec)
+            pid = _pid_of(rec) if isinstance(rec, dict) else None
+            if pid is None:
+                # conf 缺失或 rec 不是 dict —— 用对象身份做桶键，保证唯一、
+                # 不会与任何其他记录合并；这条记录会按首次出现顺序原样写回。
+                unique_key = ("__no_conf__", id(rec))
+                pid_to_record[unique_key] = rec
+                order.append(unique_key)
+                skipped_no_conf += 1
+                continue
             prior = pid_to_record.get(pid)
             if prior is None:
                 pid_to_record[pid] = rec
@@ -153,6 +183,7 @@ def cleanup(
         "unique_pids": unique,
         "rows_saved": rows_saved,
         "merge_events": merge_events,
+        "skipped_no_conf": skipped_no_conf,
         "abstract_rescued": abstract_rescued,
         "abstract_upgraded": abstract_upgraded,
         "code_upgraded": code_upgraded,
@@ -162,6 +193,18 @@ def cleanup(
 
     if report_path is not None:
         _write_report(report_path, stats)
+
+    # 解析错误占比检查：契约上声明 exit code 1。total 与 parse_errors 共同
+    # 构成「曾出现过的行数」分母——空行已经被前面 skip，不计入。
+    denom = total + parse_errors
+    if denom > 0:
+        ratio = parse_errors / denom
+        if ratio > max_parse_error_ratio:
+            raise ParseErrorThresholdExceeded(
+                f"parse_errors ratio {ratio:.4f} exceeds threshold "
+                f"{max_parse_error_ratio:.4f} (parse_errors={parse_errors}, "
+                f"total_rows={total}); refusing to rewrite cache"
+            )
 
     if dry_run:
         return stats
@@ -228,6 +271,12 @@ def main(argv=None) -> int:
                         help="写入时不保留 .bak 备份（不推荐）")
     parser.add_argument("--report", type=Path, default=None,
                         help="把统计结果同时写到该文本文件")
+    parser.add_argument(
+        "--max-parse-error-ratio",
+        type=float,
+        default=0.0,
+        help="允许的 JSON 解析失败行占比，超过则以 exit code 1 终止；默认 0.0",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -236,9 +285,13 @@ def main(argv=None) -> int:
             dry_run=args.dry_run,
             backup=not args.no_backup,
             report_path=args.report,
+            max_parse_error_ratio=args.max_parse_error_ratio,
         )
     except FileNotFoundError as exc:
         print(f"[cleanup_cache_dedupe] ERROR: {exc}", file=sys.stderr)
+        return 1
+    except ParseErrorThresholdExceeded as exc:
+        print(f"[cleanup_cache_dedupe] PARSE ERRORS: {exc}", file=sys.stderr)
         return 1
     except RuntimeError as exc:
         print(f"[cleanup_cache_dedupe] VERIFY FAILED: {exc}", file=sys.stderr)
