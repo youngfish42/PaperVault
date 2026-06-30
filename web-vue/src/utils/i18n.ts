@@ -93,10 +93,7 @@ const messages: Record<Lang, Record<string, string>> = {
     'settings.pageTitle': '设置',
     'settings.intro':
       '配置 LLM 提供方、API 密钥和默认参数。设置仅保存在本地，不会上传。',
-    'settings.wip': '即将在 P2-D 版本提供',
     'settings.aiSuggest.title': 'AI 关键词推荐',
-    'settings.aiSuggest.desc':
-      '在此选择用于生成相关关键词的 LLM 提供方与模型，配置入口将在 P2-D 开放。',
     'settings.aiSuggest.form.provider': '提供方',
     'settings.aiSuggest.form.baseUrl': '接口地址',
     'settings.aiSuggest.form.model': '模型',
@@ -262,10 +259,7 @@ const messages: Record<Lang, Record<string, string>> = {
     'settings.pageTitle': 'Settings',
     'settings.intro':
       'Configure the LLM provider, API key, and defaults. Settings live in your browser only.',
-    'settings.wip': 'Coming in P2-D',
     'settings.aiSuggest.title': 'AI keyword suggestions',
-    'settings.aiSuggest.desc':
-      'Choose the LLM provider and model used to generate related keywords. Configuration UI ships in P2-D.',
     'settings.aiSuggest.form.provider': 'Provider',
     'settings.aiSuggest.form.baseUrl': 'Endpoint URL',
     'settings.aiSuggest.form.model': 'Model',
