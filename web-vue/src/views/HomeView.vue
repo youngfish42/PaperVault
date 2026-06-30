@@ -6,6 +6,7 @@ import { ElMessage, ElLoading } from 'element-plus'
 import ConfsTree from '@/components/ConfsTree.vue'
 import SearchResultList from '@/components/SearchResultList.vue'
 import GuessYourLike from '@/components/GuessYourLike.vue'
+import MainNavBar from '@/components/MainNavBar.vue'
 import {
   listConfs,
   searchPapers,
@@ -277,6 +278,10 @@ const goAdvanced = (): void => {
   router.push({ path: '/advanced' })
 }
 
+const goSettings = (): void => {
+  router.push({ path: '/settings' })
+}
+
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 
@@ -312,40 +317,15 @@ onMounted(async () => {
 
 <template>
   <main class="full pos-relative">
+    <!-- 共享顶栏（Smart / Advanced / Settings）：跨 firstEntry 状态常驻 -->
+    <MainNavBar
+      active-key="home"
+      :is-dark="isDark"
+      @toggle-dark="toggleDark()"
+    />
+
     <!-- 首屏：WoS 风格 hero -->
     <section v-if="firstEntry" class="pv-hero">
-      <!-- 顶部 tab：Smart Search / Advanced Search -->
-      <nav class="pv-hero-tabs">
-        <div class="pv-container pv-hero-tabs-inner">
-          <button class="pv-hero-tab pv-hero-tab--active" type="button">
-            {{ t('search.tab.smart') }}
-          </button>
-          <button class="pv-hero-tab" type="button" @click="goAdvanced">
-            {{ t('search.tab.advanced') }}
-          </button>
-          <div class="pv-hero-tabs-actions">
-            <el-link
-              type="primary"
-              :icon="isDark ? 'Sunny' : 'Moon'"
-              @click="toggleDark()"
-            >
-              {{ isDark ? t('toolbar.light') : t('toolbar.dark') }}
-            </el-link>
-            <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
-              {{ t('toolbar.lang') }}
-            </el-link>
-            <el-link
-              type="primary"
-              icon="Link"
-              href="https://github.com/youngfish42/PaperVault"
-              target="_blank"
-            >
-              {{ t('toolbar.github') }}
-            </el-link>
-          </div>
-        </div>
-      </nav>
-
       <div class="pv-container pv-hero-inner">
         <h1 class="pv-hero-title">
           <a href="/">{{ t('app.title') }}</a>
@@ -474,6 +454,9 @@ onMounted(async () => {
             <el-icon class="pv-dsl-info"><InfoFilled /></el-icon>
           </el-tooltip>
           <div class="pv-topbar-actions">
+            <el-link type="primary" icon="Tools" @click="goSettings">
+              {{ t('toolbar.settings') }}
+            </el-link>
             <el-link type="primary" icon="Setting" @click="goAdvanced">
               {{ t('toolbar.advanced') }}
             </el-link>

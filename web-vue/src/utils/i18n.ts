@@ -89,6 +89,17 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.light': '浅色模式',
     'toolbar.github': 'GitHub',
     'toolbar.lang': 'English',
+    'toolbar.settings': '设置',
+    'settings.pageTitle': '设置',
+    'settings.intro':
+      '管理 PaperVault 的偏好与配置，更多分组将在后续版本上线。',
+    'settings.wip': '即将在 P2-D 版本提供',
+    'settings.aiSuggest.title': 'AI 关键词推荐',
+    'settings.aiSuggest.desc':
+      '在此选择用于生成相关关键词的 LLM 提供方与模型，配置入口将在 P2-D 开放。',
+    'settings.about.title': '关于此页面',
+    'settings.about.body':
+      '本页是 P2-C 阶段交付的设置面板外壳，负责承载 P2-D 接入的 AI 提供方配置、模型选择与默认参数。',
     'tips.title': '搜索小贴士',
     'tips.desc':
       '① 直接输入关键词即可，默认按主题（标题 + 摘要 + 关键词）匹配；② 可使用 Web of Science 风格语法精确限定字段，如 AU="Yang Liu" SO=ICLR,NeurIPS PY=2023-2026；③ 想要可视化组合多条件？点击「高级搜索」打开行式表单，自动生成检索式；④ 点击作者名可一键检索其所有论文。',
@@ -130,7 +141,6 @@ const messages: Record<Lang, Record<string, string>> = {
     'year.since': '自 {year} 起',
     'year.all': '不限',
     'adv.pageTitle': '高级搜索',
-    'adv.backHome': '返回首页',
     'adv.builder.title': '检索条件',
     'adv.builder.hint': '按行添加字段条件，使用 AND / OR / NOT 组合',
     'adv.builder.firstRow': '检索式',
@@ -227,6 +237,17 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.light': 'Light',
     'toolbar.github': 'GitHub',
     'toolbar.lang': '中文',
+    'toolbar.settings': 'Settings',
+    'settings.pageTitle': 'Settings',
+    'settings.intro':
+      'Manage PaperVault preferences and configuration. More sections will be added in upcoming releases.',
+    'settings.wip': 'Coming in P2-D',
+    'settings.aiSuggest.title': 'AI keyword suggestions',
+    'settings.aiSuggest.desc':
+      'Choose the LLM provider and model used to generate related keywords. Configuration UI ships in P2-D.',
+    'settings.about.title': 'About this page',
+    'settings.about.body':
+      'This page is the P2-C settings panel shell. It will host the P2-D AI provider configuration, model selection, and default-parameter controls.',
     'tips.title': 'Search Tips',
     'tips.desc':
       '① Just type keywords — the default Topic search matches title + abstract + author keywords. ② Use Web of Science style field tags for precision, e.g. AU="Yang Liu" SO=ICLR,NeurIPS PY=2023-2026. ③ Need a visual builder? Open "Advanced search" to add rows and auto-generate the expression. ④ Click any author name to instantly list all their papers.',
@@ -269,7 +290,6 @@ const messages: Record<Lang, Record<string, string>> = {
     'year.since': 'Since {year}',
     'year.all': 'All',
     'adv.pageTitle': 'Advanced search',
-    'adv.backHome': 'Back to home',
     'adv.builder.title': 'Query builder',
     'adv.builder.hint': 'Add rows and combine them with AND / OR / NOT',
     'adv.builder.firstRow': 'Query',
