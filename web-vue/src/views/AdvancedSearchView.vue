@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
+import MainNavBar from '@/components/MainNavBar.vue'
 import { listConfs } from '@/api/paper'
 import { useI18n } from '@/utils/i18n'
 import { buildDsl, type DslRow } from '@/utils/queryDsl'
 
-const { t, toggle: toggleLang } = useI18n()
+const { t } = useI18n()
 const router = useRouter()
+const isDark = useDark()
+const toggleDark = useToggle(isDark)
 
 /**
  * Web of Science-style advanced search:
@@ -97,10 +101,6 @@ const runSearch = (): void => {
   router.push({ path: '/', query: { q: expr } })
 }
 
-const goHome = (): void => {
-  router.push({ path: '/' })
-}
-
 onMounted(async () => {
   try {
     const res = await listConfs()
@@ -113,26 +113,12 @@ onMounted(async () => {
 
 <template>
   <main class="pv-adv-page">
-    <!-- WoS 风格 tab 栏 -->
-    <nav class="pv-adv-tabs">
-      <div class="pv-container pv-adv-tabs-inner">
-        <a class="brand" @click="goHome">{{ t('app.title') }}</a>
-        <button class="pv-adv-tab" type="button" @click="goHome">
-          {{ t('search.tab.smart') }}
-        </button>
-        <button class="pv-adv-tab pv-adv-tab--active" type="button">
-          {{ t('search.tab.advanced') }}
-        </button>
-        <div class="pv-adv-tabs-actions">
-          <el-link type="primary" icon="Back" @click="goHome">
-            {{ t('adv.backHome') }}
-          </el-link>
-          <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
-            {{ t('toolbar.lang') }}
-          </el-link>
-        </div>
-      </div>
-    </nav>
+    <!-- 共享 MainNavBar：Smart / Advanced / Settings + 暗色 / 语言 / GitHub -->
+    <MainNavBar
+      active-key="advanced"
+      :is-dark="isDark"
+      @toggle-dark="toggleDark()"
+    />
 
     <section class="pv-container pv-adv-body">
       <div class="pv-adv-grid">
