@@ -42,15 +42,13 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from pydantic import ValidationError
-
 from ..errors import ApiError, UpstreamError
 from .ai_clients import ChatResult, call_anthropic, call_openai_compatible
 from .ai_providers import (
     PROTOCOL_ANTHROPIC,
     PROTOCOL_OPENAI,
 )
-from .suggest import SuggestionRequest, _resolve_provider, _settings_or_none
+from .suggest import ProviderHints, _resolve_provider, _settings_or_none
 
 logger = logging.getLogger("papervault.rerank")
 
@@ -191,8 +189,8 @@ def _parse_rerank_response(
     payload: Optional[str] = None
     for extract in (
         lambda: content.strip(),
-        lambda: _FENCED_RE.search(content).group(1) if _FENCED_RE.search(content) else None,
-        lambda: _OBJECT_RE.search(content).group(0) if _OBJECT_RE.search(content) else None,
+        lambda: (m.group(1) if (m := _FENCED_RE.search(content)) else None),
+        lambda: (m.group(0) if (m := _OBJECT_RE.search(content)) else None),
     ):
         try:
             candidate = extract()
@@ -286,21 +284,23 @@ def rank_papers(
 
     snippets = [_snippet(p) for p in papers]
     id_order = [s.id for s in snippets]
-
-    # Borrow the dispatch logic from ``services.suggest``. Constructing a
-    # SuggestionRequest is the cheapest way to reuse ``_resolve_provider``
-    # without copying ~80 lines of priority resolution.
-    dispatch_req = SuggestionRequest(
-        query=query,
+    # ``_resolve_provider`` already accepts any duck-typed object with
+    # the five dispatch fields; the dedicated ``ProviderHints`` dataclass
+    # avoids dragging unused keyword-suggestion fields (``max_keywords`` /
+    # ``temperature`` default) into rerank's call site.
+    hints = ProviderHints(
         provider=provider,
         base_url=base_url,
         model=model,
         api_key=api_key,
         protocol=protocol,
-        temperature=temperature if temperature is not None else 0.0,
-        max_keywords=1,  # unused but required by dataclass
     )
-    resolved = _resolve_provider(dispatch_req)
+    resolved = _resolve_provider(hints)
+
+    # ``temperature`` defaults to 0.0 for rerank because deterministic
+    # ordering is more useful than diverse suggestions; callers can still
+    # override.
+    effective_temperature = temperature if temperature is not None else 0.0
 
     # Anthropic requires ``max_tokens``; use settings fallback chain.
     if resolved.protocol == PROTOCOL_ANTHROPIC:
@@ -320,7 +320,7 @@ def rank_papers(
             model=resolved.model,
             system=system,
             user=user,
-            temperature=dispatch_req.temperature,
+            temperature=effective_temperature,
             max_tokens=anthropic_max_tokens,
         )
     else:
@@ -330,7 +330,7 @@ def rank_papers(
             model=resolved.model,
             system=system,
             user=user,
-            temperature=dispatch_req.temperature,
+            temperature=effective_temperature,
         )
     elapsed_ms = (time.time() - start) * 1000.0
 
