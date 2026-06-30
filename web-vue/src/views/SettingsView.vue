@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { useDark, useToggle } from '@vueuse/core'
+import AiSuggestSection from '@/components/AiSuggestSection.vue'
 import MainNavBar from '@/components/MainNavBar.vue'
 import { useI18n } from '@/utils/i18n'
 
 /**
- * P2-C Settings page shell. No data fetching, no forms — those arrive
- * in P2-D when the AI Suggest section starts consuming P2-B's
- * ``listAiProviders()`` and ``suggestKeywordsWithSettings()``.
- *
- * The visual structure (title + intro + two ``el-card`` placeholders)
- * mirrors AdvancedSearchView's density so the page doesn't feel empty.
+ * P2-C Settings page shell + P2-D AI Suggest section. The AI Suggest
+ * card (``<AiSuggestSection />``) replaces the P2-C ``<el-alert>``
+ * placeholder and consumes P2-B's settings + API wrappers end-to-end.
  */
 
 const isDark = useDark()
@@ -29,20 +27,7 @@ const { t } = useI18n()
       <h1 class="pv-settings-title">{{ t('settings.pageTitle') }}</h1>
       <p class="pv-settings-intro">{{ t('settings.intro') }}</p>
 
-      <el-card shadow="never" class="pv-settings-card">
-        <template #header>
-          <span class="pv-settings-card-title">
-            {{ t('settings.aiSuggest.title') }}
-          </span>
-        </template>
-        <el-alert
-          type="info"
-          :title="t('settings.wip')"
-          :description="t('settings.aiSuggest.desc')"
-          show-icon
-          :closable="false"
-        />
-      </el-card>
+      <AiSuggestSection />
 
       <el-card shadow="never" class="pv-settings-card">
         <template #header>
