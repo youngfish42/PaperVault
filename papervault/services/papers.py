@@ -56,6 +56,7 @@ class PaperRepository:
 
     _papers: List[Paper] = field(default_factory=list, init=False)
     _by_conf: Dict[str, List[Paper]] = field(default_factory=dict, init=False)
+    _by_id: Dict[str, Paper] = field(default_factory=dict, init=False)
     _loaded: bool = field(default=False, init=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False)
 
@@ -72,6 +73,7 @@ class PaperRepository:
         with self._lock:
             self._papers = []
             self._by_conf = {}
+            self._by_id = {}
             self._load()
             self._loaded = True
 
@@ -142,6 +144,7 @@ class PaperRepository:
                 )
                 self._papers.append(rec)
                 self._by_conf.setdefault(conf_name, []).append(rec)
+                self._by_id[pid] = rec
 
         logger.info(
             "Loaded %d papers across %d conferences (%d duplicate rows dropped)",
@@ -153,6 +156,17 @@ class PaperRepository:
     def all_papers(self) -> List[Paper]:
         self.ensure_loaded()
         return self._papers
+
+    def get_by_id(self, paper_id: str) -> Optional[Paper]:
+        """Return the :class:`Paper` with the given 16-char id or ``None``.
+
+        Backed by the index built once at load time, so lookup is O(1) per
+        id — call sites that resolve a small batch (e.g. ``/v1/ai/rerank``)
+        should prefer this over iterating ``all_papers()``.
+        """
+
+        self.ensure_loaded()
+        return self._by_id.get(paper_id)
 
     def confs(self) -> Dict[str, List[Paper]]:
         self.ensure_loaded()

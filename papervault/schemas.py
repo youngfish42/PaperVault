@@ -110,3 +110,78 @@ class SuggestResponse(BaseModel):
     model: str
     provider: str
     protocol: str
+
+
+class RerankRequest(BaseModel):
+    """Re-rank payload sent to ``POST /v1/ai/rerank``.
+
+    ``paper_ids`` are the SHA-1-prefixed 16-char paper hashes the backend
+    uses internally (see ``services.papers.Paper.id``). We intentionally
+    cap the batch size server-side to keep a single LLM call bounded —
+    even with truncated abstracts, 300 papers × ~100 tokens each still
+    costs ~30k input tokens, which is the practical ceiling for the
+    providers currently wired in.
+
+    The provider / model / api_key fields mirror ``SuggestRequest`` so a
+    caller can reuse exactly the same settings object on both endpoints.
+    """
+
+    query: str = Field(min_length=1, max_length=200)
+    paper_ids: List[str] = Field(min_length=1, max_length=300)
+    provider: Optional[str] = Field(default=None, max_length=64)
+    base_url: Optional[str] = Field(default=None, max_length=512)
+    model: Optional[str] = Field(default=None, max_length=128)
+    api_key: Optional[str] = Field(default=None, max_length=512)
+    protocol: Optional[str] = Field(default=None, max_length=32)
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+
+    @field_validator("provider", "protocol", mode="before")
+    @classmethod
+    def _strip_lower(cls, value: Any):
+        return _strip_or_none(value, lower=True)
+
+    @field_validator("base_url", "model", "api_key", mode="before")
+    @classmethod
+    def _strip_normalize(cls, value: Any):
+        return _strip_or_none(value, lower=False)
+
+    @field_validator("paper_ids", mode="after")
+    @classmethod
+    def _dedupe_paper_ids(cls, value: List[str]) -> List[str]:
+        # Drop duplicates while preserving first-seen order so the LLM
+        # prompt never lists the same paper twice and the response never
+        # surfaces duplicate ``paper_id`` entries to the UI (the previous
+        # implementation could emit duplicates when an id appeared twice
+        # *and* the LLM forgot to score it: both copies would land in the
+        # ``missing`` tail list).
+        #
+        # Note: shape validation (``^[0-9a-f]{16}$``) is *not* enforced
+        # here on purpose — the endpoint contract is that unknown /
+        # malformed ids flow through to ``skipped_ids`` so the caller
+        # can render a non-fatal warning rather than retry the whole
+        # batch. ``PaperRepository.get_by_id`` is the single point that
+        # turns a string into a hit or a skip.
+        return list(dict.fromkeys(value))
+
+
+class RerankEntry(BaseModel):
+    paper_id: str
+    # Score is normalized to ``[0.0, 1.0]`` server-side; the UI multiplies
+    # by 100 for display. Providers that natively score on a different
+    # scale (e.g. 0-10 or 0-100) are mapped into this range inside
+    # ``services.rerank``.
+    score: float = Field(ge=0.0, le=1.0)
+
+
+class RerankResponse(BaseModel):
+    # The full re-ranked list, highest score first. ``paper_ids`` that the
+    # LLM failed to score are appended at the tail with a default score so
+    # the caller never loses items from the input batch.
+    ordered: List[RerankEntry]
+    # Paper ids the caller sent that did not resolve in the local index
+    # (typically stale ids). Empty list means every id was honoured.
+    skipped_ids: List[str] = Field(default_factory=list)
+    timecost_ms: float
+    model: str
+    provider: str
+    protocol: str
