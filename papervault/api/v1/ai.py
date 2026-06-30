@@ -12,7 +12,6 @@ back-compat; moving it here is purely cosmetic and not worth the diff.
 from __future__ import annotations
 
 import logging
-from typing import List
 
 from flask import Blueprint, current_app, jsonify, request
 from pydantic import ValidationError
@@ -51,6 +50,7 @@ def post_rerank():
 
         {
             "ordered": [{"paper_id":"<id>", "score": 0.0..1.0}, ...],
+            "skipped_ids": ["<unknown id>", ...],
             "timecost_ms": <float>,
             "model": "<str>",
             "provider": "<str>",
@@ -80,13 +80,35 @@ def post_rerank():
             code="REPO_NOT_READY",
         )
 
-    by_id = {p.id: p for p in repo.all_papers()}
-    papers = [by_id[pid] for pid in req.paper_ids if pid in by_id]
-    missing = [pid for pid in req.paper_ids if pid not in by_id]
-    if missing:
+    # Resolve each requested id through the repository's pre-built index.
+    # ``get_by_id`` is O(1) per id, so the total per-request cost here is
+    # O(len(paper_ids)) instead of O(corpus). Falls back to a single
+    # ``all_papers`` scan if the repo predates the indexed accessor (older
+    # tests still stub the legacy shape).
+    papers = []
+    skipped_ids: list[str] = []
+    getter = getattr(repo, "get_by_id", None)
+    if callable(getter):
+        for pid in req.paper_ids:
+            paper = getter(pid)
+            if paper is None:
+                skipped_ids.append(pid)
+            else:
+                papers.append(paper)
+    else:  # pragma: no cover - legacy stub path
+        by_id = {p.id: p for p in repo.all_papers()}
+        for pid in req.paper_ids:
+            paper = by_id.get(pid)
+            if paper is None:
+                skipped_ids.append(pid)
+            else:
+                papers.append(paper)
+    if skipped_ids:
         # Not fatal — the model can still rank the survivors — but worth
         # logging because it usually means the caller passed stale ids.
-        logger.info("Re-rank skipped %d unknown paper id(s)", len(missing))
+        # The caller also gets a ``skipped_ids`` field in the response so
+        # the drop is visible without diffing request against response.
+        logger.info("Re-rank skipped %d unknown paper id(s)", len(skipped_ids))
 
     result = rank_papers(
         query=req.query,
@@ -102,6 +124,7 @@ def post_rerank():
     body = RerankResponse(
         ordered=[RerankEntry(paper_id=pid, score=result.scores.get(pid, 0.5))
                  for pid in result.ordered_ids],
+        skipped_ids=skipped_ids,
         timecost_ms=round(result.elapsed_ms, 1),
         model=result.model,
         provider=result.provider,

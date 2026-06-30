@@ -127,7 +127,7 @@ class RerankRequest(BaseModel):
     """
 
     query: str = Field(min_length=1, max_length=200)
-    paper_ids: List[str] = Field(min_items=1, max_length=300)
+    paper_ids: List[str] = Field(min_length=1, max_length=300)
     provider: Optional[str] = Field(default=None, max_length=64)
     base_url: Optional[str] = Field(default=None, max_length=512)
     model: Optional[str] = Field(default=None, max_length=128)
@@ -160,6 +160,9 @@ class RerankResponse(BaseModel):
     # LLM failed to score are appended at the tail with a default score so
     # the caller never loses items from the input batch.
     ordered: List[RerankEntry]
+    # Paper ids the caller sent that did not resolve in the local index
+    # (typically stale ids). Empty list means every id was honoured.
+    skipped_ids: List[str] = Field(default_factory=list)
     timecost_ms: float
     model: str
     provider: str

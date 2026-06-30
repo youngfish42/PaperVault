@@ -52,6 +52,10 @@ def fake_papers(monkeypatch):
         code=None,
     )
     repo.all_papers.return_value = [p1, p2]
+    # Mirror the production ``PaperRepository`` so the handler hits the
+    # O(1) indexed accessor instead of the legacy O(N) fallback.
+    _by_id = {p1.id: p1, p2.id: p2}
+    repo.get_by_id.side_effect = lambda pid: _by_id.get(pid)
 
     def _seed(app):
         app.extensions["paper_repository"] = repo
@@ -234,6 +238,71 @@ def test_rerank_drops_unknown_ids_from_response(client, monkeypatch):
     ordered = resp.get_json()["ordered"]
     assert len(ordered) == 1
     assert ordered[0]["paper_id"] == "aaaa1111aaaa1111"
+
+
+def test_rerank_reports_stale_ids_in_skipped_field(client, monkeypatch):
+    """Stale (unknown) paper_ids must be surfaced via ``skipped_ids``.
+
+    The handler used to drop them silently with only an INFO log entry,
+    which left the UI unable to distinguish "model trimmed list" from
+    "client passed dangling references". The response contract now lists
+    every dropped id so the caller can show a recoverable warning.
+    """
+
+    monkeypatch.setattr(
+        rerank, "call_openai_compatible",
+        lambda **kwargs: ai_clients.ChatResult(
+            content='{"ordered":[{"paper_id":"aaaa1111aaaa1111","score":0.7}]}',
+            raw_model="gpt-4o-mini",
+        ),
+    )
+
+    resp = client.post(
+        "/api/v1/ai/rerank",
+        json={
+            "query": "time series",
+            "paper_ids": [
+                "aaaa1111aaaa1111",
+                "stale-id-1",
+                "stale-id-2",
+            ],
+            "provider": "openai",
+            "api_key": "sk-test",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert [e["paper_id"] for e in body["ordered"]] == ["aaaa1111aaaa1111"]
+    # Order of ``skipped_ids`` mirrors the request order so the UI can
+    # line them up without resorting.
+    assert body["skipped_ids"] == ["stale-id-1", "stale-id-2"]
+
+
+def test_rerank_skipped_ids_empty_when_all_resolve(client, monkeypatch):
+    """Happy path: every id maps; ``skipped_ids`` is an empty list."""
+
+    monkeypatch.setattr(
+        rerank, "call_openai_compatible",
+        lambda **kwargs: ai_clients.ChatResult(
+            content=(
+                '{"ordered":[{"paper_id":"aaaa1111aaaa1111","score":0.8},'
+                '{"paper_id":"bbbb2222bbbb2222","score":0.4}]}'
+            ),
+            raw_model="gpt-4o-mini",
+        ),
+    )
+
+    resp = client.post(
+        "/api/v1/ai/rerank",
+        json={
+            "query": "time series",
+            "paper_ids": ["aaaa1111aaaa1111", "bbbb2222bbbb2222"],
+            "provider": "openai",
+            "api_key": "sk-test",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["skipped_ids"] == []
 
 
 def test_rerank_503_when_no_api_key(client):
