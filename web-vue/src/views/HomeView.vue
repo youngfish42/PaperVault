@@ -5,14 +5,13 @@ import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage, ElLoading } from 'element-plus'
 import ConfsTree from '@/components/ConfsTree.vue'
 import SearchResultList from '@/components/SearchResultList.vue'
-import GuessYourLike from '@/components/GuessYourLike.vue'
+import AiSuggestPanel from '@/components/AiSuggestPanel.vue'
+import AiSearchDialog from '@/components/AiSearchDialog.vue'
 import MainNavBar from '@/components/MainNavBar.vue'
-import {
-  listConfs,
-  searchPapers,
-  suggestKeywords,
-  type PaperItem
-} from '@/api/paper'
+import { listConfs, searchPapers, type PaperItem } from '@/api/paper'
+import { suggestKeywordsWithSettings } from '@/api/ai'
+import { loadAiSettings, loadApiKey, toApiPayload } from '@/utils/aiSettings'
+import { buildOrMerge } from '@/utils/queryMerge'
 import { useI18n } from '@/utils/i18n'
 import {
   parseDsl,
@@ -58,6 +57,9 @@ const searchResult = ref<InstanceType<typeof SearchResultList> | null>(null)
 
 const guessLoading = ref(false)
 const guessList = ref<string[]>([])
+const guessProviderLabel = ref('')
+
+const aiDialogOpen = ref(false)
 
 const cheatsheetOpen = ref(false)
 const toggleCheatsheet = (): void => {
@@ -212,9 +214,18 @@ const search = (): void => {
       : ''
   if (suggestSeed) {
     guessLoading.value = true
-    suggestKeywords(suggestSeed)
+    guessList.value = []
+    guessProviderLabel.value = ''
+    const payload = toApiPayload(loadAiSettings(), loadApiKey())
+    suggestKeywordsWithSettings(suggestSeed, payload)
       .then(res => {
         guessList.value = res.keywords || []
+        if (res.provider && res.model) {
+          guessProviderLabel.value = t('guess.provider', {
+            provider: `${res.provider} · ${res.model}`,
+            ms: String(res.timecost_ms ?? 0)
+          })
+        }
       })
       .catch(err => {
         console.error(err)
@@ -261,6 +272,24 @@ const onToggleRefineMode = (val: string | number | boolean): void => {
 
 const handleSearchGuess = (data: string): void => {
   searchContent.query = data
+  search()
+}
+
+const handleSearchGuessMany = (picked: string[]): void => {
+  if (!picked.length) return
+  searchContent.query = buildOrMerge(searchContent.query, picked)
+  search()
+}
+
+const handleAiSearchPick = (payload: {
+  query: string
+  rerank: boolean
+}): void => {
+  // P3-B wires the OR-merged query from the hero dialog. P3-C will also
+  // honour the ``rerank`` flag here to drive the new ``aiRerankEnabled``
+  // toggle; for now we only persist the query and re-run.
+  searchContent.query = payload.query
+  aiDialogOpen.value = false
   search()
 }
 
@@ -349,6 +378,19 @@ onMounted(async () => {
             <el-icon><Search /></el-icon>
           </button>
         </div>
+
+        <!-- AI 搜索入口：和 hero 主搜索框同一行，opt-in 不会改变现有体验 -->
+        <div class="pv-hero-ai-row">
+          <el-button class="pv-hero-ai-btn" plain @click="aiDialogOpen = true">
+            <el-icon><MagicStick /></el-icon>
+            <span>{{ t('search.aiSearch.button') }}</span>
+          </el-button>
+          <span class="pv-hero-ai-hint">{{ t('search.aiSearch.hint') }}</span>
+        </div>
+        <AiSearchDialog
+          v-model:visible="aiDialogOpen"
+          @pick="handleAiSearchPick"
+        />
 
         <!-- 搜索框下方的轻量跳转提示（对齐 WoS） -->
         <p class="pv-hero-hint">
@@ -498,10 +540,16 @@ onMounted(async () => {
           />
         </div>
         <aside class="pv-side pv-side-right">
-          <GuessYourLike
+          <AiSuggestPanel
+            :keywords="guessList"
             :loading="guessLoading"
-            :result="guessList"
-            @search-guess="handleSearchGuess"
+            :title="t('guess.header')"
+            :provider-label="guessProviderLabel"
+            :empty-text="t('guess.empty')"
+            :single-replace-text="t('guess.replace')"
+            :merge-button-text="t('guess.merge')"
+            @pick-many="handleSearchGuessMany"
+            @replace="handleSearchGuess"
           />
         </aside>
       </section>
@@ -654,6 +702,24 @@ onMounted(async () => {
 .pv-hero-searchbox-btn:hover {
   background: var(--el-color-primary-dark-2, #5847c0);
   transform: scale(1.04);
+}
+
+/* 搜索框下方的轻量 AI 入口：与 hero hint 同一视觉权重 */
+.pv-hero-ai-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px auto 0;
+  max-width: 720px;
+}
+.pv-hero-ai-btn :deep(.el-icon) {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.pv-hero-ai-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
 }
 
 .pv-hero-hint {

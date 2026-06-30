@@ -1,0 +1,184 @@
+<script setup lang="ts">
+/**
+ * Hero "AI search" dialog (P3).
+ *
+ * Two responsibilities:
+ *   1. Take a free-form seed description from the user, ask the LLM for
+ *      a handful of related keywords, let the user pick some, and emit the
+ *      resulting OR-merged query string for the parent to push into the
+ *      search box.
+ *   2. Carry the "also rerank the result set by AI relevance" intent
+ *      through to the parent. The actual rerank call is owned by the
+ *      parent (HomeView) so the dialog stays free of search-flow state.
+ *
+ * The dialog reaches into the same provider / API key / settings that the
+ * Settings page already configured (P2-D). If the user hasn't configured
+ * anything yet, the request still goes out (the backend will resolve via
+ * environment defaults and either succeed or 503 with a structured error
+ * the dialog surfaces as a toast).
+ */
+import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useI18n } from '@/utils/i18n'
+import { suggestKeywordsWithSettings } from '@/api/ai'
+import { loadAiSettings, loadApiKey, toApiPayload } from '@/utils/aiSettings'
+import { buildOrMerge } from '@/utils/queryMerge'
+import AiSuggestPanel from '@/components/AiSuggestPanel.vue'
+
+const { t } = useI18n()
+
+const props = defineProps<{
+  visible: boolean
+  defaultRerank?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:visible', value: boolean): void
+  (e: 'pick', payload: { query: string; rerank: boolean }): void
+}>()
+
+const seed = ref('')
+const keywords = ref<string[]>([])
+const loading = ref(false)
+const rerankEnabled = ref(props.defaultRerank ?? true)
+const errorMsg = ref('')
+const providerLabel = ref('')
+
+const visibleProxy = computed({
+  get: () => props.visible,
+  set: (v: boolean) => emit('update:visible', v)
+})
+
+watch(
+  () => props.visible,
+  open => {
+    if (open) {
+      // Reset transient state on each open so a stale result from the
+      // previous session doesn't bleed into the new one. ``rerankEnabled``
+      // is kept in sync with ``defaultRerank`` so the dialog remembers
+      // the parent's last choice.
+      keywords.value = []
+      errorMsg.value = ''
+      providerLabel.value = ''
+      rerankEnabled.value = props.defaultRerank ?? rerankEnabled.value
+      // Pre-fill the seed with the most recent pick if the caller passed
+      // it (re-opening from a failed previous session). For the simple
+      // hero entry path we just leave it blank.
+    }
+  }
+)
+
+const extractError = (err: unknown): string => {
+  if (!err || typeof err !== 'object')
+    return t('search.aiSearch.toastFailGeneric')
+  const e = err as Record<string, any>
+  return (
+    e?.error?.message ||
+    e?.data?.message ||
+    e?.msg ||
+    e?.message ||
+    t('search.aiSearch.toastFailGeneric')
+  )
+}
+
+const run = async (): Promise<void> => {
+  const q = seed.value.trim()
+  if (!q) {
+    ElMessage.warning(t('search.aiSearch.toastNoSeed'))
+    return
+  }
+  loading.value = true
+  errorMsg.value = ''
+  keywords.value = []
+  try {
+    const payload = toApiPayload(loadAiSettings(), loadApiKey())
+    const res = await suggestKeywordsWithSettings(q, payload)
+    keywords.value = res.keywords || []
+    if (res.provider && res.model) {
+      providerLabel.value = `${res.provider} · ${res.model} · ${res.timecost_ms}ms`
+    } else {
+      providerLabel.value = ''
+    }
+  } catch (err) {
+    errorMsg.value = extractError(err)
+    ElMessage.error(t('search.aiSearch.toastFail', { msg: errorMsg.value }))
+  } finally {
+    loading.value = false
+  }
+}
+
+const handlePickMany = (picked: string[]): void => {
+  const merged = buildOrMerge(seed.value.trim(), picked)
+  emit('pick', { query: merged, rerank: rerankEnabled.value })
+  visibleProxy.value = false
+}
+
+const handleReplace = (kw: string): void => {
+  emit('pick', { query: kw, rerank: rerankEnabled.value })
+  visibleProxy.value = false
+}
+</script>
+
+<template>
+  <el-dialog
+    v-model="visibleProxy"
+    :title="t('search.aiSearch.dialogTitle')"
+    width="520px"
+    destroy-on-close
+    :close-on-click-modal="false"
+  >
+    <div class="pv-ai-search-row">
+      <el-input
+        v-model="seed"
+        :placeholder="t('search.aiSearch.seedPh')"
+        clearable
+        @keyup.enter="run"
+      />
+      <el-button type="primary" :loading="loading" @click="run">
+        {{ t('search.aiSearch.run') }}
+      </el-button>
+    </div>
+
+    <el-checkbox v-model="rerankEnabled" class="pv-ai-search-rerank">
+      {{ t('search.aiSearch.rerank') }}
+    </el-checkbox>
+
+    <AiSuggestPanel
+      v-if="keywords.length || loading"
+      :keywords="keywords"
+      :loading="loading"
+      :title="''"
+      :provider-label="providerLabel"
+      :empty-text="t('search.aiSearch.empty')"
+      :single-replace-text="t('guess.replace')"
+      :merge-button-text="t('guess.merge')"
+      class="pv-ai-search-panel"
+      @pick-many="handlePickMany"
+      @replace="handleReplace"
+    />
+    <div v-else-if="errorMsg" class="pv-ai-search-error">{{ errorMsg }}</div>
+  </el-dialog>
+</template>
+
+<style scoped>
+.pv-ai-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.pv-ai-search-row :deep(.el-input) {
+  flex: 1 1 auto;
+}
+.pv-ai-search-rerank {
+  margin-bottom: 12px;
+}
+.pv-ai-search-panel {
+  margin-top: 4px;
+}
+.pv-ai-search-error {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--el-color-danger, #f56c6c);
+}
+</style>
