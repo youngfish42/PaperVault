@@ -317,15 +317,15 @@ onMounted(async () => {
 
 <template>
   <main class="full pos-relative">
+    <!-- 共享顶栏（Smart / Advanced / Settings）：跨 firstEntry 状态常驻 -->
+    <MainNavBar
+      active-key="home"
+      :is-dark="isDark"
+      @toggle-dark="toggleDark()"
+    />
+
     <!-- 首屏：WoS 风格 hero -->
     <section v-if="firstEntry" class="pv-hero">
-      <!-- 顶部 tab：MainNavBar 接管（Smart / Advanced / Settings） -->
-      <MainNavBar
-        active-key="home"
-        :is-dark="isDark"
-        @toggle-dark="toggleDark()"
-      />
-
       <div class="pv-container pv-hero-inner">
         <h1 class="pv-hero-title">
           <a href="/">{{ t('app.title') }}</a>
@@ -454,7 +454,7 @@ onMounted(async () => {
             <el-icon class="pv-dsl-info"><InfoFilled /></el-icon>
           </el-tooltip>
           <div class="pv-topbar-actions">
-            <el-link type="primary" icon="Setting" @click="goSettings">
+            <el-link type="primary" icon="Tools" @click="goSettings">
               {{ t('toolbar.settings') }}
             </el-link>
             <el-link type="primary" icon="Setting" @click="goAdvanced">

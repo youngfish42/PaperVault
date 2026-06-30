@@ -27,12 +27,15 @@ const router = useRouter()
 const { t, toggle: toggleLang } = useI18n()
 
 const goHome = (): void => {
+  if (props.activeKey === 'home') return
   router.push({ path: '/' })
 }
 const goAdvanced = (): void => {
+  if (props.activeKey === 'advanced') return
   router.push({ path: '/advanced' })
 }
 const goSettings = (): void => {
+  if (props.activeKey === 'settings') return
   router.push({ path: '/settings' })
 }
 </script>
@@ -40,7 +43,7 @@ const goSettings = (): void => {
 <template>
   <nav class="pv-nav">
     <div class="pv-container pv-nav-inner">
-      <a class="brand" @click="goHome">PaperVault</a>
+      <button type="button" class="brand" @click="goHome">PaperVault</button>
       <button
         class="pv-nav-tab"
         :class="{ 'pv-nav-tab--active': props.activeKey === 'home' }"
@@ -76,14 +79,15 @@ const goSettings = (): void => {
         <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
           {{ t('toolbar.lang') }}
         </el-link>
-        <a
-          class="pv-nav-github"
+        <el-link
+          type="primary"
+          icon="Link"
           :href="GITHUB_URL"
           target="_blank"
           rel="noopener noreferrer"
         >
           {{ t('toolbar.github') }}
-        </a>
+        </el-link>
       </div>
     </div>
   </nav>
@@ -113,7 +117,10 @@ const goSettings = (): void => {
   cursor: pointer;
   padding: 8px 18px 14px 0;
   margin-right: 8px;
+  border: none;
   border-right: 1px solid var(--el-border-color-lighter, #ebeef5);
+  background: transparent;
+  font-family: inherit;
 }
 .pv-nav-tab {
   position: relative;
@@ -150,14 +157,6 @@ const goSettings = (): void => {
   gap: 14px;
   align-items: center;
   padding-bottom: 6px;
-}
-.pv-nav-github {
-  text-decoration: none;
-  color: var(--el-color-primary, #6f5ed3);
-  font-size: 14px;
-}
-.pv-nav-github:hover {
-  text-decoration: underline;
 }
 @media (max-width: 768px) {
   .brand {
