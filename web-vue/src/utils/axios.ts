@@ -59,7 +59,13 @@ service.interceptors.response.use(
   err => {
     console.error(err)
     let { message } = err
-    if (message === 'Network Error') {
+    // Prefer the server's structured error message when the backend already
+    // wrapped it (e.g. ``LLM_NOT_CONFIGURED``); the default axios
+    // ``"Request failed with status code 503"`` is useless to the user.
+    const serverMsg = (err as any)?.response?.data?.error?.message
+    if (typeof serverMsg === 'string' && serverMsg) {
+      message = serverMsg
+    } else if (message === 'Network Error') {
       message = '后端接口连接异常'
     } else if (message?.includes('timeout')) {
       message = '系统接口请求超时'

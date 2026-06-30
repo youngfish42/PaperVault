@@ -167,6 +167,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.aiSearch.toastFail': 'AI 搜索失败：{msg}',
     'search.aiSearch.toastFailGeneric': '请求失败',
     'search.aiSearch.toastNoSeed': '请先输入搜索主题',
+    'search.aiSearch.toastNoKey': '请先在「设置」配置 API key',
+    'search.aiSearch.goSettings': '前往设置',
     'search.aiSearch.hint': 'AI 自动扩展关键词。普通搜索流程不受影响。',
     'tree.all': '全部',
     'tree.truncatedMark': '· 仅展示 {n}',
@@ -350,6 +352,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.aiSearch.toastFail': 'AI search failed: {msg}',
     'search.aiSearch.toastFailGeneric': 'Request failed',
     'search.aiSearch.toastNoSeed': 'Please enter a topic first',
+    'search.aiSearch.toastNoKey': 'Configure your API key in Settings first',
+    'search.aiSearch.goSettings': 'Open Settings',
     'search.aiSearch.hint':
       'AI expands your keywords automatically. Plain search keeps working unchanged.',
     'tree.all': 'All',

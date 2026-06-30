@@ -91,7 +91,8 @@ const flashSaved = (): void => {
 
 const handleSave = (): void => {
   saveAiSettings(form)
-  if (apiKey.value) saveApiKey(apiKey.value)
+  const trimmed = apiKey.value.trim()
+  if (trimmed) saveApiKey(trimmed)
   else clearApiKey()
   flashSaved()
 }

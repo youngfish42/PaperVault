@@ -18,6 +18,7 @@
  * the dialog surfaces as a toast).
  */
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from '@/utils/i18n'
 import { suggestKeywordsWithSettings } from '@/api/ai'
@@ -26,6 +27,7 @@ import { buildOrMerge } from '@/utils/queryMerge'
 import AiSuggestPanel from '@/components/AiSuggestPanel.vue'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const props = defineProps<{
   visible: boolean
@@ -87,6 +89,16 @@ const run = async (): Promise<void> => {
     ElMessage.warning(t('search.aiSearch.toastNoSeed'))
     return
   }
+  // Pre-flight: catch the most common AI failure up front so the user gets
+  // an actionable hint instead of a backend 503. Both ``loadApiKey()`` and
+  // ``loadAiSettings().provider`` come from this tab's session / local
+  // storage — if either is empty here, the backend has nothing to work
+  // with and would just raise ``LLM_NOT_CONFIGURED``.
+  if (!loadApiKey() && !loadAiSettings().provider) {
+    errorMsg.value = t('search.aiSearch.toastNoKey')
+    ElMessage.warning(t('search.aiSearch.toastNoKey'))
+    return
+  }
   loading.value = true
   errorMsg.value = ''
   keywords.value = []
@@ -105,6 +117,11 @@ const run = async (): Promise<void> => {
   } finally {
     loading.value = false
   }
+}
+
+const goSettings = (): void => {
+  visibleProxy.value = false
+  router.push('/settings')
 }
 
 const handlePickMany = (picked: string[]): void => {
@@ -156,7 +173,18 @@ const handleReplace = (kw: string): void => {
       @pick-many="handlePickMany"
       @replace="handleReplace"
     />
-    <div v-else-if="errorMsg" class="pv-ai-search-error">{{ errorMsg }}</div>
+    <div v-else-if="errorMsg" class="pv-ai-search-error">
+      {{ errorMsg }}
+      <el-button
+        v-if="!loadApiKey() && !loadAiSettings().provider"
+        link
+        type="primary"
+        class="pv-ai-search-error-link"
+        @click="goSettings"
+      >
+        {{ t('search.aiSearch.goSettings') }}
+      </el-button>
+    </div>
   </el-dialog>
 </template>
 
@@ -180,5 +208,10 @@ const handleReplace = (kw: string): void => {
   margin-top: 12px;
   font-size: 12px;
   color: var(--el-color-danger, #f56c6c);
+}
+.pv-ai-search-error-link {
+  margin-left: 8px;
+  font-size: 12px;
+  padding: 0 4px;
 }
 </style>
