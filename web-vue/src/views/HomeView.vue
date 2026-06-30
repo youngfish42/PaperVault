@@ -457,7 +457,7 @@ onMounted(async () => {
             <el-link type="primary" icon="Tools" @click="goSettings">
               {{ t('toolbar.settings') }}
             </el-link>
-            <el-link type="primary" icon="Setting" @click="goAdvanced">
+            <el-link type="primary" icon="Operation" @click="goAdvanced">
               {{ t('toolbar.advanced') }}
             </el-link>
             <el-link
