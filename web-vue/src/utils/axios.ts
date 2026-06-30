@@ -57,14 +57,35 @@ service.interceptors.response.use(
     return body as unknown as AxiosResponse
   },
   err => {
-    console.error(err)
+    // Log the raw failure so DevTools always shows what really came back
+    // (status, body shape, headers). The interceptor's job is just to
+    // surface a readable message; debugging info lives here.
+    console.error(
+      '[axios] request failed:',
+      err?.config?.url,
+      'status=',
+      err?.response?.status,
+      'body=',
+      err?.response?.data
+    )
     let { message } = err
-    // Prefer the server's structured error message when the backend already
-    // wrapped it (e.g. ``LLM_NOT_CONFIGURED``); the default axios
-    // ``"Request failed with status code 503"`` is useless to the user.
-    const serverMsg = (err as any)?.response?.data?.error?.message
+    const status = err?.response?.status
+    const body = err?.response?.data
+    // Prefer the server's structured envelope: ``{error: {code, message}}``.
+    // Fall back to a flat ``{message}`` body for endpoints that didn't
+    // wrap their errors. Final fallback: axios' default message with a
+    // "[503]" prefix so the status code is never lost.
+    let serverMsg: string | undefined
+    if (body && typeof body === 'object') {
+      serverMsg =
+        (body as any)?.error?.message ||
+        (body as any)?.message ||
+        (body as any)?.msg
+    }
     if (typeof serverMsg === 'string' && serverMsg) {
       message = serverMsg
+    } else if (status) {
+      message = `[${status}] ${message || 'Request failed'}`
     } else if (message === 'Network Error') {
       message = '后端接口连接异常'
     } else if (message?.includes('timeout')) {

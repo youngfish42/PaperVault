@@ -75,9 +75,15 @@ const extractError = (err: unknown): string => {
     return t('search.aiSearch.toastFailGeneric')
   const e = err as Record<string, any>
   return (
+    e?.response?.data?.error?.message ||
+    e?.response?.data?.message ||
+    e?.response?.data?.msg ||
     e?.error?.message ||
     e?.data?.message ||
     e?.msg ||
+    (e?.response?.status
+      ? `[${e.response.status}] ${t('search.aiSearch.toastFailGeneric')}`
+      : '') ||
     e?.message ||
     t('search.aiSearch.toastFailGeneric')
   )
