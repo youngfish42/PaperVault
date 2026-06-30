@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, send_from_directory
 from werkzeug.exceptions import NotFound
 
-from .api.v1 import confs_bp, health_bp, papers_bp, suggest_bp
+from .api.v1 import ai_bp, confs_bp, health_bp, papers_bp, suggest_bp
 from .config import Settings, get_settings
 from .errors import _handle_http_exception, register_error_handlers
 from .logging import configure_logging, install_request_id
@@ -47,6 +47,7 @@ def create_app(settings: Settings | None = None, *, eager_load: bool = True) -> 
     app.register_blueprint(confs_bp, url_prefix="/api/v1")
     app.register_blueprint(papers_bp, url_prefix="/api/v1")
     app.register_blueprint(suggest_bp, url_prefix="/api/v1")
+    app.register_blueprint(ai_bp, url_prefix="/api/v1")
 
     @app.get("/")
     def _root():
