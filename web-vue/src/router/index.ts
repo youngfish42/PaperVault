@@ -12,6 +12,11 @@ const router = createRouter({
       path: '/advanced',
       name: 'advanced',
       component: () => import('../views/AdvancedSearchView.vue')
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue')
     }
     // {
     //   path: '/about',
