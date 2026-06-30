@@ -139,14 +139,42 @@ def call_anthropic(
         kwargs["default_headers"] = dict(extra_headers)
 
     client = anthropic.Anthropic(**kwargs)
+    # ``StepFun.step_plan`` enables a "thinking" mode by default that
+    # consumes the entire ``max_tokens`` budget on internal reasoning and
+    # returns ``stop_reason='max_tokens'`` with no visible text. The
+    # ``thinking`` field is not part of the official Anthropic SDK
+    # signature (the SDK forwards unknown kwargs through ``extra_body``),
+    # so we pass it via ``client.messages.create(..., extra_body=...)``
+    # below. Anthropic's native API treats ``type: disabled`` as a
+    # no-op (its default state), so the same payload is safe to send
+    # everywhere.
     try:
-        response = client.messages.create(
-            model=model,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        try:
+            response = client.messages.create(
+                model=model,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+        except TypeError as type_exc:
+            # Older anthropic SDK (<0.40) does not accept ``extra_body`` on
+            # ``messages.create``; fall back to the plain call so callers
+            # with pinned SDK versions still work. We narrow the trigger to
+            # the specific kwargs-rejection message so unrelated TypeErrors
+            # (e.g. a future SDK renaming a stable kwarg) are not silently
+            # swallowed into a retry.
+            msg = str(type_exc)
+            if "extra_body" not in msg and "unexpected keyword" not in msg:
+                raise
+            response = client.messages.create(
+                model=model,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
     except Exception as exc:
         logger.exception("Anthropic-compatible call failed: %s", exc)
         raise UpstreamError(

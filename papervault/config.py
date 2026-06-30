@@ -89,7 +89,7 @@ class Settings:
     )
 
     anthropic_max_tokens: int = field(
-        default_factory=lambda: _env_int("PAPERVAULT_ANTHROPIC_MAX_TOKENS", 512)
+        default_factory=lambda: _env_int("PAPERVAULT_ANTHROPIC_MAX_TOKENS", 2048)
     )
     anthropic_model: str = field(
         default_factory=lambda: _env_str("PAPERVAULT_ANTHROPIC_MODEL", "claude-haiku-4-5")
