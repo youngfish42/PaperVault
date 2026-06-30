@@ -145,6 +145,24 @@ class RerankRequest(BaseModel):
     def _strip_normalize(cls, value: Any):
         return _strip_or_none(value, lower=False)
 
+    @field_validator("paper_ids", mode="after")
+    @classmethod
+    def _dedupe_paper_ids(cls, value: List[str]) -> List[str]:
+        # Drop duplicates while preserving first-seen order so the LLM
+        # prompt never lists the same paper twice and the response never
+        # surfaces duplicate ``paper_id`` entries to the UI (the previous
+        # implementation could emit duplicates when an id appeared twice
+        # *and* the LLM forgot to score it: both copies would land in the
+        # ``missing`` tail list).
+        #
+        # Note: shape validation (``^[0-9a-f]{16}$``) is *not* enforced
+        # here on purpose — the endpoint contract is that unknown /
+        # malformed ids flow through to ``skipped_ids`` so the caller
+        # can render a non-fatal warning rather than retry the whole
+        # batch. ``PaperRepository.get_by_id`` is the single point that
+        # turns a string into a hit or a skip.
+        return list(dict.fromkeys(value))
+
 
 class RerankEntry(BaseModel):
     paper_id: str

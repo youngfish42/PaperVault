@@ -230,6 +230,14 @@ def _parse_rerank_response(
 
     expected = set(expected_ids)
     scores: Dict[str, float] = {}
+    # Observability counters: silently dropping malformed scores or
+    # invented ids used to be invisible at the call site. Aggregate the
+    # drops here and emit one ``logger.info`` line per parse so a
+    # spike (e.g. model regressed to emitting ``score=150`` for every
+    # item) shows up in normal request logs instead of requiring a
+    # bespoke metric.
+    invented_ids = 0
+    unparseable_scores = 0
     for item in ordered:
         if not isinstance(item, dict):
             continue
@@ -239,11 +247,26 @@ def _parse_rerank_response(
         if pid not in expected:
             # The LLM sometimes invents ids; ignore them silently rather
             # than erroring out. Strict schema validation happens upstream.
+            invented_ids += 1
             continue
-        score = _normalise_score(item.get("score"))
+        raw_score = item.get("score")
+        score = _normalise_score(raw_score)
         if score is None:
+            # Out-of-range (>100), NaN, or non-numeric. We still want
+            # the paper in the response (the ``missing`` tail in
+            # ``rank_papers`` will assign it 0.5), so just count and
+            # move on.
+            unparseable_scores += 1
             continue
         scores[pid] = score
+
+    if invented_ids or unparseable_scores:
+        logger.info(
+            "Rerank parse: kept=%d invented=%d unparseable_score=%d",
+            len(scores),
+            invented_ids,
+            unparseable_scores,
+        )
 
     return scores
 
@@ -273,13 +296,18 @@ def rank_papers(
             code="BAD_REQUEST",
         )
     if not papers:
+        # No papers to rank → return an explicit empty result without
+        # touching the LLM. Provider / protocol / model fields are empty
+        # strings instead of the legacy ``"-"`` placeholder so the UI can
+        # treat "empty string" as "no provider was actually consulted"
+        # rather than rendering a literal dash.
         return RerankResult(
             ordered_ids=[],
             scores={},
-            model="-",
+            model="",
             elapsed_ms=0.0,
-            provider="-",
-            protocol="-",
+            provider="",
+            protocol="",
         )
 
     snippets = [_snippet(p) for p in papers]
@@ -323,7 +351,7 @@ def rank_papers(
             temperature=effective_temperature,
             max_tokens=anthropic_max_tokens,
         )
-    else:
+    elif resolved.protocol == PROTOCOL_OPENAI:
         chat = call_openai_compatible(
             api_key=resolved.api_key,
             base_url=resolved.base_url,
@@ -331,6 +359,12 @@ def rank_papers(
             system=system,
             user=user,
             temperature=effective_temperature,
+        )
+    else:  # pragma: no cover - ``_resolve_provider`` rejects unknown protocols
+        raise ApiError(
+            f"Unsupported protocol: {resolved.protocol!r}",
+            status_code=400,
+            code="BAD_REQUEST",
         )
     elapsed_ms = (time.time() - start) * 1000.0
 

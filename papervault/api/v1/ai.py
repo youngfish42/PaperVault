@@ -110,6 +110,24 @@ def post_rerank():
         # the drop is visible without diffing request against response.
         logger.info("Re-rank skipped %d unknown paper id(s)", len(skipped_ids))
 
+    if not papers:
+        # Every requested id was stale: there is nothing to send to the
+        # LLM. Short-circuit at the handler so we don't even touch the
+        # ``rank_papers`` provider-resolution path (which would otherwise
+        # also reach an empty-papers branch but cost an extra import and
+        # one extra hop). The response advertises an empty ``ordered``
+        # plus the full ``skipped_ids`` so the UI can render a single
+        # "all results stale, please refresh" notice.
+        body = RerankResponse(
+            ordered=[],
+            skipped_ids=skipped_ids,
+            timecost_ms=0.0,
+            model="",
+            provider="",
+            protocol="",
+        )
+        return jsonify(body.model_dump())
+
     result = rank_papers(
         query=req.query,
         papers=papers,

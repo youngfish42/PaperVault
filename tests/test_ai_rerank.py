@@ -451,3 +451,141 @@ def test_parse_rerank_response_rejects_non_json():
             "Sorry, I cannot do that.",
             expected_ids=["a"],
         )
+
+
+# --- HTTP tests for fixes derived from PR #105 code review ---
+
+
+def test_rerank_dedupes_duplicate_paper_ids(client, monkeypatch):
+    """Duplicate ids in the request must collapse to a single response entry.
+
+    Before the fix, the handler accepted duplicates as-is. When the LLM
+    then forgot to score a duplicated id, both copies survived as
+    ``missing`` and surfaced as duplicate ``paper_id`` entries in the
+    response. The ``RerankRequest._dedupe_paper_ids`` validator collapses
+    duplicates while preserving first-seen order; downstream code only
+    ever sees the deduped list.
+    """
+
+    captured: dict = {}
+
+    def _fake_call(**kwargs):
+        # Snapshot the user prompt so we can also assert the LLM only
+        # received the paper once (no "[1] id=...  [2] id=..." dupes).
+        captured["user"] = kwargs["user"]
+        return ai_clients.ChatResult(
+            content=(
+                '{"ordered":[{"paper_id":"aaaa1111aaaa1111","score":0.8}]}'
+            ),
+            raw_model="gpt-4o-mini",
+        )
+
+    monkeypatch.setattr(rerank, "call_openai_compatible", _fake_call)
+
+    resp = client.post(
+        "/api/v1/ai/rerank",
+        json={
+            "query": "time series",
+            "paper_ids": [
+                "aaaa1111aaaa1111",
+                "aaaa1111aaaa1111",
+                "bbbb2222bbbb2222",
+                "aaaa1111aaaa1111",
+            ],
+            "provider": "openai",
+            "api_key": "sk-test",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    # Exactly two distinct entries in deduped first-seen order.
+    paper_ids = [e["paper_id"] for e in body["ordered"]]
+    assert paper_ids == ["aaaa1111aaaa1111", "bbbb2222bbbb2222"]
+    # The LLM prompt only contained each id once.
+    assert captured["user"].count("id=aaaa1111aaaa1111") == 1
+    assert captured["user"].count("id=bbbb2222bbbb2222") == 1
+
+
+def test_rerank_short_circuits_when_all_ids_stale(client, monkeypatch):
+    """If every paper_id is unknown, skip the LLM call and return an
+    empty result with all ids reflected in ``skipped_ids``.
+
+    The provider / protocol / model fields are empty strings (not the
+    legacy ``"-"`` placeholder) so the UI can detect "no LLM was
+    consulted" without string-matching a sentinel.
+    """
+
+    def _explode(**kwargs):
+        raise AssertionError(
+            "LLM client must not be invoked when every paper_id is stale."
+        )
+
+    monkeypatch.setattr(rerank, "call_openai_compatible", _explode)
+    monkeypatch.setattr(rerank, "call_anthropic", _explode)
+
+    resp = client.post(
+        "/api/v1/ai/rerank",
+        json={
+            "query": "time series",
+            "paper_ids": ["deadbeefdeadbeef", "cafebabecafebabe"],
+            "provider": "openai",
+            "api_key": "sk-test",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ordered"] == []
+    assert body["skipped_ids"] == ["deadbeefdeadbeef", "cafebabecafebabe"]
+    assert body["model"] == ""
+    assert body["provider"] == ""
+    assert body["protocol"] == ""
+    assert body["timecost_ms"] == 0.0
+
+
+def test_rerank_dispatches_anthropic_path(client, monkeypatch):
+    """Cover the Anthropic dispatch branch the PR description claims to
+    test. The original suite only ever monkey-patched
+    ``call_openai_compatible``; the Anthropic limb of ``rank_papers``
+    (including the ``anthropic_max_tokens`` default) was untouched.
+    """
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+
+    captured: dict = {}
+
+    def _fake_anthropic(**kwargs):
+        captured.update(kwargs)
+        return ai_clients.ChatResult(
+            content=(
+                '{"ordered":[{"paper_id":"aaaa1111aaaa1111","score":0.7}]}'
+            ),
+            raw_model="claude-3-5-sonnet-20241022",
+        )
+
+    monkeypatch.setattr(rerank, "call_anthropic", _fake_anthropic)
+    monkeypatch.setattr(
+        rerank, "call_openai_compatible",
+        lambda **kwargs: pytest.fail(
+            "OpenAI path must not be hit when provider=anthropic."
+        ),
+    )
+
+    resp = client.post(
+        "/api/v1/ai/rerank",
+        json={
+            "query": "time series",
+            "paper_ids": ["aaaa1111aaaa1111"],
+            "provider": "anthropic",
+        },
+    )
+    assert resp.status_code == 200, resp.get_json()
+    body = resp.get_json()
+    assert body["protocol"] == "anthropic"
+    assert body["provider"] == "anthropic"
+    # ``max_tokens`` must be forwarded; the rerank service falls back to
+    # ``settings.anthropic_max_tokens`` (or 2048 if unset) — either way
+    # it is a positive integer, never ``None``.
+    assert isinstance(captured.get("max_tokens"), int)
+    assert captured["max_tokens"] > 0
+    # Temperature defaults to 0.0 for deterministic ordering.
+    assert captured.get("temperature") == 0.0
