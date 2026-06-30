@@ -63,6 +63,32 @@ function safeRemove(storage: Storage, key: string): void {
   }
 }
 
+function pickString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function pickFiniteNumber(
+  value: unknown,
+  min: number,
+  max: number
+): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  if (value < min || value > max) return null
+  return value
+}
+
+function sanitizeAiSettings(raw: Record<string, unknown>): AiUserSettings {
+  return {
+    provider: pickString(raw.provider),
+    baseUrl: pickString(raw.baseUrl),
+    model: pickString(raw.model),
+    protocol: pickString(raw.protocol),
+    temperature: pickFiniteNumber(raw.temperature, 0, 2),
+    maxKeywords: pickFiniteNumber(raw.maxKeywords, 1, 50),
+    maxTokens: pickFiniteNumber(raw.maxTokens, 1, 4096)
+  }
+}
+
 export function loadAiSettings(): AiUserSettings {
   const raw = safeGet(
     typeof localStorage !== 'undefined'
@@ -73,10 +99,8 @@ export function loadAiSettings(): AiUserSettings {
   if (!raw) return { ...EMPTY_SETTINGS }
   try {
     const parsed = JSON.parse(raw)
-    return {
-      ...EMPTY_SETTINGS,
-      ...parsed
-    }
+    if (!parsed || typeof parsed !== 'object') return { ...EMPTY_SETTINGS }
+    return sanitizeAiSettings(parsed as Record<string, unknown>)
   } catch {
     return { ...EMPTY_SETTINGS }
   }
