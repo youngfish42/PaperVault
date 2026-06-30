@@ -149,25 +149,32 @@ def call_anthropic(
     # no-op (its default state), so the same payload is safe to send
     # everywhere.
     try:
-        response = client.messages.create(
-            model=model,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            extra_body={"thinking": {"type": "disabled"}},
-        )
-    except TypeError:
-        # Older anthropic SDK (<0.40) does not accept ``extra_body`` on
-        # ``messages.create``; fall back to the plain call so callers
-        # with pinned SDK versions still work.
-        response = client.messages.create(
-            model=model,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        try:
+            response = client.messages.create(
+                model=model,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+        except TypeError as type_exc:
+            # Older anthropic SDK (<0.40) does not accept ``extra_body`` on
+            # ``messages.create``; fall back to the plain call so callers
+            # with pinned SDK versions still work. We narrow the trigger to
+            # the specific kwargs-rejection message so unrelated TypeErrors
+            # (e.g. a future SDK renaming a stable kwarg) are not silently
+            # swallowed into a retry.
+            msg = str(type_exc)
+            if "extra_body" not in msg and "unexpected keyword" not in msg:
+                raise
+            response = client.messages.create(
+                model=model,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
     except Exception as exc:
         logger.exception("Anthropic-compatible call failed: %s", exc)
         raise UpstreamError(
