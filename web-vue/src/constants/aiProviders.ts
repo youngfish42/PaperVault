@@ -1,9 +1,15 @@
 /**
  * Frontend mirror of `papervault.services.ai_providers.ProviderPreset`.
  *
- * Keep the field names (camelCase) and values in lockstep with the backend
- * catalog. The backend serves the same list at `GET /api/v1/ai/providers`
- * so the Settings page (P2-C) can confirm the two sides have not drifted.
+ * Catalog values are kept in lockstep with the backend by hand. Field
+ * *names* are NOT: this module uses camelCase (`baseUrl`, `envKeyVar`,
+ * `requiresMaxTokens`) for ergonomic FE consumption, while the backend's
+ * `ProviderPreset.as_dict()` emits snake_case (`base_url`, `env_key_var`,
+ * `requires_max_tokens`) directly from `dataclasses.asdict`. The two
+ * shapes are bridged at ingress by `normalizeProviderPreset` in
+ * `@/api/ai.ts`, which maps the wire payload of `GET /api/v1/ai/providers`
+ * into this `AiProviderPreset` interface. The Settings page (P2-C) should
+ * always consume the normalized version, never cast the raw response.
  *
  * `StepFun`'s `step_plan` endpoint speaks the Anthropic Messages protocol,
  * not the OpenAI-compatible chat completions used by plan-pilot's StepFun
