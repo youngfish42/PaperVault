@@ -37,12 +37,18 @@ def call_openai_compatible(
     temperature: float,
     max_tokens: Optional[int] = None,
     timeout: float = 30.0,
+    json_mode: bool = False,
 ) -> ChatResult:
     """Issue a Chat Completions request via the official ``openai`` SDK.
 
     Args:
         max_tokens: Optional maximum tokens for the response.
             Not all OpenAI-compatible providers support this parameter.
+        json_mode: When ``True`` the request opts into the provider's
+            native JSON-output mode (``response_format={"type": "json_object"}``).
+            This is best-effort: if the provider rejects the flag with a
+            400 we fall back to the plain call. Pure OpenAI, DeepSeek and
+            most well-behaved OpenAI-compatible endpoints honor it.
     """
 
     if not api_key:
@@ -54,7 +60,7 @@ def call_openai_compatible(
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
-    create_kwargs = {
+    create_kwargs: Dict[str, object] = {
         "model": model,
         "messages": [
             {"role": "system", "content": system},
@@ -64,9 +70,26 @@ def call_openai_compatible(
     }
     if max_tokens is not None and max_tokens > 0:
         create_kwargs["max_tokens"] = max_tokens
+    if json_mode:
+        create_kwargs["response_format"] = {"type": "json_object"}
 
     try:
-        response = client.chat.completions.create(**create_kwargs)
+        try:
+            response = client.chat.completions.create(**create_kwargs)
+        except Exception as exc:
+            # Some OpenAI-compatible vendors reject ``response_format`` with
+            # a 400. Detect by message content (cheap and avoids coupling to
+            # the SDK's specific exception classes) and retry without it.
+            msg = str(exc).lower() if exc else ""
+            if json_mode and "response_format" in msg:
+                logger.warning(
+                    "Provider %s rejected response_format=json_object; retrying plain.",
+                    model,
+                )
+                create_kwargs.pop("response_format", None)
+                response = client.chat.completions.create(**create_kwargs)
+            else:
+                raise
     except Exception as exc:
         logger.exception("OpenAI-compatible call failed: %s", exc)
         raise UpstreamError(

@@ -246,13 +246,48 @@ def _legacy_key_fallback(provider_key: str) -> str:
 
 def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
     system = (
-        "You are a helpful assistant for search suggestion of paper "
-        "in the field of artificial intelligence"
+        "You are a senior AI researcher's paper-discovery assistant. "
+        "Given a research topic, return diverse, realistic search keywords "
+        "a researcher would type into an academic CS paper search engine "
+        "(NeurIPS, ICML, ICLR, KDD, AAAI, ACL, EMNLP and similar).\n"
+        "\n"
+        "Aim for HIGH RECALL while staying on-topic. The list MUST mix all "
+        "four kinds of terms across the entries:\n"
+        "  1. Synonymous phrases and reformulations of the topic. "
+        'e.g. for "LLM agent" -> "language model agent", '
+        '"tool-augmented LLM", "autonomous LLM".\n'
+        "  2. Concrete model / framework / method names actually cited by "
+        'papers in this sub-area. e.g. "ReAct", "Toolformer", "Voyager", '
+        '"Reflexion".\n'
+        "  3. Adjacent research subareas a paper on this topic commonly "
+        'belongs to. e.g. for "time series agent" -> "sequential decision '
+        'making", "decision transformer".\n'
+        "  4. Specific dataset / benchmark names a paper on this topic "
+        "would be evaluated on.\n"
+        "\n"
+        "DO NOT generate:\n"
+        '  - Literal "X Y" word-salad combinations that are just the '
+        'original tokens stitched together. "Time Series Reinforcement '
+        'Learning" is NOT a useful keyword; "decision transformer" IS. '
+        "Think about what concept the topic actually represents; name "
+        "keywords from that concept.\n"
+        '  - Overly generic filler like "machine learning" or "deep '
+        'learning" unless the topic is exactly those.\n'
+        "  - The original query verbatim.\n"
+        "  - Marketing buzzwords.\n"
+        "\n"
+        "Output rules (strict):\n"
+        '  - Return ONLY JSON of shape {"keywords": ["k1", "k2", ...]}.\n'
+        "  - Exactly N keywords where N is in the user message.\n"
+        "  - Each keyword 1-6 words.\n"
+        "  - Any phrase of 2+ words MUST be wrapped in double quotes so "
+        "the downstream OR-merge search keeps the phrase intact.\n"
+        "  - A mix of bare words and quoted phrases is expected.\n"
+        "  - No commentary, no prose, no markdown fences."
     )
     user = (
-        f'Please just return the top-{max_keywords} related keywords of papers on "{query}" '
-        'in JSON format with the key named "keywords". '
-        'The output must start with "```json" and end with "```".'
+        f'Research topic: "{query}"\n'
+        f"Return exactly {max_keywords} keywords."
     )
     return system, user
 
@@ -286,6 +321,9 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
         # OpenAI-compatible providers historically ran without a cap.
         # Only forward ``max_tokens`` when the caller explicitly set one,
         # so default keyword suggestions are not silently truncated.
+        # ``json_mode=True`` opts into the provider's native JSON-output
+        # mode; ai_clients.call_openai_compatible transparently falls
+        # back to a plain call if a vendor rejects the flag.
         result = call_openai_compatible(
             api_key=resolved.api_key,
             base_url=resolved.base_url,
@@ -294,6 +332,7 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
             user=user,
             temperature=req.temperature,
             max_tokens=req.max_tokens,
+            json_mode=True,
         )
 
     elapsed_ms = (time.time() - start) * 1000.0
