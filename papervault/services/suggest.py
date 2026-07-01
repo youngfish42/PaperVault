@@ -251,39 +251,25 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         "a researcher would type into an academic CS paper search engine "
         "(NeurIPS, ICML, ICLR, KDD, AAAI, ACL, EMNLP and similar).\n"
         "\n"
-        "Aim for HIGH RECALL while staying on-topic. The list MUST mix all "
-        "four kinds of terms across the entries:\n"
-        "  1. Synonymous phrases and reformulations of the topic. "
-        'e.g. for "LLM agent" -> "language model agent", '
-        '"tool-augmented LLM", "autonomous LLM".\n'
-        "  2. Concrete model / framework / method names actually cited by "
-        'papers in this sub-area. e.g. "ReAct", "Toolformer", "Voyager", '
-        '"Reflexion".\n'
-        "  3. Adjacent research subareas a paper on this topic commonly "
-        'belongs to. e.g. for "time series agent" -> "sequential decision '
-        'making", "decision transformer".\n'
-        "  4. Specific dataset / benchmark names a paper on this topic "
-        "would be evaluated on.\n"
+        "Mix ALL FOUR kinds across the list:\n"
+        "  (1) synonymous reformulations of the topic;\n"
+        "  (2) concrete model / framework / method names cited by papers "
+        'in this area (e.g. "ReAct", "Lag-Llama", "Toolformer", "Voyager");\n'
+        "  (3) adjacent research subareas papers on this topic commonly "
+        "belong to;\n"
+        "  (4) dataset / benchmark names such papers are evaluated on.\n"
         "\n"
-        "DO NOT generate:\n"
-        '  - Literal "X Y" word-salad combinations that are just the '
-        'original tokens stitched together. "Time Series Reinforcement '
-        'Learning" is NOT a useful keyword; "decision transformer" IS. '
-        "Think about what concept the topic actually represents; name "
-        "keywords from that concept.\n"
-        '  - Overly generic filler like "machine learning" or "deep '
-        'learning" unless the topic is exactly those.\n'
-        "  - The original query verbatim.\n"
-        "  - Marketing buzzwords.\n"
+        'Do NOT generate literal "X Y" word-salad of the original tokens '
+        'stitched together (e.g. "Time Series Reinforcement Learning"). '
+        "Do NOT repeat the topic verbatim, do NOT use generic filler "
+        '("machine learning" / "deep learning"), do NOT use marketing '
+        "buzzwords.\n"
         "\n"
-        "Output rules (strict):\n"
-        '  - Return ONLY JSON of shape {"keywords": ["k1", "k2", ...]}.\n'
-        "  - Exactly N keywords where N is in the user message.\n"
-        "  - Each keyword 1-6 words.\n"
-        "  - Any phrase of 2+ words MUST be wrapped in double quotes so "
-        "the downstream OR-merge search keeps the phrase intact.\n"
-        "  - A mix of bare words and quoted phrases is expected.\n"
-        "  - No commentary, no prose, no markdown fences."
+        "Output: only JSON {\"keywords\":[...]} with EXACTLY N entries "
+        "(N given in the user message). Each entry 1-6 words. Any 2+ word "
+        "phrase MUST be wrapped in double quotes (downstream OR-merge "
+        "keeps quoted phrases intact). Mix bare words and quoted phrases. "
+        "No commentary, no markdown fences."
     )
     user = (
         f'Research topic: "{query}"\n'
