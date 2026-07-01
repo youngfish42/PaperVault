@@ -157,7 +157,8 @@ jobs:
         # workflow well under the 330 min hard cap.
         run: |
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
-            python scripts/fetch_cvf_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --soft-timeout 2400
+            read -r -a confs <<< "${{ github.event.inputs.target_conf }}"
+            python scripts/fetch_cvf_abstracts.py --conf "${confs[@]}" --soft-timeout 2400
           else
             python scripts/fetch_cvf_abstracts.py --soft-timeout 2400
           fi
