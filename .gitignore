@@ -155,3 +155,4 @@ test/
 .vscode/*
 cache/*.bak
 cache/openreview_backfill_progress.json
+.trae/

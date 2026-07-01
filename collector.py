@@ -796,10 +796,18 @@ def search_from_thecvf(url, name, res):
             if ns2:
                 authors = [author.string for author in ns2.find_all('a', href='#') if author.string]
 
+        paper_abstract = ""
         try:
-            paper_abstract = search_abs_from_thecvf(paper_url)
-        except:
-            print(f"Skip url:{paper_url}")
+            # Delayed import: scripts/cvf_abstract itself imports HEADERS +
+            # search_abs_from_thecvf from this module at load time, so the
+            # reverse import must stay inside the function body.
+            # NOTE: importing from `scripts.cvf_abstract` (side-effect-free)
+            # rather than `scripts.fetch_cvf_abstracts` (a CLI entrypoint
+            # that mutates sys.path and reconfigures stdio at import time).
+            from scripts.cvf_abstract import fetch_cvf_abstract
+            paper_abstract = fetch_cvf_abstract(paper_url)
+        except Exception as e:
+            print(f"[!] cvf-abs miss {paper_url}: {e}")
             paper_abstract = ""
         record = {
             "paper_name": paper,

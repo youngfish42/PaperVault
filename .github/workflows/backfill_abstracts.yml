@@ -147,6 +147,22 @@ jobs:
             python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 18000 --max-failed-attempts 3
           fi
 
+      - name: Backfill CVF Open Access abstracts
+        # DOI-less venues (CVPR / ICCV / WACV) fall outside the
+        # Crossref → Semantic Scholar → arXiv → OpenAlex cascade run above.
+        # This step scrapes the openaccess.thecvf.com detail pages directly
+        # to fill their <div id="abstract"> content. Runs strictly after the
+        # generic backfill so both writers to cache.jsonl.gz are serialised
+        # within the same job. `--soft-timeout 2400` (40 min) keeps the total
+        # workflow well under the 330 min hard cap.
+        run: |
+          if [ -n "${{ github.event.inputs.target_conf }}" ]; then
+            read -r -a confs <<< "${{ github.event.inputs.target_conf }}"
+            python scripts/fetch_cvf_abstracts.py --conf "${confs[@]}" --soft-timeout 2400
+          else
+            python scripts/fetch_cvf_abstracts.py --soft-timeout 2400
+          fi
+
       - name: Scan GitHub code links from newly backfilled abstracts
         # Pure regex pass over all abstracts; cheap I/O-bound step that keeps the
         # `paper_code` field in sync whenever new abstracts are introduced.
