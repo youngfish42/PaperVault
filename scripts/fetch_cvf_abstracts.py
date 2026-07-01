@@ -43,19 +43,23 @@ import os
 import re
 import sys
 import time
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
-from urllib.parse import urlparse
-
-import requests
-from bs4 import BeautifulSoup
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from collector import search_abs_from_thecvf, HEADERS as COLLECTOR_HEADERS  # noqa: E402
+# The three CVF scraping primitives live in a dedicated side-effect-free
+# helper module so that `collector.py` can import them without inheriting
+# this file's CLI-only side effects (sys.path mutation, stdout reconfigure,
+# tqdm, argparse, ...). We keep re-exporting them from this module for
+# backward compatibility with any external caller.
+from scripts.cvf_abstract import (  # noqa: E402
+    _clean_abstract,
+    fetch_cvf_abstract,
+    is_cvf_paper_url,
+)
 from data_artifacts import (  # noqa: E402
     ensure_cache_local,
     ensure_progress_local,
@@ -112,90 +116,6 @@ CACHE_DIR = ROOT / "cache"
 CACHE_FILE = CACHE_DIR / "cache.jsonl.gz"
 BACKUP_FILE = CACHE_DIR / "cache.jsonl.gz.cvf.bak"
 PROGRESS_FILE = CACHE_DIR / "cvf_backfill_progress.json"
-
-_thread_local = threading.local()
-
-
-def _get_session() -> requests.Session:
-    if not hasattr(_thread_local, "session"):
-        s = requests.Session()
-        s.trust_env = False
-        _thread_local.session = s
-    return _thread_local.session
-
-
-def _clean_abstract(text: str) -> str:
-    if not text:
-        return ""
-    text = re.sub(r"<[^>]+>", "", text)
-    text = text.strip()
-    text = re.sub(r"-\r?\n\s*", "", text)
-    text = re.sub(r"\r?\n\s*([a-z0-9])", r" \1", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-_CVF_HOST = "openaccess.thecvf.com"
-
-
-def is_cvf_paper_url(url: str) -> bool:
-    if not url:
-        return False
-    try:
-        parsed = urlparse(url)
-    except Exception:
-        return False
-    host = (parsed.netloc or "").lower()
-    if host != _CVF_HOST and not host.endswith("." + _CVF_HOST):
-        return False
-    path = parsed.path or ""
-    return "/html/" in path and path.endswith(".html")
-
-
-def fetch_cvf_abstract(url: str, *, timeout: int = 20) -> str:
-    """抓一个 CVF 详情页的摘要。
-
-    主策略：复用 collector.search_abs_from_thecvf（BeautifulSoup 上 `id=abstract`）。
-    若返回空，则再次自行 GET 一次，尝试回退到 <meta name="description"> /
-    <meta property="og:description">。最后 _clean_abstract 剥换行/多余空白。
-
-    失败（网络异常、非 200、结构变化）时抛异常，让上层记录 tried/failed。
-    """
-    primary: Optional[str] = None
-    try:
-        primary = search_abs_from_thecvf(url)
-    except Exception:
-        primary = None
-
-    if primary:
-        cleaned = _clean_abstract(primary)
-        if cleaned:
-            return cleaned
-
-    session = _get_session()
-    resp = session.get(url, headers=COLLECTOR_HEADERS, timeout=timeout)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    node = soup.find(id="abstract")
-    if node is not None:
-        text = node.get_text(" ", strip=True)
-        cleaned = _clean_abstract(text)
-        if cleaned:
-            return cleaned
-
-    for selector in (
-        {"name": "meta", "attrs": {"name": "description"}},
-        {"name": "meta", "attrs": {"property": "og:description"}},
-    ):
-        tag = soup.find(**selector)
-        if tag is not None:
-            content = tag.get("content", "") or ""
-            cleaned = _clean_abstract(content)
-            if cleaned and len(cleaned) >= 40:
-                return cleaned
-
-    return ""
 
 
 def load_cache(path: Path) -> List[dict]:

@@ -798,11 +798,13 @@ def search_from_thecvf(url, name, res):
 
         paper_abstract = ""
         try:
-            # Delayed import to avoid a circular dependency: fetch_cvf_abstracts
-            # itself imports `search_abs_from_thecvf` and `HEADERS` from this
-            # module at file load time, so we can only pull the hardened wrapper
-            # in after collector.py has finished being imported.
-            from scripts.fetch_cvf_abstracts import fetch_cvf_abstract
+            # Delayed import: scripts/cvf_abstract itself imports HEADERS +
+            # search_abs_from_thecvf from this module at load time, so the
+            # reverse import must stay inside the function body.
+            # NOTE: importing from `scripts.cvf_abstract` (side-effect-free)
+            # rather than `scripts.fetch_cvf_abstracts` (a CLI entrypoint
+            # that mutates sys.path and reconfigures stdio at import time).
+            from scripts.cvf_abstract import fetch_cvf_abstract
             paper_abstract = fetch_cvf_abstract(paper_url)
         except Exception as e:
             print(f"[!] cvf-abs miss {paper_url}: {e}")
