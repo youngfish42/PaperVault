@@ -503,8 +503,10 @@ def run(args) -> int:
                 )
         # Always try to push the CVF progress ledger (even on zero-fill runs)
         # so tried/failed counters survive across GitHub Actions runs.
+        # If cache sync failed after filling abstracts, skip pushing progress to
+        # avoid marking URLs as "filled" remotely when the cache update didn't land.
         try:
-            if PROGRESS_FILE.exists():
+            if (total_filled == 0 or not sync_failed) and PROGRESS_FILE.exists():
                 upload_to_huggingface(
                     [PROGRESS_FILE],
                     commit_message=(
