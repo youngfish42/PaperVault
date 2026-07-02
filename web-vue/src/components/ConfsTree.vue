@@ -112,7 +112,7 @@ watch(lang, () => rebuild(props.data))
 </script>
 <template>
   <el-card class="tree-card pv-compact-card" shadow="never">
-    <el-scrollbar height="320px">
+    <div class="tree-card-scroll">
       <el-tree
         :data="tree"
         :props="defaultProps"
@@ -121,7 +121,7 @@ watch(lang, () => rebuild(props.data))
         :default-expand-all="true"
         @node-click="treeNodeClick"
       />
-    </el-scrollbar>
+    </div>
     <div v-if="props.meta?.truncated" class="tree-truncated-hint">
       {{ t('tree.truncatedHint').replace('{n}', String(fetchedCount)) }}
     </div>
@@ -131,11 +131,32 @@ watch(lang, () => rebuild(props.data))
 <style scoped>
 .tree-card {
   user-select: none;
+  /* The card lives in a sticky .pv-side that sits under the 70px topbar,
+     so cap it to the rest of the viewport. The body becomes the scroll
+     container below, so the user can browse a 200-venue list without
+     dragging the page or hunting for a tiny custom-scrollbar. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 90px);
+  overflow: hidden;
+}
+.tree-card-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  /* Slim native scrollbar on desktop; falls back to overlay on touch. */
+  scrollbar-width: thin;
+}
+.tree-card-scroll :deep(.el-tree) {
+  /* el-tree renders an inline-block wrapper that constrains to its
+     children's width; let it stretch so empty horizontal space doesn't
+     look like a layout bug once we have a vertical scrollbar. */
+  min-width: 100%;
 }
 .tree-card :deep(.el-tree-node__label) {
   font-size: 13px;
 }
 .tree-truncated-hint {
+  flex: 0 0 auto;
   margin-top: 8px;
   padding: 6px 8px;
   font-size: 12px;
