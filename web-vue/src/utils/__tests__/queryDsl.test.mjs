@@ -194,6 +194,31 @@ test('splitForBackend: top-level OR cannot be hoisted → stays in residual', ()
   assert.equal(split.residual.kind, 'or')
 })
 
+test('splitForBackend: AI-merged "seed OR (kw1 OR kw2 OR kw3)" keeps q=null AND residual=whole OR', () => {
+  // P3-B's ``buildOrMerge`` emits a parenthesized OR group after a bare
+  // seed, e.g. ``time series llm OR ("time-series forecasting" OR
+  // "foundation models for TS" OR "time-series LLM")``. The splitter
+  // must NOT promote individual OR legs (that would silently degrade the
+  // query to its AND-over-OR-leg-tokens prefilter), so it keeps the whole
+  // OR tree in ``residual`` and leaves ``q`` null. ``HomeView`` then
+  // detects "no field-qualified clauses" and falls back to ``originalTopic``
+  // (``"time series llm"``) as a coarse ``q`` so the backend doesn't
+  // fan out across the whole corpus (~621k papers).
+  const split = splitForBackend(
+    parseDsl(
+      'time series llm OR ("time-series forecasting" OR "foundation models for TS" OR "time-series LLM")'
+    )
+  )
+  assert.equal(split.q, null)
+  assert.equal(split.author, null)
+  assert.equal(split.conf, null)
+  assert.equal(split.residual.kind, 'or')
+  // ``residual`` must contain exactly one OR node whose children are the
+  // seed term plus the parenthesised OR group — i.e. we did NOT flatten
+  // it, otherwise the frontend evaluator would re-AND the legs.
+  assert.equal(split.residual.nodes.length, 2)
+})
+
 test('splitForBackend: unqualified phrase forwards q WITHOUT literal quotes', () => {
   // Regression: a previous version of splitForBackend wrapped phrase clauses
   // back in literal ``"…"`` before forwarding them as ``q``. The backend

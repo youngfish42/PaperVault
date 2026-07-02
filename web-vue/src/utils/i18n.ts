@@ -170,6 +170,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.aiSearch.toastNoKey': '请先在「设置」配置 API key',
     'search.aiSearch.goSettings': '前往设置',
     'search.aiSearch.hint': 'AI 自动扩展关键词。普通搜索流程不受影响。',
+    'search.aiSearch.mergeCapHint':
+      '仅合并前 {cap} 个，避免搜索范围过宽',
     'tree.all': '全部',
     'tree.truncatedMark': '· 仅展示 {n}',
     'tree.truncatedHint':
@@ -356,6 +358,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.aiSearch.goSettings': 'Open Settings',
     'search.aiSearch.hint':
       'AI expands your keywords automatically. Plain search keeps working unchanged.',
+    'search.aiSearch.mergeCapHint':
+      'Only the first {cap} keywords will be merged to avoid overshooting the result cap',
     'tree.all': 'All',
     'tree.truncatedMark': '· showing {n}',
     'tree.truncatedHint':

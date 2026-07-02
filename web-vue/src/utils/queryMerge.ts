@@ -47,12 +47,24 @@ export const quoteIfNeeded = (s: string): string => {
  * deliberate: the existing query might already contain field qualifiers
  * like ``AU="X"`` whose top-level ANDing is unaffected by a single right-
  * hand OR, but a single bare word in parens would be visually noisy.
+ *
+ * ``cap`` (optional, default ``Infinity``) limits how many picked keywords
+ * actually get merged. Excess picks are silently truncated to the first N.
+ * The dialog uses a cap of 3 to defend against an LLM returning a long
+ * tail of loosely related keywords — each OR'd keyword widens the result
+ * set multiplicatively, and a single broad keyword like "offline
+ * reinforcement learning" alone can already saturate MAX_FETCH.
  */
-export const buildOrMerge = (current: string, picked: string[]): string => {
+export const buildOrMerge = (
+  current: string,
+  picked: string[],
+  cap: number = Infinity
+): string => {
   const cleaned = picked.map(quoteIfNeeded).filter(Boolean)
-  if (!cleaned.length) return current.trim()
+  const trimmed = cap > 0 && Number.isFinite(cap) ? cleaned.slice(0, cap) : cleaned
+  if (!trimmed.length) return current.trim()
   const addition =
-    cleaned.length === 1 ? cleaned[0] : `(${cleaned.join(' OR ')})`
+    trimmed.length === 1 ? trimmed[0] : `(${trimmed.join(' OR ')})`
   const base = current.trim()
   return base ? `${base} OR ${addition}` : addition
 }

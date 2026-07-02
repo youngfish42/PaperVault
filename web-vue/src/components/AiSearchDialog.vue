@@ -16,6 +16,13 @@
  * anything yet, the request still goes out (the backend will resolve via
  * environment defaults and either succeed or 503 with a structured error
  * the dialog surfaces as a toast).
+ *
+ * ``MERGE_CAP`` (default 3) is a UX guard against the OR-merged query
+ * ballooning past MAX_FETCH=5000. Each OR'd keyword multiplies the
+ * candidate set; with a long tail of LLM-suggested keywords, even one
+ * broad one (e.g. "offline reinforcement learning") is enough to
+ * saturate the cap. Excess picks are silently truncated to the first
+ * ``MERGE_CAP`` and a hint tells the user how many got dropped.
  */
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -29,6 +36,8 @@ import AiSuggestPanel from '@/components/AiSuggestPanel.vue'
 const { t } = useI18n()
 const router = useRouter()
 
+const MERGE_CAP = 3
+
 const props = defineProps<{
   visible: boolean
   defaultRerank?: boolean
@@ -36,7 +45,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
-  (e: 'pick', payload: { query: string; rerank: boolean }): void
+  (e: 'pick', payload: { query: string; rerank: boolean; seed: string }): void
 }>()
 
 const seed = ref('')
@@ -131,13 +140,14 @@ const goSettings = (): void => {
 }
 
 const handlePickMany = (picked: string[]): void => {
-  const merged = buildOrMerge(seed.value.trim(), picked)
-  emit('pick', { query: merged, rerank: rerankEnabled.value })
+  const baseSeed = seed.value.trim()
+  const merged = buildOrMerge(baseSeed, picked, MERGE_CAP)
+  emit('pick', { query: merged, rerank: rerankEnabled.value, seed: baseSeed })
   visibleProxy.value = false
 }
 
 const handleReplace = (kw: string): void => {
-  emit('pick', { query: kw, rerank: rerankEnabled.value })
+  emit('pick', { query: kw, rerank: rerankEnabled.value, seed: kw })
   visibleProxy.value = false
 }
 </script>
@@ -175,6 +185,7 @@ const handleReplace = (kw: string): void => {
       :empty-text="t('search.aiSearch.empty')"
       :single-replace-text="t('guess.replace')"
       :merge-button-text="t('guess.merge')"
+      :merge-cap="MERGE_CAP"
       class="pv-ai-search-panel"
       @pick-many="handlePickMany"
       @replace="handleReplace"

@@ -14,8 +14,16 @@
  * picked strings (or a single click for legacy replace) and decide how
  * to apply them. This split keeps the same look-and-feel across both
  * call sites without coupling either to the other's data shape.
+ *
+ * ``mergeCap`` (optional) is a UX guard passed in by the dialog. When the
+ * user picks more keywords than the cap, the merge button surfaces the
+ * actual count that will be applied (first N), so excess picks are not
+ * silently dropped.
  */
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from '@/utils/i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   keywords: string[]
@@ -25,6 +33,7 @@ const props = defineProps<{
   emptyText: string
   singleReplaceText: string
   mergeButtonText: string
+  mergeCap?: number
 }>()
 
 const emit = defineEmits<{
@@ -42,9 +51,45 @@ watch(
   }
 )
 
+const effectiveMergeCount = computed<number>(() => {
+  if (!props.mergeCap || !Number.isFinite(props.mergeCap)) {
+    return picked.value.length
+  }
+  return Math.min(picked.value.length, props.mergeCap)
+})
+
+const mergeOvercap = computed<boolean>(
+  () =>
+    typeof props.mergeCap === 'number' &&
+    Number.isFinite(props.mergeCap) &&
+    picked.value.length > props.mergeCap
+)
+
+const mergeButtonLabel = computed<string>(() => {
+  const base = props.mergeButtonText
+  if (mergeOvercap.value) {
+    return `${base} (${effectiveMergeCount.value}/${picked.value.length})`
+  }
+  return `${base} (${picked.value.length})`
+})
+
+const capHintText = computed<string>(() => {
+  // mergeCap is only rendered when mergeOvercap is true, so the
+  // non-null assertion is sound; the v-if gate keeps it from leaking
+  // to users with no cap configured.
+  return t('search.aiSearch.mergeCapHint', { cap: props.mergeCap as number })
+})
+
 const onPickMany = (): void => {
   if (!picked.value.length) return
-  emit('pick-many', [...picked.value])
+  // Truncate to mergeCap on emit when the panel is configured with one,
+  // so the parent's downstream buildOrMerge sees the same number the
+  // button label advertises. Without this the dialog and panel would
+  // diverge on what gets actually merged.
+  const out = props.mergeCap && Number.isFinite(props.mergeCap)
+    ? picked.value.slice(0, props.mergeCap)
+    : [...picked.value]
+  emit('pick-many', out)
 }
 
 const onReplaceFirst = (): void => {
@@ -88,8 +133,11 @@ const onReplaceFirst = (): void => {
         {{ singleReplaceText }}
       </el-button>
       <el-button type="primary" :disabled="!picked.length" @click="onPickMany">
-        {{ mergeButtonText }} ({{ picked.length }})
+        {{ mergeButtonLabel }}
       </el-button>
+      <div v-if="mergeOvercap" class="pv-ai-suggest-cap-hint">
+        {{ capHintText }}
+      </div>
     </div>
   </el-card>
 </template>
@@ -135,9 +183,18 @@ const onReplaceFirst = (): void => {
 }
 .pv-ai-suggest-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
   margin-top: 8px;
   padding: 0 4px 4px;
+}
+.pv-ai-suggest-cap-hint {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #909399);
+  text-align: right;
+  line-height: 1.4;
 }
 </style>

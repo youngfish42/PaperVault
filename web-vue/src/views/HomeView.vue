@@ -61,6 +61,15 @@ const guessProviderLabel = ref('')
 
 const aiDialogOpen = ref(false)
 
+// Pinned at the moment the user issues a search so the right-sidebar AI
+// "guess" panel can be re-fed the *original* topic on every subsequent
+// search, instead of a query that already contains an OR-merged keyword
+// list from a previous AI dialog pick. Without this, the OR-merged string
+// is sent straight back into the LLM as a topic prompt, which destroys
+// keyword quality ("time series agent" + the merged words are themselves
+// the prompt the LLM sees).
+const originalTopic = ref('')
+
 const cheatsheetOpen = ref(false)
 const toggleCheatsheet = (): void => {
   cheatsheetOpen.value = !cheatsheetOpen.value
@@ -107,6 +116,33 @@ const buildBaseQuery = () => {
     // zero substring filter on top of the (already correct) ``author`` param
     // and silently wipe out every hit.
     params.q = rawQuery
+  } else if (
+    rawQuery &&
+    !split.author &&
+    !split.conf &&
+    split.since == null &&
+    split.until == null
+  ) {
+    // Pure free-text query that the splitter couldn't hoist into a coarse
+    // ``q`` (top-level OR, NOT, NEAR, or field-qualified topic terms that
+    // stayed in residual). The residual AST still drives the precise
+    // client-side re-evaluation, but the backend needs a coarse AND pre-
+    // filter to keep from returning the whole corpus (≈621k papers). Without
+    // this, the "All venues" badge, match-total counter, and truncated-
+    // warning all key off garbage numbers from the full-corpus fetch.
+    //
+    // Prefer ``originalTopic`` (the user's pre-OR-merge seed), cleaning any
+    // residual syntax so a dirty URL-loaded topic still narrows something.
+    // Falls back to the cleaned raw query when ``originalTopic`` is empty
+    // (e.g. a brand-new direct text search that happens to use OR).
+    const cleaned = (s: string): string =>
+      s
+        .replace(/[()"]/g, ' ')
+        .replace(/\s+OR\s+/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const seed = cleaned(originalTopic.value) || cleaned(rawQuery)
+    if (seed) params.q = seed
   }
   const author = split.author ?? searchContent.sp_author
   if (author) params.author = author
@@ -133,6 +169,16 @@ const search = (): void => {
   if (searchContent.query === '' && searchContent.sp_author === '') {
     ElMessage.warning(t('search.warn.empty'))
     return
+  }
+  // Heuristic to keep ``originalTopic`` in sync with whatever the user
+  // actually searched for. A pure topic (no `` OR `` operator) is by
+  // definition a fresh query — overwrite. An OR-merged query keeps
+  // whatever originalTopic was pinned by ``handleAiSearchPick`` /
+  // ``handleSearchGuess`` / ``consumeQueryParam`` so the right sidebar
+  // keeps re-grounding on the original seed rather than the merged
+  // composite.
+  if (!/\s+OR\s+/i.test(searchContent.query)) {
+    originalTopic.value = searchContent.query.trim()
   }
   const loading = ElLoading.service({
     lock: true,
@@ -208,10 +254,16 @@ const search = (): void => {
   // the same fallback we use for the backend ``q`` parameter so the
   // suggestion is always grounded in real topic words rather than syntax
   // noise like ``AU="..."`` or ``PY=2023-2026``.
+  //
+  // Prefer ``originalTopic`` (captured in ``handleAiSearchPick`` and on
+  // direct text searches) over ``baseParams.q`` so that a query string
+  // like ``time series agent OR (...)`` doesn't get fed back into the
+  // LLM as the seed prompt — which used to return offline-RL drift.
   const suggestSeed =
-    typeof baseParams.q === 'string' && baseParams.q.trim()
+    (originalTopic.value && originalTopic.value.trim()) ||
+    (typeof baseParams.q === 'string' && baseParams.q.trim()
       ? baseParams.q.trim()
-      : ''
+      : '')
   if (suggestSeed) {
     guessLoading.value = true
     guessList.value = []
@@ -272,6 +324,10 @@ const onToggleRefineMode = (val: string | number | boolean): void => {
 
 const handleSearchGuess = (data: string): void => {
   searchContent.query = data
+  // Treat a single-click "search this only" replacement as a fresh topic
+  // so the right panel re-grounds against the new query rather than the
+  // previous one.
+  originalTopic.value = data
   search()
 }
 
@@ -284,11 +340,19 @@ const handleSearchGuessMany = (picked: string[]): void => {
 const handleAiSearchPick = (payload: {
   query: string
   rerank: boolean
+  seed: string
 }): void => {
   // P3-B wires the OR-merged query from the hero dialog. P3-C will also
   // honour the ``rerank`` flag here to drive the new ``aiRerankEnabled``
   // toggle; for now we only persist the query and re-run.
+  //
+  // The dialog hands back the *original* seed (the free-text topic the
+  // user typed into the dialog before any keyword merge) so we can pin
+  // ``originalTopic`` to that seed. The right-sidebar Guess panel will
+  // then use the seed instead of the OR-merged query on its own
+  // suggestion call.
   searchContent.query = payload.query
+  originalTopic.value = payload.seed
   aiDialogOpen.value = false
   search()
 }
@@ -315,11 +379,14 @@ const isDark = useDark()
 const toggleDark = useToggle(isDark)
 
 // Accept ``?q=...`` from the Advanced Search page (or a shared link) and
-// run the search immediately so users land on results directly.
+// run the search immediately so users land on results directly. Treat the
+// incoming query as the original topic so the right panel re-grounds on
+// it instead of any URL-derived noise.
 const consumeQueryParam = (): void => {
   const q = route.query.q
   if (typeof q === 'string' && q.trim()) {
     searchContent.query = q
+    originalTopic.value = q
     search()
   }
 }
