@@ -1,10 +1,6 @@
 <!--
- * @Author: 0x3E5
- * @Date: 2023-02-12 17:29:45
- * @LastEditTime: 2023-03-06 10:34:09
- * @LastEditors: 0x3E5
- * @Description: 
- * @FilePath: \web-vue\src\components\ConfsTree.vue
+ * @Description: Conference / year filter tree rendered in the sticky sidebar.
+ * @FilePath: web-vue/src/components/ConfsTree.vue
 -->
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
@@ -131,17 +127,32 @@ watch(lang, () => rebuild(props.data))
 <style scoped>
 .tree-card {
   user-select: none;
-  /* The card lives in a sticky .pv-side that sits under the 70px topbar,
-     so cap it to the rest of the viewport. The body becomes the scroll
+  /* The card lives in a sticky .pv-side that sits under the topbar, so cap
+     it to the rest of the viewport. Use 100dvh so the dynamic mobile URL bar
+     does not push the scroll region past the visible area; fall back to
+     100vh on browsers without dvh support. The body becomes the scroll
      container below, so the user can browse a 200-venue list without
      dragging the page or hunting for a tiny custom-scrollbar. */
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 90px);
+  max-height: calc(100vh - var(--pv-topbar-h) - var(--pv-side-gap));
+  max-height: calc(100dvh - var(--pv-topbar-h) - var(--pv-side-gap));
+  overflow: hidden;
+}
+.tree-card :deep(.el-card__body) {
+  /* Element Plus wraps default-slot content in .el-card__body (a plain
+     block by default). We need it to become a bounded flex column so the
+     inner .tree-card-scroll actually receives a height and its
+     overflow-y:auto produces a scrollbar instead of being clipped. */
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 .tree-card-scroll {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   /* Slim native scrollbar on desktop; falls back to overlay on touch. */
   scrollbar-width: thin;

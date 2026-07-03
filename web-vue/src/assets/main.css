@@ -3,6 +3,8 @@
 :root {
   --pv-max-width: 1600px;
   --pv-gutter: 16px;
+  --pv-topbar-h: 70px;
+  --pv-side-gap: 20px;
 }
 
 #app {

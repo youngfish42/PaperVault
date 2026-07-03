@@ -459,7 +459,7 @@ onMounted(async () => {
 /* ---------- 右侧 cheatsheet ---------- */
 .pv-adv-cheatsheet {
   position: sticky;
-  top: 70px;
+  top: var(--pv-topbar-h);
 }
 .pv-adv-cheatsheet-title {
   font-size: 15px;
