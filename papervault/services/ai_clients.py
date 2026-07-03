@@ -37,12 +37,20 @@ def call_openai_compatible(
     temperature: float,
     max_tokens: Optional[int] = None,
     timeout: float = 30.0,
+    json_mode: bool = False,
 ) -> ChatResult:
     """Issue a Chat Completions request via the official ``openai`` SDK.
 
     Args:
         max_tokens: Optional maximum tokens for the response.
             Not all OpenAI-compatible providers support this parameter.
+        json_mode: When ``True``, request the provider's native JSON output
+            mode via ``response_format={"type": "json_object"}``. Not every
+            OpenAI-compatible vendor supports this flag; if the first
+            attempt fails with a "parameter not supported" style error we
+            transparently retry once without ``response_format`` so the
+            call still returns text (the caller is expected to parse
+            defensively).
     """
 
     if not api_key:
@@ -64,15 +72,48 @@ def call_openai_compatible(
     }
     if max_tokens is not None and max_tokens > 0:
         create_kwargs["max_tokens"] = max_tokens
+    if json_mode:
+        create_kwargs["response_format"] = {"type": "json_object"}
 
     try:
         response = client.chat.completions.create(**create_kwargs)
     except Exception as exc:
-        logger.exception("OpenAI-compatible call failed: %s", exc)
-        raise UpstreamError(
-            "Suggestion service is temporarily unavailable.",
-            code="LLM_CALL_FAILED",
+        # Some OpenAI-compatible vendors (older self-hosted gateways,
+        # certain third-party proxies) reject ``response_format`` with a
+        # 400 BadRequest. We can't reliably switch on the SDK's exception
+        # class across versions, so we fall back on message inspection
+        # and only for the JSON-mode retry path -- any other failure is
+        # surfaced as ``LLM_CALL_FAILED`` unchanged.
+        message = str(exc).lower()
+        json_mode_rejected = json_mode and (
+            "response_format" in message
+            or "json_object" in message
+            or "unsupported" in message
+            or "not supported" in message
         )
+        if json_mode_rejected:
+            logger.warning(
+                "Provider rejected json_mode; retrying without response_format: %s",
+                exc,
+            )
+            create_kwargs.pop("response_format", None)
+            try:
+                response = client.chat.completions.create(**create_kwargs)
+            except Exception as retry_exc:
+                logger.exception(
+                    "OpenAI-compatible retry (no json_mode) failed: %s",
+                    retry_exc,
+                )
+                raise UpstreamError(
+                    "Suggestion service is temporarily unavailable.",
+                    code="LLM_CALL_FAILED",
+                )
+        else:
+            logger.exception("OpenAI-compatible call failed: %s", exc)
+            raise UpstreamError(
+                "Suggestion service is temporarily unavailable.",
+                code="LLM_CALL_FAILED",
+            )
 
     try:
         choice = response.choices[0]

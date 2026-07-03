@@ -399,12 +399,36 @@ def _extract_keywords(content: str, max_keywords: int) -> List[str]:
     payload = fenced.group(1) if fenced else content
     try:
         parsed = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        logger.warning("Cannot parse keyword JSON: %s | content=%r", exc, content[:200])
-        raise UpstreamError(
-            "Suggestion provider returned non-JSON output.",
-            code="LLM_BAD_JSON",
-        )
+    except json.JSONDecodeError:
+        # v2 prompt asks for "only JSON, no fences", but providers whose
+        # json_mode flag was rejected by the fallback path (see
+        # ai_clients.call_openai_compatible) may still return prose like
+        # ``Sure! {"keywords": [...]}``. Strip everything before the first
+        # ``{`` and after the last ``}`` and try once more before giving up.
+        start = payload.find("{")
+        end = payload.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                parsed = json.loads(payload[start : end + 1])
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    "Cannot parse keyword JSON after brace-trim: %s | content=%r",
+                    exc,
+                    content[:200],
+                )
+                raise UpstreamError(
+                    "Suggestion provider returned non-JSON output.",
+                    code="LLM_BAD_JSON",
+                )
+        else:
+            logger.warning(
+                "Cannot parse keyword JSON: no JSON object braces | content=%r",
+                content[:200],
+            )
+            raise UpstreamError(
+                "Suggestion provider returned non-JSON output.",
+                code="LLM_BAD_JSON",
+            )
 
     keywords = parsed.get("keywords") if isinstance(parsed, dict) else None
     if not isinstance(keywords, list):
@@ -412,4 +436,15 @@ def _extract_keywords(content: str, max_keywords: int) -> List[str]:
             "Suggestion provider returned no keywords.",
             code="LLM_NO_KEYWORDS",
         )
-    return [str(k) for k in keywords][:max_keywords]
+    result = [str(k) for k in keywords][:max_keywords]
+    if len(result) < max_keywords:
+        # The prompt asks for EXACTLY N entries; if the provider dropped
+        # candidates (typically because the topic-anchor rule filtered
+        # them) we surface a warning so operators can spot systematic
+        # under-return without failing the request.
+        logger.warning(
+            "Suggestion provider returned %d/%d keywords",
+            len(result),
+            max_keywords,
+        )
+    return result
