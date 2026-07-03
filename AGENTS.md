@@ -18,7 +18,7 @@ This project was originally forked from [MLNLP-World/AI-Paper-Collector](https:/
 | **HTTP Client** | Axios 1.x |
 | **Data Collection** | BeautifulSoup4, Requests, PyYAML, tqdm, thefuzz / python-Levenshtein |
 | **Data Artifacts** | huggingface_hub (dataset upload with `parent_commit` optimistic locking) |
-| **AI Features** | OpenAI / DeepSeek-compatible chat API (for "Guess You Like" keyword suggestions, provider selectable via `PAPERVAULT_SUGGEST_PROVIDER`), tiktoken |
+| **AI Features** | Multi-provider LLM catalog (OpenAI, DeepSeek, Anthropic Claude, Qwen/DashScope, GLM, StepFun, custom) for keyword suggestion (`POST /api/v1/suggest`) and LLM-driven result re-ranking (`POST /api/v1/ai/rerank`). Wire formats: `openai-compatible` (via `openai` SDK) and `anthropic` (via `anthropic` SDK). Presets exposed through `GET /api/v1/ai/providers`; per-request overrides for provider / base_url / model / api_key. `tiktoken` for token counting |
 | **Stats / Visualization** | numpy, matplotlib, wordcloud |
 | **Build Tool** | Vite 8 with `vite-plugin-compression2` (gzip), `unplugin-auto-import`, `unplugin-vue-components` (auto-generated `auto-imports.d.ts` / `components.d.ts`) |
 | **Tests** | Backend: `pytest` under `tests/` (`pytest.ini` → `testpaths=tests`); Frontend: zero-dependency `node:test` regression suite for the DSL parser (`web-vue/src/utils/__tests__/queryDsl.test.mjs`) |
@@ -32,7 +32,7 @@ PaperVault/
 ├── collector.py                  # Multi-source data collector for paper metadata
 ├── maintain.py                   # README updater, stats renderer, cache refresh utility
 ├── data_artifacts.py             # Hugging Face dataset sync helpers (cache.jsonl.gz upload with parent_commit optimistic locking)
-├── requirements.txt              # Python dependencies (includes pydantic>=2.6,<3, python-dotenv, openai, huggingface_hub, …)
+├── requirements.txt              # Python dependencies (includes pydantic>=2.6,<3, python-dotenv, openai>=1, anthropic>=0.40, huggingface_hub, tiktoken, …)
 ├── pytest.ini                    # `testpaths=tests`, quiet mode, DeprecationWarning filter
 ├── papervault/                   # Backend application package (Flask app factory + v1 REST surface)
 │   ├── __init__.py               # Re-exports `create_app`
@@ -40,25 +40,39 @@ PaperVault/
 │   ├── config.py                 # `Settings` `@dataclass(frozen=True)` (env-driven, rebuilt per `get_settings()` call)
 │   ├── errors.py                 # `ApiError` + JSON error-envelope handlers (HTTPException + generic 500)
 │   ├── logging.py                # `configure_logging` + `install_request_id` (X-Request-ID middleware)
-│   ├── schemas.py                # Pydantic v2 models: `PaperOut`, `ConfOut`, `PageMeta`, `PaperSearchParams`, `SuggestRequest`, `SuggestResponse`, …
+│   ├── schemas.py                # Pydantic v2 models: `PaperOut`, `ConfOut`, `PageMeta`, `PaperSearchParams`, `SuggestRequest`/`SuggestResponse`, `RerankRequest`/`RerankResponse`/`RerankEntry`
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── v1/                   # All v1 blueprints (each mounted with `url_prefix="/api/v1"`)
-│   │       ├── __init__.py       # Re-exports `health_bp`, `confs_bp`, `papers_bp`, `suggest_bp`
+│   │   └── v1/                   # All v1 blueprints (each mounted with `url_prefix="/api/v1"` via `register_blueprints`)
+│   │       ├── __init__.py       # Re-exports `health_bp`, `confs_bp`, `papers_bp`, `suggest_bp`, `ai_bp`
 │   │       ├── health.py         # `GET /api/v1/healthz`
 │   │       ├── confs.py          # `GET /api/v1/confs`
 │   │       ├── papers.py         # `GET /api/v1/papers` (DSL-aware, Pydantic-validated)
-│   │       └── suggest.py        # `POST /api/v1/suggest`
+│   │       ├── suggest.py        # `POST /api/v1/suggest` + `GET /api/v1/ai/providers` (catalog list)
+│   │       └── ai.py             # `POST /api/v1/ai/rerank` (LLM-driven result re-ranking)
 │   └── services/
 │       ├── __init__.py
-│       ├── papers.py             # `PaperRepository` (lazy/eager cache load) + `search_papers` / `SearchCriteria`
-│       └── suggest.py            # `suggest_keywords` (OpenAI/DeepSeek provider abstraction)
+│       ├── papers.py             # `PaperRepository` (lazy/eager cache load, `get_by_id` O(1) index) + `search_papers` / `SearchCriteria`
+│       ├── suggest.py            # `suggest_keywords` (multi-provider dispatch, provider resolution)
+│       ├── rerank.py             # `rank_papers` (LLM relevance scoring; JSON output parsing, score normalisation)
+│       ├── ai_clients.py         # Vendor-neutral SDK dispatch: `call_openai_compatible`, `call_anthropic` (with StepFun `thinking:disabled` compatibility)
+│       └── ai_providers.py       # `ProviderPreset` catalog: openai / deepseek / anthropic / qwen / glm / stepfun / custom
 ├── tests/                        # Backend pytest suite (runs offline against fixture cache via `PAPERVAULT_OFFLINE=1`)
 │   ├── __init__.py
 │   ├── conftest.py               # `client_with_sample` fixture and sample-cache factories
 │   ├── test_api_v1.py            # End-to-end coverage for the v1 blueprints + error envelope
-│   ├── test_paper_repository.py  # `PaperRepository` load / index behaviour
-│   └── test_papers_search.py     # Behavioural tests for `/api/v1/papers` and `/api/v1/confs`
+│   ├── test_paper_repository.py  # `PaperRepository` load / index / `get_by_id` behaviour
+│   ├── test_papers_search.py     # Behavioural tests for `/api/v1/papers` and `/api/v1/confs`
+│   ├── test_per_token_search.py  # Per-token DSL evaluation on the backend side
+│   ├── test_load_dedup.py        # In-memory dedupe when loading `cache.jsonl.gz`
+│   ├── test_collector_dedupe.py  # `_merge_with_cache` per-`(conf, paper_url)` dedupe
+│   ├── test_cleanup_cache_dedupe.py  # One-shot `scripts/cleanup_cache_dedupe.py` regression
+│   ├── test_ai_providers.py      # `ProviderPreset` catalog shape + `get_preset` fallback
+│   ├── test_ai_clients.py        # `call_openai_compatible` / `call_anthropic` dispatch (mocked SDKs)
+│   ├── test_ai_rerank.py         # `POST /v1/ai/rerank` end-to-end (mocked LLM)
+│   ├── test_suggest_api.py       # `POST /v1/suggest` + `GET /v1/ai/providers`
+│   ├── test_suggest_dispatch.py  # Provider / protocol resolution in `services.suggest`
+│   └── test_suggest_topic_anchor.py  # Topic-anchor prompt shaping for `suggest_keywords`
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -81,7 +95,12 @@ PaperVault/
 ├── scripts/                      # Maintenance / data enrichment scripts
 │   ├── fetch_abstracts.py            # Multi-source abstract backfill (Crossref/S2/arXiv/OpenAlex)
 │   ├── fetch_openreview_abstracts.py # OpenReview-only abstract backfill (v2 batch → v1 fallback) for ICLR/NeurIPS forums
+│   ├── fetch_cvf_abstracts.py        # CVF Open Access-only abstract backfill (scrapes `*_paper.html` detail pages)
+│   ├── cvf_abstract.py               # Side-effect-free CVF scraping helpers, shared by `collector` and `fetch_cvf_abstracts.py`
 │   ├── fetch_code_links.py           # Extract GitHub code links from abstracts
+│   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
+│   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
+│   ├── sync_hf_readme.py             # Render `docs/HF_README.md` and push it as the Hugging Face dataset repo root README
 │   └── capture_screenshot.py         # Playwright-driven README hero screenshot regenerator (1280x540 @ 2x; assumes backend :5001 + Vite :8080)
 ├── docs/                         # Auxiliary docs & generated reports
 │   ├── refactor-plan.md          # Design notes for the `papervault/` package + `/api/v1` REST refactor (referenced by `app.py`)
@@ -89,6 +108,7 @@ PaperVault/
 │   ├── execution_guide.md
 │   ├── source_analysis.md
 │   ├── abstract_backfill_progress.md
+│   ├── HF_README.md              # Template rendered + pushed by `scripts/sync_hf_readme.py` as the Hugging Face dataset root README
 │   └── stats.html                # Generated stats page
 ├── web-vue/                      # Vue 3 frontend application
 │   ├── package.json              # Scripts: `dev`, `build` (= type-check + build-only), `type-check`, `lint`, `lint:check`, `preview`
@@ -101,16 +121,24 @@ PaperVault/
 │   ├── src/
 │   │   ├── main.ts               # App entry point
 │   │   ├── App.vue               # Root component
-│   │   ├── router/index.ts       # Vue Router (hash mode); routes `/`, `/advanced`, `/about`
-│   │   ├── api/paper.ts          # Axios calls against the v1 surface: `/api/v1/papers`, `/api/v1/confs`, `/api/v1/suggest`
+│   │   ├── router/index.ts       # Vue Router (hash mode); routes `/`, `/advanced`, `/settings` (`/about` is currently commented out)
+│   │   ├── api/
+│   │   │   ├── paper.ts          # Axios calls against the v1 surface: `/api/v1/papers`, `/api/v1/confs`, legacy `/api/v1/suggest` shim
+│   │   │   └── ai.ts             # P2/P3 AI endpoints: `listAiProviders` (`GET /v1/ai/providers`), `suggestKeywordsWithSettings` (`POST /v1/suggest` with per-request provider/API key, 120s timeout)
 │   │   ├── views/
-│   │   │   ├── HomeView.vue              # Landing + Smart Search (DSL-aware single-box)
+│   │   │   ├── HomeView.vue              # Landing + Smart Search (DSL-aware single-box); also owns the AI search + rerank flow
 │   │   │   ├── AdvancedSearchView.vue    # Visual query builder that compiles to the WoS-style DSL
-│   │   │   └── AboutView.vue             # About / info page
+│   │   │   ├── SettingsView.vue          # AI provider settings page (P2-C shell + P2-D `AiSuggestSection`)
+│   │   │   └── AboutView.vue             # About / info page (route currently commented out in `router/index.ts`)
 │   │   ├── components/
+│   │   │   ├── MainNavBar.vue            # Top navigation bar shared across Home / Advanced / Settings
 │   │   │   ├── SearchResultList.vue      # Results display with pagination / export
 │   │   │   ├── ConfsTree.vue             # Conference / year filter tree
-│   │   │   └── GuessYourLike.vue         # AI keyword suggestions panel
+│   │   │   ├── AiSearchDialog.vue        # Hero "AI search" dialog: LLM keyword suggestion + OR-merge into search box + optional rerank
+│   │   │   ├── AiSuggestPanel.vue        # Right-sidebar post-search AI keyword suggestion panel
+│   │   │   └── AiSuggestSection.vue      # AI provider / API-key card inside the Settings page
+│   │   ├── constants/
+│   │   │   └── aiProviders.ts            # Frontend mirror of `ProviderPreset` (camelCase); consumed after `normalizeProviderPreset`
 │   │   ├── icons/element-icons.ts        # Element Plus icon registrations
 │   │   ├── types/error-code-type.ts      # Shared HTTP error code typing
 │   │   ├── assets/                       # Global styles & images
@@ -120,6 +148,8 @@ PaperVault/
 │   │       ├── i18n.ts                   # Lightweight in-house i18n (CN / EN)
 │   │       ├── fields.ts                 # Field metadata (display names, validators) for the query DSL
 │   │       ├── queryDsl.ts               # WoS-style query DSL parser / splitter / evaluator
+│   │       ├── queryMerge.ts             # `quoteIfNeeded` + OR-merge helper used by `AiSearchDialog` and `AiSuggestPanel`
+│   │       ├── aiSettings.ts             # localStorage (non-secret settings) + sessionStorage (API key) adapter for the AI panel
 │   │       └── __tests__/
 │   │           └── queryDsl.test.mjs     # `node:test` regression suite for the DSL parser
 │   └── public/                   # Static assets
@@ -155,18 +185,33 @@ python app.py
 The Flask server runs on `http://127.0.0.1:5001` by default. Override the bind address with `HOST` / `PORT` env vars; debug mode is toggled by `FLASK_DEBUG=1`.
 
 **Required / Optional Environment Variables:**
-- `OPENAI_API_KEY` - API key for the "Guess You Like" feature (works for both OpenAI and DeepSeek when `PAPERVAULT_SUGGEST_PROVIDER=deepseek`)
-- `OPENAI_API_BASE` - OpenAI API base URL (optional, defaults to official endpoint)
-- `PAPERVAULT_SUGGEST_PROVIDER` - Suggestion provider, `deepseek` (default) or `openai`
-- `PAPERVAULT_OPENAI_MODEL` / `PAPERVAULT_DEEPSEEK_MODEL` / `PAPERVAULT_DEEPSEEK_BASE_URL` - Per-provider overrides (see `papervault/config.py` for the full list)
-- `PAPERVAULT_LOG_LEVEL` - Backend log level (default `INFO`)
-- `PAPERVAULT_CORS_ORIGINS` - Comma-separated CORS allow-list (empty by default)
-- `PAPERVAULT_MAX_PAGE_SIZE` / `PAPERVAULT_DEFAULT_PAGE_SIZE` - Pagination guards for `/api/v1/papers` (defaults 200 / 50)
-- `CONTACT_EMAIL` - Contact email injected into `User-Agent` for discovery / scraping (default `im.young@foxmail.com`)
+
+*Cache / Hugging Face (see `.env.example` for the full template)*
 - `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` - **Required** for cache reads/writes. The authoritative `cache/cache.jsonl.gz` lives on this Hugging Face dataset repo; every entry point calls `data_artifacts.ensure_cache_local()` on startup to pull the latest revision before reading
 - `PAPERVAULT_HF_REPO_TYPE` - Repo kind, defaults to `dataset`
 - `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS`, `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF` - HF upload retry tuning (the upload uses `parent_commit` optimistic locking and will rebase + retry on stale-parent rejections)
 - `PAPERVAULT_OFFLINE=1` - Skip HF refresh entirely; only the local copy of the cache will be used (useful for air-gapped dev, when HF is unreachable, or when running `pytest`)
+
+*Backend server*
+- `HOST` / `PORT` - Flask bind address (defaults `127.0.0.1:5001`)
+- `FLASK_DEBUG=1` - Enable Werkzeug reloader / debugger
+- `PAPERVAULT_LOG_LEVEL` - Backend log level (default `INFO`)
+- `PAPERVAULT_CORS_ORIGINS` - Comma-separated CORS allow-list (empty by default)
+- `PAPERVAULT_MAX_PAGE_SIZE` / `PAPERVAULT_DEFAULT_PAGE_SIZE` - Pagination guards for `/api/v1/papers` (defaults 200 / 50)
+- `CONTACT_EMAIL` - Contact email injected into `User-Agent` for discovery / scraping (default `im.young@foxmail.com`)
+
+*AI providers (used by `/api/v1/suggest` and `/api/v1/ai/rerank`)*
+
+Each provider preset in `papervault/services/ai_providers.py` declares its own env-var names; the ones set below are only used when the request does **not** override them. Every field can also be sent per request (`api_key`, `base_url`, `model`, `provider`, `protocol`, `temperature`, `max_tokens`).
+
+- `OPENAI_API_KEY` / `OPENAI_API_BASE` / `PAPERVAULT_OPENAI_MODEL` - OpenAI-compatible defaults (also works for legacy DeepSeek routing)
+- `DEEPSEEK_API_KEY` / `PAPERVAULT_DEEPSEEK_BASE_URL` / `PAPERVAULT_DEEPSEEK_MODEL` - DeepSeek preset overrides
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_API_BASE` / `PAPERVAULT_ANTHROPIC_MODEL` / `PAPERVAULT_ANTHROPIC_MAX_TOKENS` - Anthropic Messages API (`claude-*` models) — `max_tokens` is mandatory for this protocol (default `2048`)
+- `QWEN_API_KEY` / `QWEN_API_BASE` / `PAPERVAULT_QWEN_MODEL` - Alibaba DashScope OpenAI-compat mode
+- `GLM_API_KEY` / `GLM_API_BASE` / `PAPERVAULT_GLM_MODEL` - Zhipu BigModel
+- `STEPFUN_API_KEY` / `STEPFUN_BASE_URL` / `PAPERVAULT_STEPFUN_MODEL` - StepFun `step_plan` endpoint (Anthropic Messages compatible, **not** OpenAI-compat)
+- `PAPERVAULT_SUGGEST_PROVIDER` - Optional server-side default provider key (`openai` / `deepseek` / `anthropic` / `qwen` / `glm` / `stepfun` / `custom`). Empty by default; the request payload / legacy detection takes precedence
+- `PAPERVAULT_OPENAI_TEMPERATURE` / `PAPERVAULT_OPENAI_MAX_KEYWORDS` - Prompt-shaping defaults for `suggest_keywords`
 
 ### Cache Storage (Hugging Face)
 
@@ -283,7 +328,11 @@ Other frontend scripts:
 | `python maintain.py force` | Force full cache rebuild and README update |
 | `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
 | `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
+| `python scripts/fetch_cvf_abstracts.py` | CVF Open Access-targeted abstract backfill (scrapes `openaccess.thecvf.com/.../*_paper.html`). Independent of DOI-based sources |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
+| `python scripts/cleanup_cache_dedupe.py` | One-shot cache dedupe by `(conf, paper_url)` — reuses `collector._merge_paper_record` so semantics stay in lockstep with the collector |
+| `python scripts/migrate_progress_to_jsonl.py` | Migrate legacy `abstract_backfill_progress.json` to the JSONL.gz format (`--dry-run` to preview) |
+| `python scripts/sync_hf_readme.py` | Render `docs/HF_README.md` + push it as the Hugging Face dataset repo root README |
 | `python scripts/capture_screenshot.py` | Regenerate `pics/screenshot/web.jpg` via Playwright (requires backend on :5001 and Vite dev server on :8080). Supports `--url`, `--output`, `--width`, `--height`, `--scale`, `--quality` |
 | `python -m discovery.generate_conf` | Generate / merge discovered conference configs |
 | `cd web-vue && npm run dev` | Start frontend dev server (Vite, :8080, proxies `/api` to the backend) |
@@ -296,25 +345,35 @@ Other frontend scripts:
 ## Code Conventions
 
 - **Python**: Follow PEP 8. Use type hints where practical. Prefer module-level constants and `pathlib.Path` for filesystem operations (see `data_artifacts.py`).
-- **Backend layout**: New endpoints **must** be added as Flask blueprints under `papervault/api/v1/*`, mounted in `papervault/app.py:create_app` with `url_prefix="/api/v1"`. Validate inputs with **Pydantic v2** schemas in `papervault/schemas.py`; raise `papervault.errors.ApiError` (or let `werkzeug.exceptions.HTTPException` propagate) so the unified JSON envelope handler picks it up — never `return jsonify({"error": ...}), 400` ad hoc. Read settings via `current_app.extensions["settings"]` or `get_settings()`; do **not** import `os.environ` inside handlers.
+- **Backend layout**: New endpoints **must** be added as Flask blueprints under `papervault/api/v1/*`, mounted in `papervault/api/v1/__init__.py:register_blueprints` (**not** in `create_app` directly). Validate inputs with **Pydantic v2** schemas in `papervault/schemas.py`; raise `papervault.errors.ApiError` (or let `werkzeug.exceptions.HTTPException` propagate) so the unified JSON envelope handler picks it up — never `return jsonify({"error": ...}), 400` ad hoc. Read settings via `current_app.extensions["settings"]` or `get_settings()`; do **not** import `os.environ` inside handlers.
+- **AI / LLM code**: Vendor SDK calls live in `papervault/services/ai_clients.py` only. Adding a new provider is a *catalog* change (`papervault/services/ai_providers.py`) — do not introduce a third dispatcher. When adding a preset, mirror it in `web-vue/src/constants/aiProviders.ts` (camelCase) and update `normalizeProviderPreset` in `web-vue/src/api/ai.ts` only if the wire schema itself grows.
 - **Vue/TypeScript**: Use Composition API with `<script setup>` syntax. Component names use PascalCase. Element Plus components and icons are auto-imported (no manual imports needed for most usage). `auto-imports.d.ts` and `components.d.ts` are generated by `unplugin-*` and **must not** be hand-edited.
 - **API Endpoints**: All backend API routes are versioned under `/api/v1/*` in production (proxied via Vite's dev server in development). Legacy `/api/search` and `/api/get_guess_you_like` have been removed — do not re-introduce unversioned endpoints.
-- **Query DSL**: User-visible search syntax (Smart Search box and Advanced Search builder) is defined in `web-vue/src/utils/queryDsl.ts` + `fields.ts`; any change to the grammar or field set **must** be paired with a new case in `web-vue/src/utils/__tests__/queryDsl.test.mjs` to prevent the kind of regression that the existing suite already pins down (e.g. `AU="Xiaowen Jiang"` → empty-result).
+- **Query DSL**: User-visible search syntax (Smart Search box and Advanced Search builder) is defined in `web-vue/src/utils/queryDsl.ts` + `fields.ts`; any change to the grammar or field set **must** be paired with a new case in `web-vue/src/utils/__tests__/queryDsl.test.mjs` to prevent the kind of regression that the existing suite already pins down (e.g. `AU="Xiaowen Jiang"` → empty-result). OR-merge helpers for AI-picked keywords are isolated in `web-vue/src/utils/queryMerge.ts` and reused by `AiSearchDialog` / `AiSuggestPanel`.
+- **AI secrets on the frontend**: The API key entered on the Settings page lives in **sessionStorage** (wiped when the tab closes); non-secret knobs (provider / base URL / model / temperature / max_keywords / max_tokens) live in **localStorage**. The split is enforced by `web-vue/src/utils/aiSettings.ts` — do not mix the two.
 - **Environment Variables**: Frontend variables must use `VITE_` or `VUE_` prefix (configured in `vite.config.ts`).
 - **Imports/Resolvers**: The `@` alias points to `web-vue/src`.
 
 ## API Surface (v1)
 
-All endpoints are mounted under `/api/v1` by `papervault/app.py:create_app`. The legacy unversioned routes (`/api/search`, `/api/get_guess_you_like`) have been deleted; do **not** re-introduce them.
+All endpoints are mounted under `/api/v1` by `papervault/app.py:create_app` (via `papervault/api/v1/__init__.py:register_blueprints`). The legacy unversioned routes (`/api/search`, `/api/get_guess_you_like`) have been deleted; do **not** re-introduce them.
 
 | Method & Path | Handler | Request | Response |
 |---------------|---------|---------|----------|
 | `GET /api/v1/healthz` | `papervault/api/v1/health.py` | — | `{ "status": "ok", "papers": int, "confs": int }` (forces `PaperRepository.ensure_loaded()`) |
 | `GET /api/v1/confs` | `papervault/api/v1/confs.py` | — | `{ "items": ConfOut[], "total": int }` with `ConfOut = { name, total, years: [{year, count}] }` |
 | `GET /api/v1/papers` | `papervault/api/v1/papers.py` | Query params validated by `PaperSearchParams` (Pydantic v2): `q?`, `field?∈{title,author,any}` (default `title`), `conf?` (repeatable / comma-separated), `since?`, `until?` (1900–2100), `author?`, `sort?∈{±year,±conf,±title}` (default `-year`), `page?≥1`, `size?≥1` (capped at `settings.max_page_size`, default `50`). The `q` field accepts the WoS-style DSL parsed inside `papers.py` | `{ "items": PaperOut[], "meta": PageMeta }` |
-| `POST /api/v1/suggest` | `papervault/api/v1/suggest.py` | JSON body validated by `SuggestRequest`: `{ "query": str (1–200), "model"?: str, "max_keywords"?: 1–50 }` | `SuggestResponse = { keywords: string[], timecost_ms: float, model: str }` |
+| `POST /api/v1/suggest` | `papervault/api/v1/suggest.py` | JSON body validated by `SuggestRequest`: `{ "query": str (1–200), "provider"?, "base_url"?, "model"?, "api_key"?, "protocol"?∈{openai-compatible,anthropic}, "temperature"?∈[0,2], "max_keywords"?∈[1,50], "max_tokens"?∈[1,4096] }` | `SuggestResponse = { keywords: string[], timecost_ms: float, model: str, provider: str, protocol: str }` |
+| `GET /api/v1/ai/providers` | `papervault/api/v1/suggest.py:list_providers` | — | `{ "items": ProviderPreset[] }` — the shipped catalog: `openai`, `deepseek`, `anthropic`, `qwen`, `glm`, `stepfun`, `custom` |
+| `POST /api/v1/ai/rerank` | `papervault/api/v1/ai.py` | JSON body validated by `RerankRequest`: `{ "query": str (1–200), "paper_ids": string[] (1–300), "provider"?, "base_url"?, "model"?, "api_key"?, "protocol"?, "temperature"? }`. Duplicates in `paper_ids` are collapsed while preserving order | `RerankResponse = { ordered: [{paper_id, score∈[0,1]}], skipped_ids: string[], timecost_ms, model, provider, protocol }` — stale ids surface in `skipped_ids`; if every id is stale the endpoint short-circuits without invoking the LLM |
 
 Errors from any route are normalised by `papervault.errors.register_error_handlers` into a unified envelope `{ "error": { "code": str, "message": str, "details"?: any } }` (HTTP status is preserved on the response). `ApiError` / `NotFoundError` / `UpstreamError` are first-class; raw `HTTPException`s have their `name` upcased into `code` and unexpected exceptions degrade to `INTERNAL_ERROR` / 500. The independent request-id is attached to logs and the `X-Request-Id` response header by `papervault.logging` middleware — it is **not** embedded in the JSON body. Non-`/api/` GET requests fall through to a SPA history fallback that serves `static/dist/index.html`.
+
+### AI dispatch layer
+
+- `papervault/services/ai_clients.py` owns the two SDK adapters: `call_openai_compatible` (via the `openai` SDK, with a `json_mode` fallback path for providers that reject `response_format`) and `call_anthropic` (via the `anthropic` SDK, normalising a trailing `/v1` off `base_url` and passing `extra_body={"thinking": {"type": "disabled"}}` so StepFun's `step_plan` doesn't burn the entire `max_tokens` budget on internal reasoning).
+- `papervault/services/ai_providers.py` publishes the `ProviderPreset` catalog. Each preset records `protocol` (`openai-compatible` | `anthropic`), `base_url`, `model`, `note` and the three env-var names (`env_key_var`, `env_base_var`, `env_model_var`) that seed defaults. Adding a new vendor requires exactly one entry in `_PRESETS` — the FE picks it up from `GET /api/v1/ai/providers`.
+- `papervault/services/suggest.py` and `papervault/services/rerank.py` share the same provider-resolution helper (`_resolve_provider`, imported from `services.suggest`). Any resolution / retry / logging change lands in one file.
 
 ## Data Sources
 
