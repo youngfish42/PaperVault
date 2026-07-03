@@ -298,6 +298,10 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         "input topic;\n"
         "  (4) ONE dataset / benchmark name papers in this area are "
         "evaluated on -- again, pick a fresh one from your own knowledge.\n"
+        "Budget rule: categories (2) and (4) are pinned at ONE entry "
+        "each. Distribute the remaining N-2 entries roughly evenly "
+        "between categories (1) and (3). If N is small (N<=2), skip (1) "
+        "and (3) and keep only (2) and (4).\n"
         "\n"
         'BANNED: literal "X Y" word-salad of the original tokens stitched '
         'together (e.g. "Time Series Reinforcement Learning"). Repeating '
@@ -317,8 +321,9 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         "  BAD  \"offline reinforcement learning\" -> RL family, off-topic\n"
         "  BAD  \"Trajectory Transformer\"       -> trajectory = RL, "
         "off-topic\n"
-        "  GOOD \"time series imputation\"      -> shares 'time series' "
-        "core noun, generic phrase, safe to keep literal\n"
+        "  GOOD <one on-topic rephrasing using different words that keeps "
+        "the topic's core noun -- a generic phrase, NOT a specific "
+        "model/dataset name>\n"
         "  GOOD <another on-topic phrase using different words, generic "
         "phrase, NOT a specific model/dataset name>\n"
         "  GOOD <one concrete model/framework name widely cited in this "
@@ -436,7 +441,17 @@ def _extract_keywords(content: str, max_keywords: int) -> List[str]:
             "Suggestion provider returned no keywords.",
             code="LLM_NO_KEYWORDS",
         )
-    result = [str(k) for k in keywords][:max_keywords]
+    # Defensive: an off-spec provider may return empty strings, whitespace,
+    # or a stringified ``None`` (via ``str(k)``). Downstream OR-merge and
+    # UI chips would then render blank tokens. Strip + drop empties so the
+    # short-return warning below reflects usable keywords, not raw count.
+    result: List[str] = []
+    for k in keywords:
+        s = str(k).strip()
+        if s and s.lower() != "none":
+            result.append(s)
+        if len(result) >= max_keywords:
+            break
     if len(result) < max_keywords:
         # The prompt asks for EXACTLY N entries; if the provider dropped
         # candidates (typically because the topic-anchor rule filtered

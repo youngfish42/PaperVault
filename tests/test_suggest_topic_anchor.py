@@ -46,9 +46,14 @@ def test_build_prompt_surfaces_bad_and_good_examples():
     assert "ETTh1" not in system
     assert "MOMENT" not in system
     assert "GOOD" in system
-    # An on-topic abstract phrase (no specific model name) is kept so the
-    # model can see one concrete rephrasing of the topic itself.
-    assert "time series imputation" in system
+    # ALL GOOD slots are now abstract placeholders (angle-bracketed). No
+    # concrete on-topic phrase leaks into the prompt any more -- earlier
+    # revisions kept "time series imputation" as a literal GOOD example,
+    # which anchored downstream queries to a TS demonstration even for
+    # unrelated topics (e.g. federated learning). Assert the anchor is
+    # gone and that the placeholder shape survives.
+    assert "time series imputation" not in system
+    assert "<one on-topic rephrasing" in system
     # The placeholders must signal "fresh, not copied" so the LLM doesn't
     # fall back to a fixed shortlist.
     assert "fresh from your own knowledge" in system
@@ -67,10 +72,13 @@ def test_build_prompt_bans_generic_filler():
     system, _ = suggest._build_prompt("federated learning", max_keywords=5)
 
     # Original v1 prompt banned "machine learning" / "deep learning" as filler;
-    # v2 must keep that.
-    assert "machine learning" in system.lower()
-    assert "deep learning" in system.lower()
+    # v2 must keep that. Slice the BANNED clause specifically so a refactor
+    # that moves the phrases into an unrelated context (e.g. a GOOD example
+    # or a comment) can no longer satisfy this assertion accidentally.
     assert "BANNED" in system
+    banned_section = system.split("BANNED:", 1)[1].split("\n\n", 1)[0].lower()
+    assert "machine learning" in banned_section
+    assert "deep learning" in banned_section
 
 
 def test_build_prompt_requires_double_quoting_for_multi_word():
