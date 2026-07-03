@@ -61,7 +61,14 @@ export const buildOrMerge = (
   cap: number = Infinity
 ): string => {
   const cleaned = picked.map(quoteIfNeeded).filter(Boolean)
-  const trimmed = cap > 0 && Number.isFinite(cap) ? cleaned.slice(0, cap) : cleaned
+  // ``cap`` semantics:
+  //   Infinity (default) / negative / NaN → no truncation (keep all)
+  //   0                                   → truncate to empty (zero picks)
+  //   n > 0 (finite)                      → keep first n picks
+  // Number.isFinite() is the cheapest way to filter out Infinity and NaN
+  // without accidentally treating 0 as "no cap".
+  const trimmed =
+    Number.isFinite(cap) && cap >= 0 ? cleaned.slice(0, cap) : cleaned
   if (!trimmed.length) return current.trim()
   const addition =
     trimmed.length === 1 ? trimmed[0] : `(${trimmed.join(' OR ')})`

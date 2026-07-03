@@ -86,9 +86,10 @@ const onPickMany = (): void => {
   // so the parent's downstream buildOrMerge sees the same number the
   // button label advertises. Without this the dialog and panel would
   // diverge on what gets actually merged.
-  const out = props.mergeCap && Number.isFinite(props.mergeCap)
-    ? picked.value.slice(0, props.mergeCap)
-    : [...picked.value]
+  const out =
+    props.mergeCap && Number.isFinite(props.mergeCap)
+      ? picked.value.slice(0, props.mergeCap)
+      : [...picked.value]
   emit('pick-many', out)
 }
 

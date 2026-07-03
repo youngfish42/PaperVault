@@ -78,10 +78,21 @@ def call_openai_compatible(
             response = client.chat.completions.create(**create_kwargs)
         except Exception as exc:
             # Some OpenAI-compatible vendors reject ``response_format`` with
-            # a 400. Detect by message content (cheap and avoids coupling to
-            # the SDK's specific exception classes) and retry without it.
+            # a 400. Detect via a small keyword whitelist so we survive
+            # provider-specific / localised error phrasings (some Chinese
+            # gateways translate everything but the parameter name; a few
+            # only say ``unsupported parameter`` without echoing the field).
+            # Any of these hits triggers the plain retry.
             msg = str(exc).lower() if exc else ""
-            if json_mode and "response_format" in msg:
+            fallback_markers = (
+                "response_format",
+                "json_object",
+                "unsupported parameter",
+                "unknown parameter",
+                "invalid parameter",
+                "not supported",
+            )
+            if json_mode and any(m in msg for m in fallback_markers):
                 logger.warning(
                     "Provider %s rejected response_format=json_object; retrying plain.",
                     model,

@@ -54,6 +54,14 @@ const loading = ref(false)
 const rerankEnabled = ref(props.defaultRerank ?? true)
 const errorMsg = ref('')
 const providerLabel = ref('')
+// Sticky "the user has actually pressed Run at least once in this session"
+// flag. Used by the template to distinguish three states that the raw
+// `keywords.length + loading + errorMsg` triplet cannot express on its
+// own: (a) untouched dialog, (b) loading, (c) run finished but returned
+// an empty keyword list (200 + `keywords: []`). Without this flag the
+// third state falls into a rendering hole where neither the suggest
+// panel nor the error block is shown, so the user sees no feedback.
+const hasRun = ref(false)
 
 const visibleProxy = computed({
   get: () => props.visible,
@@ -71,6 +79,7 @@ watch(
       keywords.value = []
       errorMsg.value = ''
       providerLabel.value = ''
+      hasRun.value = false
       rerankEnabled.value = props.defaultRerank ?? rerankEnabled.value
       // Pre-fill the seed with the most recent pick if the caller passed
       // it (re-opening from a failed previous session). For the simple
@@ -107,16 +116,22 @@ const run = async (): Promise<void> => {
   // Pre-flight: catch the most common AI failure up front so the user gets
   // an actionable hint instead of a backend 503. Both ``loadApiKey()`` and
   // ``loadAiSettings().provider`` come from this tab's session / local
-  // storage — if either is empty here, the backend has nothing to work
-  // with and would just raise ``LLM_NOT_CONFIGURED``.
-  if (!loadApiKey() && !loadAiSettings().provider) {
+  // storage — if *either* is empty here, the backend has nothing to work
+  // with and would just raise ``LLM_NOT_CONFIGURED``. (apiKey lives in
+  // sessionStorage and is wiped on tab close, so a user who saved a
+  // provider yesterday still needs to re-paste their key today; the OR
+  // makes sure we catch that half-configured state locally instead of
+  // handing the user a raw 503.)
+  if (!loadApiKey() || !loadAiSettings().provider) {
     errorMsg.value = t('search.aiSearch.toastNoKey')
     ElMessage.warning(t('search.aiSearch.toastNoKey'))
+    hasRun.value = true
     return
   }
   loading.value = true
   errorMsg.value = ''
   keywords.value = []
+  hasRun.value = true
   try {
     const payload = toApiPayload(loadAiSettings(), loadApiKey())
     const res = await suggestKeywordsWithSettings(q, payload)
@@ -177,7 +192,7 @@ const handleReplace = (kw: string): void => {
     </el-checkbox>
 
     <AiSuggestPanel
-      v-if="keywords.length || loading"
+      v-if="loading || hasRun"
       :keywords="keywords"
       :loading="loading"
       :title="''"
@@ -190,10 +205,10 @@ const handleReplace = (kw: string): void => {
       @pick-many="handlePickMany"
       @replace="handleReplace"
     />
-    <div v-else-if="errorMsg" class="pv-ai-search-error">
+    <div v-if="errorMsg" class="pv-ai-search-error">
       {{ errorMsg }}
       <el-button
-        v-if="!loadApiKey() && !loadAiSettings().provider"
+        v-if="!loadApiKey() || !loadAiSettings().provider"
         link
         type="primary"
         class="pv-ai-search-error-link"
