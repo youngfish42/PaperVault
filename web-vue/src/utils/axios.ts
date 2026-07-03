@@ -34,19 +34,13 @@ service.interceptors.response.use(
   // public-facing type.
   (res: AxiosResponse) => {
     const body = res.data
-    if (
-      body &&
-      typeof body === 'object' &&
-      'msg' in body &&
-      body.msg !== 'success'
-    ) {
-      const message =
-        (body as any)?.data?.message ||
-        (body as any).msg ||
-        ERROR_CODE_TYPE('default')
-      if (!isSilent(res.config)) ElMessage.error(message)
-      return Promise.reject(body)
-    }
+    // v1 API contract (see ``papervault/errors.py``): success responses are
+    // plain domain payloads (e.g. ``{items, meta}``, ``{keywords, ...}``),
+    // errors always come wrapped as ``{error: {code, message, details?}}``.
+    // A 2xx response that still carries an ``error`` key means the backend
+    // encountered a soft failure it chose to signal in-band — surface it
+    // as a rejection so callers can handle it uniformly with the axios
+    // error branch below.
     if (body && typeof body === 'object' && 'error' in body) {
       const error = (body as any).error
       const message =
