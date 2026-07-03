@@ -269,13 +269,34 @@ def _legacy_key_fallback(provider_key: str) -> str:
 
 def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
     system = (
-        "You are a helpful assistant for search suggestion of paper "
-        "in the field of artificial intelligence"
+        "You are a senior AI researcher's paper-discovery assistant. "
+        "Given a research topic, return diverse, realistic search keywords "
+        "a researcher would type into an academic CS paper search engine "
+        "(NeurIPS, ICML, ICLR, KDD, AAAI, ACL, EMNLP and similar).\n"
+        "\n"
+        "Mix ALL FOUR kinds across the list:\n"
+        "  (1) synonymous reformulations of the topic;\n"
+        "  (2) concrete model / framework / method names cited by papers "
+        'in this area (e.g. "ReAct", "Lag-Llama", "Toolformer", "Voyager");\n'
+        "  (3) adjacent research subareas papers on this topic commonly "
+        "belong to;\n"
+        "  (4) dataset / benchmark names such papers are evaluated on.\n"
+        "\n"
+        'Do NOT generate literal "X Y" word-salad of the original tokens '
+        'stitched together (e.g. "Time Series Reinforcement Learning"). '
+        "Do NOT repeat the topic verbatim, do NOT use generic filler "
+        '("machine learning" / "deep learning"), do NOT use marketing '
+        "buzzwords.\n"
+        "\n"
+        "Output: only JSON {\"keywords\":[...]} with EXACTLY N entries "
+        "(N given in the user message). Each entry 1-6 words. Any 2+ word "
+        "phrase MUST be wrapped in double quotes (downstream OR-merge "
+        "keeps quoted phrases intact). Mix bare words and quoted phrases. "
+        "No commentary, no markdown fences."
     )
     user = (
-        f'Please just return the top-{max_keywords} related keywords of papers on "{query}" '
-        'in JSON format with the key named "keywords". '
-        'The output must start with "```json" and end with "```".'
+        f'Research topic: "{query}"\n'
+        f"Return exactly {max_keywords} keywords."
     )
     return system, user
 
@@ -309,6 +330,9 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
         # OpenAI-compatible providers historically ran without a cap.
         # Only forward ``max_tokens`` when the caller explicitly set one,
         # so default keyword suggestions are not silently truncated.
+        # ``json_mode=True`` opts into the provider's native JSON-output
+        # mode; ai_clients.call_openai_compatible transparently falls
+        # back to a plain call if a vendor rejects the flag.
         result = call_openai_compatible(
             api_key=resolved.api_key,
             base_url=resolved.base_url,
@@ -317,6 +341,7 @@ def suggest_keywords(req: SuggestionRequest) -> SuggestionResult:
             user=user,
             temperature=req.temperature,
             max_tokens=req.max_tokens,
+            json_mode=True,
         )
 
     elapsed_ms = (time.time() - start) * 1000.0

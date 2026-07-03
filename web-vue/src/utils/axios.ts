@@ -34,19 +34,13 @@ service.interceptors.response.use(
   // public-facing type.
   (res: AxiosResponse) => {
     const body = res.data
-    if (
-      body &&
-      typeof body === 'object' &&
-      'msg' in body &&
-      body.msg !== 'success'
-    ) {
-      const message =
-        (body as any)?.data?.message ||
-        (body as any).msg ||
-        ERROR_CODE_TYPE('default')
-      if (!isSilent(res.config)) ElMessage.error(message)
-      return Promise.reject(body)
-    }
+    // v1 API contract (see ``papervault/errors.py``): success responses are
+    // plain domain payloads (e.g. ``{items, meta}``, ``{keywords, ...}``),
+    // errors always come wrapped as ``{error: {code, message, details?}}``.
+    // A 2xx response that still carries an ``error`` key means the backend
+    // encountered a soft failure it chose to signal in-band — surface it
+    // as a rejection so callers can handle it uniformly with the axios
+    // error branch below.
     if (body && typeof body === 'object' && 'error' in body) {
       const error = (body as any).error
       const message =
@@ -57,9 +51,36 @@ service.interceptors.response.use(
     return body as unknown as AxiosResponse
   },
   err => {
-    console.error(err)
+    // Log the raw failure so DevTools always shows what really came back
+    // (status, body shape, headers). The interceptor's job is just to
+    // surface a readable message; debugging info lives here.
+    console.error(
+      '[axios] request failed:',
+      err?.config?.url,
+      'status=',
+      err?.response?.status,
+      'body=',
+      err?.response?.data
+    )
     let { message } = err
-    if (message === 'Network Error') {
+    const status = err?.response?.status
+    const body = err?.response?.data
+    // Prefer the server's structured envelope: ``{error: {code, message}}``.
+    // Fall back to a flat ``{message}`` body for endpoints that didn't
+    // wrap their errors. Final fallback: axios' default message with a
+    // "[503]" prefix so the status code is never lost.
+    let serverMsg: string | undefined
+    if (body && typeof body === 'object') {
+      serverMsg =
+        (body as any)?.error?.message ||
+        (body as any)?.message ||
+        (body as any)?.msg
+    }
+    if (typeof serverMsg === 'string' && serverMsg) {
+      message = serverMsg
+    } else if (status) {
+      message = `[${status}] ${message || 'Request failed'}`
+    } else if (message === 'Network Error') {
       message = '后端接口连接异常'
     } else if (message?.includes('timeout')) {
       message = '系统接口请求超时'

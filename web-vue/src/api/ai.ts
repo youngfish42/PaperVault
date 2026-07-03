@@ -94,6 +94,12 @@ export const suggestKeywordsWithSettings = (
     url: '/v1/suggest',
     method: 'post',
     data: body,
-    silent: true
+    silent: true,
+    // Keyword suggestion is a multi-call chain on the server side:
+    // request -> provider prefill -> first token. StepFun/Anthropic-tier
+    // models frequently take 30-90s for the very first response, well past
+    // the global 60s axios budget. Bump to 120s only for AI endpoints; the
+    // default service timeout stays at 60s for search/list calls.
+    timeout: 120000
   })
 }

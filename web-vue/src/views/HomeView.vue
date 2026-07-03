@@ -5,14 +5,13 @@ import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage, ElLoading } from 'element-plus'
 import ConfsTree from '@/components/ConfsTree.vue'
 import SearchResultList from '@/components/SearchResultList.vue'
-import GuessYourLike from '@/components/GuessYourLike.vue'
+import AiSuggestPanel from '@/components/AiSuggestPanel.vue'
+import AiSearchDialog from '@/components/AiSearchDialog.vue'
 import MainNavBar from '@/components/MainNavBar.vue'
-import {
-  listConfs,
-  searchPapers,
-  suggestKeywords,
-  type PaperItem
-} from '@/api/paper'
+import { listConfs, searchPapers, type PaperItem } from '@/api/paper'
+import { suggestKeywordsWithSettings } from '@/api/ai'
+import { loadAiSettings, loadApiKey, toApiPayload } from '@/utils/aiSettings'
+import { buildOrMerge } from '@/utils/queryMerge'
 import { useI18n } from '@/utils/i18n'
 import {
   parseDsl,
@@ -58,6 +57,18 @@ const searchResult = ref<InstanceType<typeof SearchResultList> | null>(null)
 
 const guessLoading = ref(false)
 const guessList = ref<string[]>([])
+const guessProviderLabel = ref('')
+
+const aiDialogOpen = ref(false)
+
+// Pinned at the moment the user issues a search so the right-sidebar AI
+// "guess" panel can be re-fed the *original* topic on every subsequent
+// search, instead of a query that already contains an OR-merged keyword
+// list from a previous AI dialog pick. Without this, the OR-merged string
+// is sent straight back into the LLM as a topic prompt, which destroys
+// keyword quality ("time series agent" + the merged words are themselves
+// the prompt the LLM sees).
+const originalTopic = ref('')
 
 const cheatsheetOpen = ref(false)
 const toggleCheatsheet = (): void => {
@@ -105,6 +116,33 @@ const buildBaseQuery = () => {
     // zero substring filter on top of the (already correct) ``author`` param
     // and silently wipe out every hit.
     params.q = rawQuery
+  } else if (
+    rawQuery &&
+    !split.author &&
+    !split.conf &&
+    split.since == null &&
+    split.until == null
+  ) {
+    // Pure free-text query that the splitter couldn't hoist into a coarse
+    // ``q`` (top-level OR, NOT, NEAR, or field-qualified topic terms that
+    // stayed in residual). The residual AST still drives the precise
+    // client-side re-evaluation, but the backend needs a coarse AND pre-
+    // filter to keep from returning the whole corpus (≈621k papers). Without
+    // this, the "All venues" badge, match-total counter, and truncated-
+    // warning all key off garbage numbers from the full-corpus fetch.
+    //
+    // Prefer ``originalTopic`` (the user's pre-OR-merge seed), cleaning any
+    // residual syntax so a dirty URL-loaded topic still narrows something.
+    // Falls back to the cleaned raw query when ``originalTopic`` is empty
+    // (e.g. a brand-new direct text search that happens to use OR).
+    const cleaned = (s: string): string =>
+      s
+        .replace(/[()"]/g, ' ')
+        .replace(/\s+OR\s+/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const seed = cleaned(originalTopic.value) || cleaned(rawQuery)
+    if (seed) params.q = seed
   }
   const author = split.author ?? searchContent.sp_author
   if (author) params.author = author
@@ -131,6 +169,16 @@ const search = (): void => {
   if (searchContent.query === '' && searchContent.sp_author === '') {
     ElMessage.warning(t('search.warn.empty'))
     return
+  }
+  // Heuristic to keep ``originalTopic`` in sync with whatever the user
+  // actually searched for. A pure topic (no `` OR `` operator) is by
+  // definition a fresh query — overwrite. An OR-merged query keeps
+  // whatever originalTopic was pinned by ``handleAiSearchPick`` /
+  // ``handleSearchGuess`` / ``consumeQueryParam`` so the right sidebar
+  // keeps re-grounding on the original seed rather than the merged
+  // composite.
+  if (!/\s+OR\s+/i.test(searchContent.query)) {
+    originalTopic.value = searchContent.query.trim()
   }
   const loading = ElLoading.service({
     lock: true,
@@ -206,15 +254,30 @@ const search = (): void => {
   // the same fallback we use for the backend ``q`` parameter so the
   // suggestion is always grounded in real topic words rather than syntax
   // noise like ``AU="..."`` or ``PY=2023-2026``.
+  //
+  // Prefer ``originalTopic`` (captured in ``handleAiSearchPick`` and on
+  // direct text searches) over ``baseParams.q`` so that a query string
+  // like ``time series agent OR (...)`` doesn't get fed back into the
+  // LLM as the seed prompt — which used to return offline-RL drift.
   const suggestSeed =
-    typeof baseParams.q === 'string' && baseParams.q.trim()
+    (originalTopic.value && originalTopic.value.trim()) ||
+    (typeof baseParams.q === 'string' && baseParams.q.trim()
       ? baseParams.q.trim()
-      : ''
+      : '')
   if (suggestSeed) {
     guessLoading.value = true
-    suggestKeywords(suggestSeed)
+    guessList.value = []
+    guessProviderLabel.value = ''
+    const payload = toApiPayload(loadAiSettings(), loadApiKey())
+    suggestKeywordsWithSettings(suggestSeed, payload)
       .then(res => {
         guessList.value = res.keywords || []
+        if (res.provider && res.model) {
+          guessProviderLabel.value = t('guess.provider', {
+            provider: `${res.provider} · ${res.model}`,
+            ms: String(res.timecost_ms ?? 0)
+          })
+        }
       })
       .catch(err => {
         console.error(err)
@@ -261,6 +324,36 @@ const onToggleRefineMode = (val: string | number | boolean): void => {
 
 const handleSearchGuess = (data: string): void => {
   searchContent.query = data
+  // Treat a single-click "search this only" replacement as a fresh topic
+  // so the right panel re-grounds against the new query rather than the
+  // previous one.
+  originalTopic.value = data
+  search()
+}
+
+const handleSearchGuessMany = (picked: string[]): void => {
+  if (!picked.length) return
+  searchContent.query = buildOrMerge(searchContent.query, picked)
+  search()
+}
+
+const handleAiSearchPick = (payload: {
+  query: string
+  rerank: boolean
+  seed: string
+}): void => {
+  // P3-B wires the OR-merged query from the hero dialog. P3-C will also
+  // honour the ``rerank`` flag here to drive the new ``aiRerankEnabled``
+  // toggle; for now we only persist the query and re-run.
+  //
+  // The dialog hands back the *original* seed (the free-text topic the
+  // user typed into the dialog before any keyword merge) so we can pin
+  // ``originalTopic`` to that seed. The right-sidebar Guess panel will
+  // then use the seed instead of the OR-merged query on its own
+  // suggestion call.
+  searchContent.query = payload.query
+  originalTopic.value = payload.seed
+  aiDialogOpen.value = false
   search()
 }
 
@@ -286,11 +379,14 @@ const isDark = useDark()
 const toggleDark = useToggle(isDark)
 
 // Accept ``?q=...`` from the Advanced Search page (or a shared link) and
-// run the search immediately so users land on results directly.
+// run the search immediately so users land on results directly. Treat the
+// incoming query as the original topic so the right panel re-grounds on
+// it instead of any URL-derived noise.
 const consumeQueryParam = (): void => {
   const q = route.query.q
   if (typeof q === 'string' && q.trim()) {
     searchContent.query = q
+    originalTopic.value = q
     search()
   }
 }
@@ -350,12 +446,25 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!-- AI 搜索入口：和 hero 主搜索框同一行，opt-in 不会改变现有体验 -->
+        <div class="pv-hero-ai-row">
+          <el-button class="pv-hero-ai-btn" plain @click="aiDialogOpen = true">
+            <el-icon><MagicStick /></el-icon>
+            <span>{{ t('search.aiSearch.button') }}</span>
+          </el-button>
+          <span class="pv-hero-ai-hint">{{ t('search.aiSearch.hint') }}</span>
+        </div>
+        <AiSearchDialog
+          v-model:visible="aiDialogOpen"
+          @pick="handleAiSearchPick"
+        />
+
         <!-- 搜索框下方的轻量跳转提示（对齐 WoS） -->
         <p class="pv-hero-hint">
           {{ t('search.heroHint')
-          }}<a class="pv-hero-hint-link" @click="goAdvanced">{{
+          }}<router-link to="/advanced" class="pv-hero-hint-link">{{
             t('search.heroHintLink')
-          }}</a
+          }}</router-link
           >{{ t('search.heroHintTail') }}
         </p>
 
@@ -393,7 +502,7 @@ onMounted(async () => {
     <template v-else>
       <header class="pv-topbar">
         <div class="pv-container pv-topbar-inner">
-          <a class="brand" href="/">{{ t('app.title') }}</a>
+          <router-link to="/" class="brand">{{ t('app.title') }}</router-link>
           <el-input
             v-if="!refineInResults"
             v-model="searchContent.query"
@@ -498,10 +607,16 @@ onMounted(async () => {
           />
         </div>
         <aside class="pv-side pv-side-right">
-          <GuessYourLike
+          <AiSuggestPanel
+            :keywords="guessList"
             :loading="guessLoading"
-            :result="guessList"
-            @search-guess="handleSearchGuess"
+            :title="t('guess.header')"
+            :provider-label="guessProviderLabel"
+            :empty-text="t('guess.empty')"
+            :single-replace-text="t('guess.replace')"
+            :merge-button-text="t('guess.merge')"
+            @pick-many="handleSearchGuessMany"
+            @replace="handleSearchGuess"
           />
         </aside>
       </section>
@@ -654,6 +769,24 @@ onMounted(async () => {
 .pv-hero-searchbox-btn:hover {
   background: var(--el-color-primary-dark-2, #5847c0);
   transform: scale(1.04);
+}
+
+/* 搜索框下方的轻量 AI 入口：与 hero hint 同一视觉权重 */
+.pv-hero-ai-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px auto 0;
+  max-width: 720px;
+}
+.pv-hero-ai-btn :deep(.el-icon) {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.pv-hero-ai-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
 }
 
 .pv-hero-hint {

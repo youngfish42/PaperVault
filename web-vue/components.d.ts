@@ -7,6 +7,8 @@ export {}
 
 declare module '@vue/runtime-core' {
   export interface GlobalComponents {
+    AiSearchDialog: typeof import('./src/components/AiSearchDialog.vue')['default']
+    AiSuggestPanel: typeof import('./src/components/AiSuggestPanel.vue')['default']
     AiSuggestSection: typeof import('./src/components/AiSuggestSection.vue')['default']
     ConfsTree: typeof import('./src/components/ConfsTree.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
@@ -14,8 +16,10 @@ declare module '@vue/runtime-core' {
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
+    ElCheckboxGroup: typeof import('element-plus/es')['ElCheckboxGroup']
     ElCheckTag: typeof import('element-plus/es')['ElCheckTag']
     ElCol: typeof import('element-plus/es')['ElCol']
+    ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDivider: typeof import('element-plus/es')['ElDivider']
     ElEmpty: typeof import('element-plus/es')['ElEmpty']
     ElForm: typeof import('element-plus/es')['ElForm']
@@ -34,7 +38,6 @@ declare module '@vue/runtime-core' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElTree: typeof import('element-plus/es')['ElTree']
-    GuessYourLike: typeof import('./src/components/GuessYourLike.vue')['default']
     MainNavBar: typeof import('./src/components/MainNavBar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
