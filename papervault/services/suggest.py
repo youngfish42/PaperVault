@@ -290,14 +290,14 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         # is told to invent one fresh concrete name from its own knowledge
         # of the topic.
         "  (2) ONE concrete model / framework / method name that is widely "
-        "cited in this topic's literature — pick a name fresh from your "
+        "cited in this topic's literature -- pick a name fresh from your "
         "own knowledge of the field, do not recycle the same two or three "
         "names every time;\n"
         "  (3) adjacent research subareas papers on this topic commonly "
-        "belong to — but ONLY subareas that share a core noun with the "
+        "belong to -- but ONLY subareas that share a core noun with the "
         "input topic;\n"
         "  (4) ONE dataset / benchmark name papers in this area are "
-        "evaluated on — again, pick a fresh one from your own knowledge.\n"
+        "evaluated on -- again, pick a fresh one from your own knowledge.\n"
         "\n"
         'BANNED: literal "X Y" word-salad of the original tokens stitched '
         'together (e.g. "Time Series Reinforcement Learning"). Repeating '
@@ -306,7 +306,7 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         "unrelated research community, even if it sounds adjacent.\n"
         "\n"
         # The BAD examples stay concrete (they show the model real
-        # failure modes — RL drift on a TS query is a recurring bug) but
+        # failure modes -- RL drift on a TS query is a recurring bug) but
         # the GOOD examples are now abstract placeholders. Listing
         # literal TS-LLM names as GOOD turns the prompt into a copycat
         # template; the model needs to be told the *shape* of a good
@@ -322,7 +322,7 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         "  GOOD <another on-topic phrase using different words, generic "
         "phrase, NOT a specific model/dataset name>\n"
         "  GOOD <one concrete model/framework name widely cited in this "
-        "area, fresh from your own knowledge — do NOT copy names from "
+        "area, fresh from your own knowledge -- do NOT copy names from "
         "other queries you've seen>\n"
         "  GOOD <one dataset/benchmark name from this area, also fresh>\n"
         "\n"
