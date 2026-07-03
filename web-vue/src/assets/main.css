@@ -3,6 +3,13 @@
 :root {
   --pv-max-width: 1600px;
   --pv-gutter: 16px;
+  /* Vertical offset applied to sticky elements that must sit below the
+     topbar (e.g. .pv-side, .pv-adv-cheatsheet). Includes the topbar's own
+     rendered height plus a small breathing gap. */
+  --pv-sticky-top: 70px;
+  /* Bottom breathing room reserved under a sticky sidebar so long content
+     (e.g. ConfsTree) does not butt up against the viewport bottom. */
+  --pv-side-bottom-gap: 20px;
 }
 
 #app {
