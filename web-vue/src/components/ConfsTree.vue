@@ -135,11 +135,11 @@ watch(lang, () => rebuild(props.data))
      dragging the page or hunting for a tiny custom-scrollbar. */
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - var(--pv-topbar-h) - var(--pv-side-gap));
-  max-height: calc(100dvh - var(--pv-topbar-h) - var(--pv-side-gap));
+  max-height: calc(100vh - var(--pv-sticky-top) - var(--pv-side-bottom-gap));
+  max-height: calc(100dvh - var(--pv-sticky-top) - var(--pv-side-bottom-gap));
   overflow: hidden;
 }
-.tree-card :deep(.el-card__body) {
+.tree-card > :deep(.el-card__body) {
   /* Element Plus wraps default-slot content in .el-card__body (a plain
      block by default). We need it to become a bounded flex column so the
      inner .tree-card-scroll actually receives a height and its

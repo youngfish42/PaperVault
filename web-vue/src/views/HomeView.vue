@@ -810,7 +810,7 @@ onMounted(async () => {
 }
 .pv-side {
   position: sticky;
-  top: var(--pv-topbar-h);
+  top: var(--pv-sticky-top);
 }
 @media (max-width: 1200px) {
   .pv-main {
