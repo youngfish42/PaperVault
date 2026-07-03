@@ -60,7 +60,7 @@ def call_openai_compatible(
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
-    create_kwargs: Dict[str, object] = {
+    create_kwargs: dict[str, object] = {
         "model": model,
         "messages": [
             {"role": "system", "content": system},

@@ -462,9 +462,9 @@ onMounted(async () => {
         <!-- 搜索框下方的轻量跳转提示（对齐 WoS） -->
         <p class="pv-hero-hint">
           {{ t('search.heroHint')
-          }}<a class="pv-hero-hint-link" @click="goAdvanced">{{
+          }}<router-link to="/advanced" class="pv-hero-hint-link">{{
             t('search.heroHintLink')
-          }}</a
+          }}</router-link
           >{{ t('search.heroHintTail') }}
         </p>
 
@@ -502,7 +502,7 @@ onMounted(async () => {
     <template v-else>
       <header class="pv-topbar">
         <div class="pv-container pv-topbar-inner">
-          <a class="brand" href="/">{{ t('app.title') }}</a>
+          <router-link to="/" class="brand">{{ t('app.title') }}</router-link>
           <el-input
             v-if="!refineInResults"
             v-model="searchContent.query"
