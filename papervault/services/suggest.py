@@ -52,6 +52,25 @@ class SuggestionResult:
 
 
 @dataclass(slots=True)
+class ProviderHints:
+    """Minimal subset of fields needed by :func:`_resolve_provider`.
+
+    Both ``services.suggest`` (via ``SuggestionRequest``) and
+    ``services.rerank`` feed dispatch through the same resolver. Rather
+    than have rerank build a ``SuggestionRequest`` with bogus
+    keyword-suggestion fields just to satisfy duck-typing, this lighter
+    dataclass captures exactly what the resolver reads: per-request
+    overrides for the five dispatch dimensions.
+    """
+
+    provider: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    protocol: Optional[str] = None
+
+
+@dataclass(slots=True)
 class SuggestionRequest:
     query: str
     provider: Optional[str] = None
@@ -119,8 +138,12 @@ def _first_non_empty(*values: Optional[str]) -> str:
     return ""
 
 
-def _resolve_provider(req: SuggestionRequest) -> _ResolvedProvider:
+def _resolve_provider(req) -> _ResolvedProvider:
     """Pick the preset and resolve all dispatch fields.
+
+    ``req`` must expose ``provider`` / ``base_url`` / ``model`` /
+    ``api_key`` / ``protocol`` attributes (either a
+    :class:`SuggestionRequest` or a :class:`ProviderHints`).
 
     Priority for each field (highest first):
 

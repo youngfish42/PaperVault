@@ -9,7 +9,7 @@
 
 import request from '@/utils/axios'
 import type { SuggestApiPayload } from '@/utils/aiSettings'
-import type { AiProviderPreset } from '@/constants/aiProviders'
+import type { AiProviderPreset, ProtocolKind } from '@/constants/aiProviders'
 
 export interface SuggestRequestBody {
   query: string
@@ -35,12 +35,55 @@ export interface ProviderListResponse {
   items: AiProviderPreset[]
 }
 
-export const listAiProviders = () =>
-  request<ProviderListResponse>({
+interface RawProviderPreset {
+  key?: string
+  label?: string
+  protocol?: string
+  base_url?: string
+  model?: string
+  note?: string
+  env_key_var?: string
+  env_base_var?: string
+  env_model_var?: string
+  requires_max_tokens?: boolean
+}
+
+interface RawProviderListResponse {
+  items?: RawProviderPreset[]
+}
+
+const PROTOCOL_VALUES: readonly ProtocolKind[] = [
+  'openai-compatible',
+  'anthropic'
+]
+
+const normalizeProtocol = (value: unknown): ProtocolKind =>
+  typeof value === 'string' && PROTOCOL_VALUES.includes(value as ProtocolKind)
+    ? (value as ProtocolKind)
+    : 'openai-compatible'
+
+const normalizeProviderPreset = (raw: RawProviderPreset): AiProviderPreset => ({
+  key: typeof raw.key === 'string' ? raw.key : '',
+  label: typeof raw.label === 'string' ? raw.label : '',
+  protocol: normalizeProtocol(raw.protocol),
+  baseUrl: typeof raw.base_url === 'string' ? raw.base_url : '',
+  model: typeof raw.model === 'string' ? raw.model : '',
+  note: typeof raw.note === 'string' ? raw.note : '',
+  envKeyVar: typeof raw.env_key_var === 'string' ? raw.env_key_var : '',
+  envBaseVar: typeof raw.env_base_var === 'string' ? raw.env_base_var : '',
+  envModelVar: typeof raw.env_model_var === 'string' ? raw.env_model_var : '',
+  requiresMaxTokens: Boolean(raw.requires_max_tokens)
+})
+
+export const listAiProviders = async (): Promise<ProviderListResponse> => {
+  const raw = await request<RawProviderListResponse>({
     url: '/v1/ai/providers',
     method: 'get',
     silent: true
   })
+  const items = Array.isArray(raw?.items) ? raw.items : []
+  return { items: items.map(normalizeProviderPreset) }
+}
 
 export const suggestKeywordsWithSettings = (
   query: string,

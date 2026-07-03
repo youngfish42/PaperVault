@@ -15,7 +15,7 @@
  * timing, and echoed model/provider. It never writes back to storage.
  */
 
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getAiProvidersInOrder,
@@ -82,12 +82,25 @@ watch(
   }
 )
 
+let savedTimer: number | null = null
+
 const flashSaved = (): void => {
   saved.value = true
-  setTimeout(() => {
+  if (savedTimer !== null) {
+    clearTimeout(savedTimer)
+  }
+  savedTimer = window.setTimeout(() => {
     saved.value = false
+    savedTimer = null
   }, 2000)
 }
+
+onBeforeUnmount(() => {
+  if (savedTimer !== null) {
+    clearTimeout(savedTimer)
+    savedTimer = null
+  }
+})
 
 const handleSave = (): void => {
   saveAiSettings(form)
