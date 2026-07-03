@@ -274,19 +274,62 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
         "a researcher would type into an academic CS paper search engine "
         "(NeurIPS, ICML, ICLR, KDD, AAAI, ACL, EMNLP and similar).\n"
         "\n"
-        "Mix ALL FOUR kinds across the list:\n"
-        "  (1) synonymous reformulations of the topic;\n"
-        "  (2) concrete model / framework / method names cited by papers "
-        'in this area (e.g. "ReAct", "Lag-Llama", "Toolformer", "Voyager");\n'
-        "  (3) adjacent research subareas papers on this topic commonly "
-        "belong to;\n"
-        "  (4) dataset / benchmark names such papers are evaluated on.\n"
+        "TOPIC ANCHOR (mandatory): every keyword must stay inside the same "
+        "research community as the input topic. At least one *core noun* "
+        "from the original topic must appear in (or be directly implied by) "
+        "every keyword you output. If a candidate keyword would drop the "
+        "topic's central object / method / data type, drop it instead.\n"
         "\n"
-        'Do NOT generate literal "X Y" word-salad of the original tokens '
-        'stitched together (e.g. "Time Series Reinforcement Learning"). '
-        "Do NOT repeat the topic verbatim, do NOT use generic filler "
-        '("machine learning" / "deep learning"), do NOT use marketing '
-        "buzzwords.\n"
+        "Mix ALL FOUR kinds across the list, but every item must clear the "
+        "topic-anchor test above:\n"
+        "  (1) synonymous reformulations of the topic;\n"
+        # Category (2) deliberately does NOT enumerate real model names for
+        # the model's topic: doing so turns the prompt into a few-shot
+        # template that the LLM copies verbatim, so every time-series query
+        # ends up suggesting the same handful of TS-LLMs. Instead, the model
+        # is told to invent one fresh concrete name from its own knowledge
+        # of the topic.
+        "  (2) ONE concrete model / framework / method name that is widely "
+        "cited in this topic's literature -- pick a name fresh from your "
+        "own knowledge of the field, do not recycle the same two or three "
+        "names every time;\n"
+        "  (3) adjacent research subareas papers on this topic commonly "
+        "belong to -- but ONLY subareas that share a core noun with the "
+        "input topic;\n"
+        "  (4) ONE dataset / benchmark name papers in this area are "
+        "evaluated on -- again, pick a fresh one from your own knowledge.\n"
+        "Budget rule: categories (2) and (4) are pinned at ONE entry "
+        "each. Distribute the remaining N-2 entries roughly evenly "
+        "between categories (1) and (3). If N is small (N<=2), skip (1) "
+        "and (3) and keep only (2) and (4).\n"
+        "\n"
+        'BANNED: literal "X Y" word-salad of the original tokens stitched '
+        'together (e.g. "Time Series Reinforcement Learning"). Repeating '
+        'the topic verbatim. Generic filler ("machine learning" / '
+        '"deep learning"). Marketing buzzwords. AND any keyword from an '
+        "unrelated research community, even if it sounds adjacent.\n"
+        "\n"
+        # The BAD examples stay concrete (they show the model real
+        # failure modes -- RL drift on a TS query is a recurring bug) but
+        # the GOOD examples are now abstract placeholders. Listing
+        # literal TS-LLM names as GOOD turns the prompt into a copycat
+        # template; the model needs to be told the *shape* of a good
+        # answer, then generate the actual names itself.
+        "BAD vs GOOD example for input \"time series agent\":\n"
+        "  BAD  \"Decision Transformer\"        -> RL sequence model, "
+        "no time-series noun\n"
+        "  BAD  \"offline reinforcement learning\" -> RL family, off-topic\n"
+        "  BAD  \"Trajectory Transformer\"       -> trajectory = RL, "
+        "off-topic\n"
+        "  GOOD <one on-topic rephrasing using different words that keeps "
+        "the topic's core noun -- a generic phrase, NOT a specific "
+        "model/dataset name>\n"
+        "  GOOD <another on-topic phrase using different words, generic "
+        "phrase, NOT a specific model/dataset name>\n"
+        "  GOOD <one concrete model/framework name widely cited in this "
+        "area, fresh from your own knowledge -- do NOT copy names from "
+        "other queries you've seen>\n"
+        "  GOOD <one dataset/benchmark name from this area, also fresh>\n"
         "\n"
         "Output: only JSON {\"keywords\":[...]} with EXACTLY N entries "
         "(N given in the user message). Each entry 1-6 words. Any 2+ word "
@@ -296,7 +339,8 @@ def _build_prompt(query: str, max_keywords: int) -> Tuple[str, str]:
     )
     user = (
         f'Research topic: "{query}"\n'
-        f"Return exactly {max_keywords} keywords."
+        f"Return exactly {max_keywords} keywords, each anchored to the "
+        "topic's core nouns."
     )
     return system, user
 
@@ -360,12 +404,36 @@ def _extract_keywords(content: str, max_keywords: int) -> List[str]:
     payload = fenced.group(1) if fenced else content
     try:
         parsed = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        logger.warning("Cannot parse keyword JSON: %s | content=%r", exc, content[:200])
-        raise UpstreamError(
-            "Suggestion provider returned non-JSON output.",
-            code="LLM_BAD_JSON",
-        )
+    except json.JSONDecodeError:
+        # v2 prompt asks for "only JSON, no fences", but providers whose
+        # json_mode flag was rejected by the fallback path (see
+        # ai_clients.call_openai_compatible) may still return prose like
+        # ``Sure! {"keywords": [...]}``. Strip everything before the first
+        # ``{`` and after the last ``}`` and try once more before giving up.
+        start = payload.find("{")
+        end = payload.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                parsed = json.loads(payload[start : end + 1])
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    "Cannot parse keyword JSON after brace-trim: %s | content=%r",
+                    exc,
+                    content[:200],
+                )
+                raise UpstreamError(
+                    "Suggestion provider returned non-JSON output.",
+                    code="LLM_BAD_JSON",
+                )
+        else:
+            logger.warning(
+                "Cannot parse keyword JSON: no JSON object braces | content=%r",
+                content[:200],
+            )
+            raise UpstreamError(
+                "Suggestion provider returned non-JSON output.",
+                code="LLM_BAD_JSON",
+            )
 
     keywords = parsed.get("keywords") if isinstance(parsed, dict) else None
     if not isinstance(keywords, list):
@@ -373,4 +441,25 @@ def _extract_keywords(content: str, max_keywords: int) -> List[str]:
             "Suggestion provider returned no keywords.",
             code="LLM_NO_KEYWORDS",
         )
-    return [str(k) for k in keywords][:max_keywords]
+    # Defensive: an off-spec provider may return empty strings, whitespace,
+    # or a stringified ``None`` (via ``str(k)``). Downstream OR-merge and
+    # UI chips would then render blank tokens. Strip + drop empties so the
+    # short-return warning below reflects usable keywords, not raw count.
+    result: List[str] = []
+    for k in keywords:
+        s = str(k).strip()
+        if s and s.lower() != "none":
+            result.append(s)
+        if len(result) >= max_keywords:
+            break
+    if len(result) < max_keywords:
+        # The prompt asks for EXACTLY N entries; if the provider dropped
+        # candidates (typically because the topic-anchor rule filtered
+        # them) we surface a warning so operators can spot systematic
+        # under-return without failing the request.
+        logger.warning(
+            "Suggestion provider returned %d/%d keywords",
+            len(result),
+            max_keywords,
+        )
+    return result
