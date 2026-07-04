@@ -10,8 +10,8 @@ env:
 
 on:
   schedule:
-    # 每月 1 号 00:00 (UTC) 运行一次，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）
-    - cron: "0 0 1 * *"
+    # 每 6 小时运行一次 (UTC 00:00 / 06:00 / 12:00 / 18:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）
+    - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
       target_conf:
