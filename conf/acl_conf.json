@@ -425,6 +425,11 @@
         "url": "https://aclanthology.org/volumes/2026.findings-acl/"
     },
     {
+        "name": "ACL2026",
+        "tag": "^2026.acl*",
+        "url": "https://aclanthology.org/events/acl-2026/"
+    },
+    {
         "name": "EMNLP2024",
         "tag": "^2024.emnlp*",
         "url": "https://aclanthology.org/events/emnlp-2024/"
