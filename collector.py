@@ -987,7 +987,28 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                 continue
             if _is_timeout():
                 break
+            before = len(res.get(name, []))
             res = search_from_acl(url, tag, name, res)
+            after = len(res.get(name, []))
+            if after == before:
+                # 本次 (url, tag) 迭代一篇都没抓到。绝大多数情况下这意味着 tag
+                # 与 Anthology 页面上的 href 命名不匹配（例如 auto-discover 给
+                # 2020+ 的新格式误生成了 ^Xyy-* 形式的老 tag）。以前这种情况
+                # 会被静默吞掉：progress 里写入 ACL::{url} 之后，cache-count
+                # gate 又判 cache 无增量 → 直接跳过 PR。这里显式告警并追加软
+                # 失败，让 workflow 摘要 / 人工排查能立刻看到。
+                msg = (
+                    f"[!] ACL '{name}' matched 0 papers for tag={tag!r} at {url}. "
+                    "Suspect tag/href mismatch (e.g. legacy ^Xyy-* tag against "
+                    "modern /{year}.{venue}-{track}.N/ hrefs)."
+                )
+                print(msg)
+                failures.append({
+                    "source": "ACL",
+                    "name": name,
+                    "url": url,
+                    "error": f"empty result for tag={tag!r}",
+                })
             progress[f"ACL::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
             _save_state()
         except Exception as e:
