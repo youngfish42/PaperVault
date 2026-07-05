@@ -451,7 +451,6 @@ def test_collect_does_not_legacy_skip_findings_when_main_already_in_cache(
         ]
     }
 
-    original_json_load = _json.load
 
     def fake_json_load(fp, *args, **kwargs):  # noqa: ARG001
         name = getattr(fp, "name", "")
