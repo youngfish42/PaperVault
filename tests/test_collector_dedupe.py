@@ -423,7 +423,6 @@ def test_collect_does_not_legacy_skip_findings_when_main_already_in_cache(
     exactly the behaviour Actions run #34 reproduced on origin/main.
     """
 
-    import json as _json
 
     # Two ACL confs sharing the same ``name``, pointing at distinct URLs.
     acl_conf = [
