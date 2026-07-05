@@ -525,7 +525,6 @@ def test_collect_multi_volume_acl_names_heals_legacy_progress_entry(
     multi-entry ACL name, the next run must scrub that marker and re-collect
     instead of honouring it forever."""
 
-    import json as _json
 
     acl_conf = [
         {
