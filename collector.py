@@ -614,16 +614,45 @@ def _parse_acl_volume(volume_url: str, tag: str, name: str, res: dict):
     return res
 
 
+_ACL_VOLUME_DIR_RE = re.compile(r"^/volumes/[A-Za-z0-9._-]+/$")
+
+
+def _is_acl_volume_entry(url: str) -> bool:
+    """入口 URL 是否已经指向一个具体的 volume 页 (/volumes/XXX/)。
+
+    findings-acl / findings-emnlp / … 这些 conf 记录直接用 volume 页作入口，
+    此时不应再枚举页面内其它 /volumes/ 链接，否则会把 .bib/.enw/.xml 等元数据
+    下载链接（或页面上出现的相邻 volume）当作 volume 页去解析，导致 empty result。
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    return bool(parsed.path) and _ACL_VOLUME_DIR_RE.match(parsed.path) is not None
+
+
 def search_from_acl(url, tag, name, res):
-    """解析 ACL Anthology events 页面，自动跳转各 volume"""
-    r = SESSION.get(url, headers=HEADERS)
-    soup = BeautifulSoup(r.text, "html.parser")
+    """解析 ACL Anthology events / volume 页面。
+
+    - 入口是 events 页 (``/events/xxx-YYYY/``)：枚举页面内的 /volumes/XXX/ 子页
+      分别解析。
+    - 入口本身就是 volume 页 (``/volumes/XXX/``)：直接解析当前页，不再枚举。
+      Anthology Hugo 模板下 volume 页面上出现的 /volumes/ 链接大多是
+      ``.bib/.enw/.xml`` 元数据下载或跨 volume 的横向导航，两者都不应作为
+      新的 volume 入口重新拉取。
+    """
     if name not in res:
         res[name] = []
 
-    # 提取所有 volume 链接（新版 events 页面结构）
+    if _is_acl_volume_entry(url):
+        return _parse_acl_volume(url, tag, name, res)
+
+    r = SESSION.get(url, headers=HEADERS)
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    # 提取所有 volume 目录链接（新版 events 页面结构）——只接受 /volumes/XXX/
+    # 目录形态，剔除 /volumes/XXX.bib、.enw、.xml、.pdf 等元数据下载。
     volume_links = set()
-    for a in soup.find_all("a", href=re.compile(r"/volumes/")):
+    for a in soup.find_all("a", href=re.compile(r"^/volumes/[A-Za-z0-9._-]+/$")):
         href = a["href"]
         if not href.startswith("http"):
             href = "https://aclanthology.org" + href
