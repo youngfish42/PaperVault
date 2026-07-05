@@ -172,9 +172,9 @@ class ACLDiscovery(BaseDiscovery):
                 stem_prefix = f"{year}.{venue_id}"
                 filtered = {s: c for s, c in modern_stem_counts.items()
                             if s == stem_prefix or s.startswith(f"{stem_prefix}-")}
-                if filtered:
-                    modern_stem_counts = filtered
-
+                if not filtered:
+                    return ""
+                modern_stem_counts = filtered
             # 优先剔除明显是 workshop / co-located 的 stem（比如 2024.acl-ws / *-workshop）
             non_ws = {s: c for s, c in modern_stem_counts.items()
                       if not (s.endswith("-ws") or "-workshop" in s or ".ws" in s)}
