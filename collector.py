@@ -997,6 +997,10 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                 # 会被静默吞掉：progress 里写入 ACL::{url} 之后，cache-count
                 # gate 又判 cache 无增量 → 直接跳过 PR。这里显式告警并追加软
                 # 失败，让 workflow 摘要 / 人工排查能立刻看到。
+                #
+                # 关键：此分支**不**写 progress。如果写入，_should_skip 会在
+                # 下次运行时立刻命中此 key 而永久跳过；即便 discover 已把 tag
+                # 从 ^P26-* 修正为 ^2026.acl*，也永远不会重新抓取。
                 msg = (
                     f"[!] ACL '{name}' matched 0 papers for tag={tag!r} at {url}. "
                     "Suspect tag/href mismatch (e.g. legacy ^Xyy-* tag against "
@@ -1009,7 +1013,8 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                     "url": url,
                     "error": f"empty result for tag={tag!r}",
                 })
-            progress[f"ACL::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            else:
+                progress[f"ACL::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
             _save_state()
         except Exception as e:
             print(f"[!] Failed to collect ACL '{conf.get('name', 'unknown')}': {e}")

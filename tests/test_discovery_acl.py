@@ -218,3 +218,143 @@ def test_discover_rewrites_main_conf_when_only_findings_entry_survived(
     # Findings must NOT be duplicated (URL already present in `existing`).
     assert not any(r["url"] == findings_page for r in results), \
         f"findings duplicated in results: {results!r}"
+
+
+# ---------------------------------------------------------------------------
+# 6. Single-track modern page — pins the _longest_common_prefix degeneracy fix.
+# ---------------------------------------------------------------------------
+
+def test_detect_event_prefix_modern_single_track_still_collapses_to_venue():
+    """When an event page exposes only ONE modern track (e.g. `/2026.acl-long.N/`
+    but short/demo/srw haven't been published yet), the detected tag body MUST
+    still collapse to `2026.acl`, NOT the single-track stem `2026.acl-long`.
+
+    Regression pin for the `_longest_common_prefix([single]) → full string`
+    degeneracy, which would otherwise emit an overly narrow `^2026.acl-long*`
+    tag that misses volumes uploaded later.
+    """
+    event_url = "https://aclanthology.org/events/acl-2026/"
+    html = _modern_event_html(2026, "acl", tracks=("long",))  # only one track
+    disc = _FakeACLDiscovery({event_url: html})
+
+    body = disc._detect_event_prefix(event_url, venue_id="acl", year=2026)
+    assert body == "2026.acl", (
+        f"single-track detection must collapse to '2026.acl', got {body!r}"
+    )
+    assert _tag_for(body) == "^2026.acl*"
+
+
+# ---------------------------------------------------------------------------
+# 7. URL normalization on existing_urls — pins the _canon_url dedup fix.
+# ---------------------------------------------------------------------------
+
+def test_discover_dedupes_across_url_variants(monkeypatch: pytest.MonkeyPatch):
+    """`_canon_url` should let discovery recognise that a hand-edited
+    `conf/acl_conf.json` entry with an alternative URL form (no trailing
+    slash, `http://` scheme, mixed-case host) is equivalent to the freshly
+    discovered canonical URL, and therefore must NOT re-emit a duplicate
+    main-conf entry.
+    """
+    venue_page = "https://aclanthology.org/venues/acl/"
+    event_page = "https://aclanthology.org/events/acl-2025/"
+
+    venue_html = (
+        '<html><body>'
+        f'<a href="/events/acl-2025/">ACL 2025</a>'
+        '</body></html>'
+    )
+    # Existing entry with a de-canonical URL variant (no trailing slash,
+    # mixed-case host). Under the old identity-string dedup this would look
+    # different and cause a duplicate re-emit.
+    existing = [
+        {
+            "name": "ACL2025",
+            "tag": "^2025.acl*",
+            "url": "https://ACLAnthology.org/events/acl-2025",
+        }
+    ]
+    disc = _FakeACLDiscovery(
+        url_to_text={
+            venue_page: venue_html,
+            event_page: _modern_event_html(2025, "acl"),
+        },
+        head_ok_urls=set(),
+        existing_conf=existing,
+    )
+    monkeypatch.setattr("discovery.acl.CORE_VENUES", {"acl": "ACL"})
+
+    results = disc.discover(2025, 2025)
+    # No duplicate main-conf entry for the same canonical event URL.
+    assert not any(r["url"] == event_page for r in results), (
+        f"main-conf duplicated across URL variants: {results!r}"
+    )
+
+
+def test_canon_url_normalizes_case_and_trailing_slash():
+    """`_canon_url` must equate the four hand-edit friendly variants."""
+    canon = "https://aclanthology.org/events/acl-2026"
+    assert ACLDiscovery._canon_url("https://aclanthology.org/events/acl-2026/") == canon
+    assert ACLDiscovery._canon_url("https://ACLAnthology.org/events/acl-2026/") == canon
+    assert ACLDiscovery._canon_url("  https://aclanthology.org/events/acl-2026  ") == canon
+    assert ACLDiscovery._canon_url(None) == ""
+
+
+# ---------------------------------------------------------------------------
+# 8. Collector-side: zero-result soft-failure MUST NOT write progress.
+# ---------------------------------------------------------------------------
+
+def test_collector_acl_loop_gates_progress_write_on_nonzero_delta():
+    """Structural pin: in the ACL collection loop in `collector.py`,
+    the `progress[f"ACL::{url}"] = {...}` write MUST live under the `else`
+    branch of `if after == before:`, not at the same indent level as the
+    `if`/`else`.
+
+    Rationale: if the write escapes the `else`, the zero-result soft-failure
+    path stamps progress unconditionally and `_should_skip` will then skip
+    the URL on every subsequent run — silently defeating the tag fix on the
+    discovery side.
+
+    A behavioural test would need to reload the entire `collect()` pipeline
+    (which reads `conf/*.json` directly, runs `_save_state`'s 5-second
+    debounce, calls `_merge_with_cache` and `add_code_links`, and depends
+    on HF sync). A focused source-shape assertion is the cheapest and most
+    stable regression pin for this specific bug.
+    """
+    from pathlib import Path
+    import re
+
+    collector_src = Path(__file__).resolve().parent.parent / "collector.py"
+    text = collector_src.read_text(encoding="utf-8")
+
+    # Locate the ACL loop block and its `if after == before:` branch.
+    m = re.search(
+        r"for conf in tqdm\(acl_conf,.*?\n"
+        r"(?P<block>(?:.*\n){1,80}?)"
+        r"        except Exception as e:\n",
+        text,
+    )
+    assert m, "could not locate ACL collection loop in collector.py"
+    block = m.group("block")
+
+    # The progress-write line must appear indented one level deeper than
+    # the `if after == before:` guard — i.e. under `else:`, not at the
+    # `if`/`else` indent.
+    assert re.search(
+        r"^            else:\n\s+progress\[f\"ACL::\{url\}\"\]",
+        block,
+        re.MULTILINE,
+    ), (
+        "collector.py ACL loop must write progress[f'ACL::{url}'] under an "
+        "`else:` branch of `if after == before:`; got block:\n" + block
+    )
+
+    # And it must NOT appear at the outer indent level (which would mean it
+    # runs on the zero-result path too).
+    assert not re.search(
+        r"^            progress\[f\"ACL::\{url\}\"\]",
+        block,
+        re.MULTILINE,
+    ), (
+        "progress write must be gated by `else:`, but found it at outer "
+        "indent (would run on zero-result path):\n" + block
+    )

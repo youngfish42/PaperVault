@@ -43,13 +43,28 @@ def _tag_for(prefix: str) -> str:
 
 
 class ACLDiscovery(BaseDiscovery):
+    @staticmethod
+    def _canon_url(url: str) -> str:
+        """规范化 URL，用于跨源合并的稳健去重。
+
+        Anthology 站点内部的 URL 都由 :func:`urljoin` 从同一 canonical base 构造，
+        差异极少；但是人工维护 ``conf/acl_conf.json`` 时可能留下 ``http://`` /
+        无尾斜杠 / 混合大小写 host 等变体，导致 ``existing_urls`` 去重集合无法
+        识别这些等价条目。这里做最小归一化：strip / rstrip trailing '/' / lower-case。
+        """
+        return (url or "").strip().rstrip("/").lower()
+
     def discover(self, start_year: int, end_year: int) -> List[Dict[str, Any]]:
         results = []
         # 用 URL（而不是 name）来判断是否已存在——这与下游 merge_conf 的语义
         # 完全一致 (see [generate_conf.merge_conf](../../discovery/generate_conf.py#L83-L91))。
         # 用 name 去重会导致："只删了 ACL2026 主会那条错 tag、保留了 findings"
         # 之后主会 URL 因为同名的 findings 还在 existing 里而永远无法被重写。
-        existing_urls = {item.get("url") for item in self.existing if item.get("url")}
+        existing_urls = {
+            self._canon_url(item.get("url"))
+            for item in self.existing
+            if item.get("url")
+        }
 
         for venue_id, venue_name in CORE_VENUES.items():
             venue_url = f"https://aclanthology.org/venues/{venue_id}/"
@@ -75,7 +90,7 @@ class ACLDiscovery(BaseDiscovery):
 
             for year, event_url in sorted(event_links):
                 name = f"{venue_name}{year}"
-                main_seen = event_url in existing_urls
+                main_seen = self._canon_url(event_url) in existing_urls
 
                 if not main_seen:
                     # 探测该 event 页面实际使用的前缀
@@ -92,14 +107,14 @@ class ACLDiscovery(BaseDiscovery):
                             "url": event_url,
                         }
                     )
-                    existing_urls.add(event_url)
+                    existing_urls.add(self._canon_url(event_url))
 
                 # Findings（2020 年后部分会议有 findings）——独立判断 URL，
                 # 让 findings 缺失时也能单独补齐。
                 findings_url = (
                     f"https://aclanthology.org/volumes/{year}.findings-{venue_id}/"
                 )
-                if findings_url in existing_urls:
+                if self._canon_url(findings_url) in existing_urls:
                     continue
                 if self._head_ok(findings_url):
                     # 与现有行为保持一致：findings 合并到同名会议
@@ -110,7 +125,7 @@ class ACLDiscovery(BaseDiscovery):
                             "url": findings_url,
                         }
                     )
-                    existing_urls.add(findings_url)
+                    existing_urls.add(self._canon_url(findings_url))
 
         return results
 
@@ -160,9 +175,20 @@ class ACLDiscovery(BaseDiscovery):
             # 收敛到该 venue 的公共前缀：拿到所有以 "{year}.{venue_id}" 开头的 stem
             # 的最长公共前缀。对 ACL2026 会得到 "2026.acl-"，去掉尾部 '-' 后就是 "2026.acl"，
             # 与人工维护的 ^2024.acl* / ^2025.acl* 等 tag 完全一致。
+            #
+            # 边界处理：当 same_venue 只有一个元素（例如 event 页面在探测时段
+            # 只暴露了单一 track，如 /2026.acl-long.N/ 尚未上线短论文），
+            # _longest_common_prefix(["2026.acl-long"]) 会返回完整字符串
+            # "2026.acl-long"，其末字符 'g' 不会被 rstrip("-") 剥掉，最终生成
+            # 过窄的 tag ^2026.acl-long*，漏掉后续上线的 short/demo/srw。
+            # 因此：当 venue_id / year 均已知时，直接返回 "{year}.{venue_id}"，
+            # 与 _fallback_prefix 的现代格式规则保持一致，让单-track 和多-track
+            # 走同一条稳定路径。
             same_venue = [s for s in pool
                           if venue_id and s.startswith(f"{year}.{venue_id}")]
-            if same_venue:
+            if same_venue and venue_id and year:
+                common = f"{year}.{venue_id}"
+            elif same_venue:
                 common = _longest_common_prefix(same_venue).rstrip("-")
             else:
                 common = best_stem.rstrip("-")
