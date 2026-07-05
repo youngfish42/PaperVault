@@ -971,6 +971,15 @@ def collect(cache_file=None, force=False, soft_timeout=None):
     multi_volume_dblp_names = {
         name for name, count in dblp_name_counter.items() if count > 1
     }
+    # 同一 ACL name（例如 ACL2026）常被拆成 events 主页 + findings volume 两条
+    # 独立 conf。legacy-skip（cache 中已存在此 name → 直接标 legacy 跳过）会误
+    # 伤第二条条目：主会先入库后，findings volume 永远进不来。这里收集所有出
+    # 现多次的 ACL name，让 _should_skip 对这些 name 放行，改由 progress 里的
+    # 每 (source, url) key 独立追踪各入口是否已完成。
+    acl_name_counter = Counter(conf["name"] for conf in acl_conf if conf.get("name"))
+    multi_volume_acl_names = {
+        name for name, count in acl_name_counter.items() if count > 1
+    }
 
     start_time = time.time()
     collected_dblp_names = set()
@@ -1001,10 +1010,20 @@ def collect(cache_file=None, force=False, soft_timeout=None):
         if force:
             return False
         key = f"{source}::{url}"
+        # 多入口 ACL 会议（例如 ACL2026 events + findings volume）之前可能
+        # 已经被误标 legacy 写进 progress，导致后续 workflow 永远跳过第二
+        # 条入口。这里主动清理这类残留 legacy 记录，让下一次运行自愈。
+        if source == "ACL" and name in multi_volume_acl_names:
+            existing = progress.get(key)
+            if isinstance(existing, dict) and existing.get("legacy"):
+                progress.pop(key, None)
         if key in progress:
             return True
         if name in cache_conf:
             if source == "DBLP" and name in multi_volume_dblp_names:
+                return False
+            if source == "ACL" and name in multi_volume_acl_names:
+                # 多入口 ACL 会议不写 legacy progress，交给具体 URL 各自跑一遍。
                 return False
             progress[key] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "legacy": True}
             return True
