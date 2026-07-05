@@ -565,9 +565,32 @@ def test_collect_multi_volume_acl_names_heals_legacy_progress_entry(
     monkeypatch.setattr("collector.json.load", fake_json_load)
     monkeypatch.setattr(collector, "load_cache", lambda _p: cache_res)
     monkeypatch.setattr(collector, "load_collect_progress", lambda: dict(stale_progress))
-    monkeypatch.setattr(collector, "save_collect_progress", lambda _p: None)
-    monkeypatch.setattr(collector, "save_cache", lambda *a, **k: None)
+    saved_progress_snapshots: List[Dict[str, Any]] = []
+
+    def _capture_progress(p):
+        saved_progress_snapshots.append({k: (v.copy() if isinstance(v, dict) else v) for k, v in p.items()})
+
+    monkeypatch.setattr(collector, "save_collect_progress", _capture_progress)
+
+    def _stub_save_cache(path, _payload):
+        # Real ``save_cache`` writes gzip so ``os.replace`` can move it into
+        # place. Since we don't care about the on-disk artefact here, just
+        # touch the tmp path so ``os.replace`` inside ``_save_state`` does
+        # not raise WinError 2 and abort the ACL loop early.
+        open(path, "wb").close()
+
+    monkeypatch.setattr(collector, "save_cache", _stub_save_cache)
     monkeypatch.setattr(collector, "ensure_cache_local", lambda *a, **k: None)
+    # Bypass the 5s throttle inside ``_save_state`` so every conf iteration
+    # actually persists progress. Without this, only the first save fires
+    # and we cannot observe the post-fix state of the findings URL entry.
+    _fake_clock = {"t": 0.0}
+
+    def _tick():
+        _fake_clock["t"] += 10.0
+        return _fake_clock["t"]
+
+    monkeypatch.setattr(collector.time, "time", _tick)
     monkeypatch.setattr(collector, "COLLECT_FAILURES_FILE", str(tmp_path / "failures.json"))
     monkeypatch.setattr(collector, "search_from_iclr", lambda url, name, res: res)
     monkeypatch.setattr(collector, "search_from_thecvf", lambda url, name, res: res)
@@ -590,4 +613,23 @@ def test_collect_multi_volume_acl_names_heals_legacy_progress_entry(
     assert "https://aclanthology.org/2026.findings-acl.1/" in urls, (
         "stale ``legacy: True`` progress entry for a multi-entry ACL name "
         "must be scrubbed and the URL re-collected on the next run."
+    )
+
+    # Directly observe the self-heal: after ``collect()`` finishes, the stale
+    # ``legacy: True`` marker for the findings URL must be gone from the
+    # persisted progress. It is fine for intermediate snapshots to still
+    # carry the marker (``_save_state`` fires between the events entry and
+    # the findings entry, i.e. before ``_should_skip`` sees the findings
+    # URL and pops the stale key). What matters is that the FINAL persisted
+    # state no longer honours the legacy marker, so the next workflow run
+    # will re-collect. This pins the pop() branch in ``_should_skip`` — a
+    # future regression that keeps the guard-return but drops the pop()
+    # would still be caught here because the final snapshot would then
+    # retain the ``legacy: True`` entry unchanged.
+    findings_key = "ACL::https://aclanthology.org/volumes/2026.findings-acl/"
+    assert saved_progress_snapshots, "collect() must call save_collect_progress at least once"
+    final_snap = saved_progress_snapshots[-1]
+    final_entry = final_snap.get(findings_key)
+    assert not (isinstance(final_entry, dict) and final_entry.get("legacy")), (
+        f"stale legacy marker persisted after collect(): {final_entry!r}"
     )
