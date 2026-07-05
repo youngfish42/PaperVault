@@ -55,9 +55,13 @@ class ACLDiscovery(BaseDiscovery):
         Anthology 站点内部的 URL 都由 :func:`urljoin` 从同一 canonical base 构造，
         差异极少；但是人工维护 ``conf/acl_conf.json`` 时可能留下 ``http://`` /
         无尾斜杠 / 混合大小写 host 等变体，导致 ``existing_urls`` 去重集合无法
-        识别这些等价条目。这里做最小归一化：strip / rstrip trailing '/' / lower-case。
+        识别这些等价条目。这里做最小归一化：strip / rstrip trailing '/' / lower-case，
+        并将 http 统一为 https。
         """
-        return (url or "").strip().rstrip("/").lower()
+        u = (url or "").strip().rstrip("/")
+        if u.lower().startswith("http://"):
+            u = "https://" + u[7:]
+        return u.lower()
 
     def discover(self, start_year: int, end_year: int) -> List[Dict[str, Any]]:
         results = []
