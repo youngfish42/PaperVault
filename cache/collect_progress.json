@@ -21500,6 +21500,15 @@
       "name": "NIPS2025",
       "ts": "2026-06-13T13:29:35",
       "legacy": true
+    },
+    "ACL::https://aclanthology.org/events/acl-2026/": {
+      "name": "ACL2026",
+      "ts": "2026-07-05T22:40:09"
+    },
+    "DBLP::https://dblp.org/db/conf/stoc/stoc2026.html": {
+      "name": "STOC2026",
+      "ts": "2026-07-05T22:42:33",
+      "legacy": true
     }
   }
 }
