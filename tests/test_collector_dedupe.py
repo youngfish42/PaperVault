@@ -488,7 +488,11 @@ def test_collect_does_not_legacy_skip_findings_when_main_already_in_cache(
     monkeypatch.setattr(collector, "load_cache", lambda _p: cache_res)
     monkeypatch.setattr(collector, "load_collect_progress", lambda: {})
     monkeypatch.setattr(collector, "save_collect_progress", lambda _p: None)
-    monkeypatch.setattr(collector, "save_cache", lambda *a, **k: None)
+
+    def _stub_save_cache(path, _payload):
+        open(path, "wb").close()
+
+    monkeypatch.setattr(collector, "save_cache", _stub_save_cache)
     monkeypatch.setattr(collector, "ensure_cache_local", lambda *a, **k: None)
     # Redirect the failures file to tmp so we don't touch the repo copy.
     monkeypatch.setattr(collector, "COLLECT_FAILURES_FILE", str(tmp_path / "failures.json"))
