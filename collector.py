@@ -3,7 +3,7 @@ import os
 import re
 import warnings
 from collections import Counter
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, urlparse
 import yaml
 import requests
 from requests.adapters import HTTPAdapter
@@ -615,18 +615,22 @@ def _parse_acl_volume(volume_url: str, tag: str, name: str, res: dict):
 
 
 _ACL_VOLUME_DIR_RE = re.compile(r"^/volumes/[A-Za-z0-9._-]+/$")
+_ACL_ALLOWED_HOSTS = ("", "aclanthology.org", "www.aclanthology.org")
 
 
 def _is_acl_volume_entry(url: str) -> bool:
-    """入口 URL 是否已经指向一个具体的 volume 页 (/volumes/XXX/)。
+    """入口 URL 是否已经指向一个具体的 ACL Anthology volume 页 (/volumes/XXX/)。
 
     findings-acl / findings-emnlp / … 这些 conf 记录直接用 volume 页作入口，
     此时不应再枚举页面内其它 /volumes/ 链接，否则会把 .bib/.enw/.xml 等元数据
     下载链接（或页面上出现的相邻 volume）当作 volume 页去解析，导致 empty result。
-    """
-    from urllib.parse import urlparse
 
+    host 采用白名单校验：空 netloc（相对路径）、aclanthology.org、www.aclanthology.org
+    才被接受；防止将来该谓词被误用于非 Anthology 域名的 URL。
+    """
     parsed = urlparse(url)
+    if parsed.netloc not in _ACL_ALLOWED_HOSTS:
+        return False
     return bool(parsed.path) and _ACL_VOLUME_DIR_RE.match(parsed.path) is not None
 
 

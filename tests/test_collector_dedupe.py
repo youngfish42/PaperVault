@@ -262,6 +262,29 @@ def test_is_acl_volume_entry_predicate():
     assert not collector._is_acl_volume_entry(
         "https://aclanthology.org/volumes/2026.findings-acl.xml"
     )
+    # Trailing-slash policy: the predicate must require the path to end with
+    # "/"; hrefs without it (e.g. some Anthology templates strip it) should
+    # not silently be accepted as volume entries.
+    assert not collector._is_acl_volume_entry(
+        "https://aclanthology.org/volumes/2026.findings-acl"
+    )
+    # Query strings / fragments must not affect the routing decision: they
+    # are peeled off by urlparse and the .path still ends with "/".
+    assert collector._is_acl_volume_entry(
+        "https://aclanthology.org/volumes/2026.findings-acl/?utm=foo"
+    )
+    assert collector._is_acl_volume_entry(
+        "https://aclanthology.org/volumes/2026.findings-acl/#top"
+    )
+    # Host whitelist: reject any non-Anthology domain even if the path
+    # happens to match the volume shape.
+    assert not collector._is_acl_volume_entry(
+        "https://example.com/volumes/2026.findings-acl/"
+    )
+    # www subdomain is a valid Anthology alias and must be accepted.
+    assert collector._is_acl_volume_entry(
+        "https://www.aclanthology.org/volumes/2026.findings-acl/"
+    )
 
 
 # ---------------------------------------------------------------------------
