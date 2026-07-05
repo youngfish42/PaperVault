@@ -244,6 +244,30 @@ def test_detect_event_prefix_modern_single_track_still_collapses_to_venue():
     assert _tag_for(body) == "^2026.acl*"
 
 
+def test_detect_event_prefix_defensive_fallback_when_venue_id_missing():
+    """Defence-in-depth pin: when a caller invokes `_detect_event_prefix`
+    WITHOUT passing `venue_id` (public signature default = ""), the
+    `same_venue` filter list is empty by construction and control flow
+    reaches the terminal `else` branch. That branch must still peel the
+    track segment off the stem (via `rsplit("-", 1)[0]`), so a modern
+    single-track page yields the venue-level body `2026.acl`, not the
+    over-narrow `2026.acl-long` that a naive `rstrip("-")` would return.
+
+    Guards the public signature `_detect_event_prefix(url)` against
+    silently re-introducing the same single-track LCP degeneracy that the
+    `venue_id`-aware branch was hardened against.
+    """
+    event_url = "https://aclanthology.org/events/acl-2026/"
+    html = _modern_event_html(2026, "acl", tracks=("long",))
+    disc = _FakeACLDiscovery({event_url: html})
+
+    body = disc._detect_event_prefix(event_url)  # no venue_id / year
+    assert body == "2026.acl", (
+        f"defensive else branch must peel track segment, got {body!r}"
+    )
+    assert _tag_for(body) == "^2026.acl*"
+
+
 # ---------------------------------------------------------------------------
 # 7. URL normalization on existing_urls — pins the _canon_url dedup fix.
 # ---------------------------------------------------------------------------

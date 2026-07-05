@@ -3,8 +3,12 @@
 重构后逻辑：
 1. 从 ACL Anthology 官网的 venues 页面获取目标 venues 列表。
 2. 对每个 venue，访问其 venue 页面，提取所有年份的 events 链接。
-3. 对每个 event 页面，自动检测实际使用的前缀（P, D, N, E, C, W, H, A 等）。
-4. 生成对应的 tag 和配置条目。
+3. 对每个 event 页面，自动检测实际使用的论文编号命名。Anthology 从 2020 起
+   全面切换到 ``/YYYY.{venue}-{track}.N/`` 的现代命名（生成的 tag 形如
+   ``^2026.acl*``）；2019 及更早仍是 ``/Xyy-NNNN/`` 的旧命名，其中首字母
+   来自 ``P``（ACL）、``D``（EMNLP）、``N``（NAACL）、``E``（EACL）、
+   ``C``（COLING）、``W``（Workshop）等，生成的 tag 形如 ``^P05-*``。
+4. 生成对应的 tag 和配置条目，并按 canonical URL 与既有 ``conf/*.json`` 去重。
 
 当前关注的核心 venues：ACL, EMNLP, NAACL, EACL, COLING
 """
@@ -31,7 +35,8 @@ _EVENTS_LINK_RE = re.compile(r"^/events/([a-z0-9]+)-(\d{4})/$")
 _PAPER_LINK_RE = re.compile(r"^/[A-Za-z]\d{2}-\d+/$")
 _PREFIX_RE = re.compile(r"^/([A-Za-z]\d{2})-\d+/$")
 # Modern Anthology paper IDs (2020+): e.g. /2026.acl-long.1/, /2024.findings-emnlp.42/
-_MODERN_PAPER_LINK_RE = re.compile(r"^/(\d{4})\.([a-zA-Z0-9-]+)\.\d+/$")
+# We only need the stem group ("YYYY.venue-track") to compute the tag body,
+# so a full-URL matcher would be dead weight — `_MODERN_STEM_RE` is enough.
 _MODERN_STEM_RE = re.compile(r"^/(\d{4}\.[a-zA-Z0-9-]+)\.\d+/$")
 
 
@@ -191,7 +196,15 @@ class ACLDiscovery(BaseDiscovery):
             elif same_venue:
                 common = _longest_common_prefix(same_venue).rstrip("-")
             else:
-                common = best_stem.rstrip("-")
+                # 纵深防御：当调用方省略 venue_id（公开签名默认 ""），same_venue
+                # 恒为空，会掉进这里。此时 best_stem 可能是单-track 字面串
+                # （如 "2026.acl-long"），rstrip("-") 无法剥掉末尾 'g'，会复现
+                # 前文修好的单-track LCP 退化。改用 rsplit("-", 1)[0] 把 track
+                # 段整段砍掉，让 fallback 路径与 venue_id 已知时的行为一致。
+                if "-" in best_stem:
+                    common = best_stem.rsplit("-", 1)[0]
+                else:
+                    common = best_stem
             if common:
                 return common
 
