@@ -1,33 +1,8 @@
 {
   "version": 1,
   "completed": {
-    "ACL::https://aclanthology.org/events/emnlp-2021/": {
-      "name": "EMNLP2021",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2021.findings-emnlp/": {
-      "name": "EMNLP2021",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/acl-2021/": {
-      "name": "ACL2021",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2021.findings-acl/": {
-      "name": "ACL2021",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
     "ACL::https://aclanthology.org/events/naacl-2021/": {
       "name": "NAACL2021",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/emnlp-2020/": {
-      "name": "EMNLP2020",
       "ts": "2026-06-04T00:17:37",
       "legacy": true
     },
@@ -56,26 +31,6 @@
       "ts": "2026-06-04T00:17:37",
       "legacy": true
     },
-    "ACL::https://aclanthology.org/events/acl-2022/": {
-      "name": "ACL2022",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2022.findings-acl/": {
-      "name": "ACL2022",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/naacl-2022/": {
-      "name": "NAACL2022",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2022.findings-naacl/": {
-      "name": "NAACL2022",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
     "ACL::https://aclanthology.org/events/coling-2022/": {
       "name": "COLING2022",
       "ts": "2026-06-04T00:17:37",
@@ -91,113 +46,13 @@
       "ts": "2026-06-04T00:17:37",
       "legacy": true
     },
-    "ACL::https://aclanthology.org/events/acl-2024/": {
-      "name": "ACL2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2024.findings-acl/": {
-      "name": "ACL2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/acl-2025/": {
-      "name": "ACL2025",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2025.findings-acl/": {
-      "name": "ACL2025",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/emnlp-2024/": {
-      "name": "EMNLP2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2024.findings-emnlp/": {
-      "name": "EMNLP2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/emnlp-2025/": {
-      "name": "EMNLP2025",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2025.findings-emnlp/": {
-      "name": "EMNLP2025",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/naacl-2024/": {
-      "name": "NAACL2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2024.findings-naacl/": {
-      "name": "NAACL2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/naacl-2025/": {
-      "name": "NAACL2025",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2025.findings-naacl/": {
-      "name": "NAACL2025",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/eacl-2024/": {
-      "name": "EACL2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2024.findings-eacl/": {
-      "name": "EACL2024",
-      "ts": "2026-06-04T00:17:37",
-      "legacy": true
-    },
     "ACL::https://aclanthology.org/events/coling-2025/": {
       "name": "COLING2025",
       "ts": "2026-06-04T00:17:47",
       "legacy": true
     },
-    "ACL::https://aclanthology.org/events/emnlp-2023/": {
-      "name": "EMNLP2023",
-      "ts": "2026-06-04T00:17:47",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2023.findings-emnlp/": {
-      "name": "EMNLP2023",
-      "ts": "2026-06-04T00:17:47",
-      "legacy": true
-    },
     "ACL::https://aclanthology.org/events/eacl-2021/": {
       "name": "EACL2021",
-      "ts": "2026-06-04T00:17:47",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/eacl-2023/": {
-      "name": "EACL2023",
-      "ts": "2026-06-04T00:17:47",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2023.findings-eacl/": {
-      "name": "EACL2023",
-      "ts": "2026-06-04T00:17:47",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/events/eacl-2026/": {
-      "name": "EACL2026",
-      "ts": "2026-06-04T00:17:47",
-      "legacy": true
-    },
-    "ACL::https://aclanthology.org/volumes/2026.findings-eacl/": {
-      "name": "EACL2026",
       "ts": "2026-06-04T00:17:47",
       "legacy": true
     },
@@ -15007,11 +14862,6 @@
       "name": "NAACL2018",
       "ts": "2026-06-07T11:19:14"
     },
-    "ACL::https://aclanthology.org/volumes/2020.findings-emnlp/": {
-      "name": "EMNLP2020",
-      "ts": "2026-06-07T11:19:38",
-      "legacy": true
-    },
     "ACL::https://aclanthology.org/events/coling-2000/": {
       "name": "COLING2000",
       "ts": "2026-06-07T11:19:39"
@@ -21509,6 +21359,110 @@
       "name": "STOC2026",
       "ts": "2026-07-05T22:42:33",
       "legacy": true
+    },
+    "ACL::https://aclanthology.org/events/emnlp-2021/": {
+      "name": "EMNLP2021",
+      "ts": "2026-07-06T01:27:22"
+    },
+    "ACL::https://aclanthology.org/events/acl-2021/": {
+      "name": "ACL2021",
+      "ts": "2026-07-06T01:28:50"
+    },
+    "ACL::https://aclanthology.org/events/emnlp-2020/": {
+      "name": "EMNLP2020",
+      "ts": "2026-07-06T01:30:27"
+    },
+    "ACL::https://aclanthology.org/events/acl-2022/": {
+      "name": "ACL2022",
+      "ts": "2026-07-06T01:31:56"
+    },
+    "ACL::https://aclanthology.org/events/naacl-2022/": {
+      "name": "NAACL2022",
+      "ts": "2026-07-06T01:33:17"
+    },
+    "ACL::https://aclanthology.org/events/acl-2024/": {
+      "name": "ACL2024",
+      "ts": "2026-07-06T01:34:55"
+    },
+    "ACL::https://aclanthology.org/volumes/2024.findings-acl/": {
+      "name": "ACL2024",
+      "ts": "2026-07-06T01:35:55"
+    },
+    "ACL::https://aclanthology.org/events/acl-2025/": {
+      "name": "ACL2025",
+      "ts": "2026-07-06T01:38:00"
+    },
+    "ACL::https://aclanthology.org/volumes/2025.findings-acl/": {
+      "name": "ACL2025",
+      "ts": "2026-07-06T01:39:30"
+    },
+    "ACL::https://aclanthology.org/volumes/2026.findings-acl/": {
+      "name": "ACL2026",
+      "ts": "2026-07-06T01:42:45"
+    },
+    "ACL::https://aclanthology.org/events/emnlp-2024/": {
+      "name": "EMNLP2024",
+      "ts": "2026-07-06T01:44:12"
+    },
+    "ACL::https://aclanthology.org/volumes/2024.findings-emnlp/": {
+      "name": "EMNLP2024",
+      "ts": "2026-07-06T01:45:15"
+    },
+    "ACL::https://aclanthology.org/events/emnlp-2025/": {
+      "name": "EMNLP2025",
+      "ts": "2026-07-06T01:47:50"
+    },
+    "ACL::https://aclanthology.org/volumes/2025.findings-emnlp/": {
+      "name": "EMNLP2025",
+      "ts": "2026-07-06T01:49:26"
+    },
+    "ACL::https://aclanthology.org/events/naacl-2024/": {
+      "name": "NAACL2024",
+      "ts": "2026-07-06T01:50:11"
+    },
+    "ACL::https://aclanthology.org/volumes/2024.findings-naacl/": {
+      "name": "NAACL2024",
+      "ts": "2026-07-06T01:50:50"
+    },
+    "ACL::https://aclanthology.org/events/naacl-2025/": {
+      "name": "NAACL2025",
+      "ts": "2026-07-06T01:51:41"
+    },
+    "ACL::https://aclanthology.org/volumes/2025.findings-naacl/": {
+      "name": "NAACL2025",
+      "ts": "2026-07-06T01:52:21"
+    },
+    "ACL::https://aclanthology.org/events/eacl-2024/": {
+      "name": "EACL2024",
+      "ts": "2026-07-06T01:53:01"
+    },
+    "ACL::https://aclanthology.org/volumes/2024.findings-eacl/": {
+      "name": "EACL2024",
+      "ts": "2026-07-06T01:53:35"
+    },
+    "ACL::https://aclanthology.org/events/emnlp-2023/": {
+      "name": "EMNLP2023",
+      "ts": "2026-07-06T01:54:49"
+    },
+    "ACL::https://aclanthology.org/volumes/2023.findings-emnlp/": {
+      "name": "EMNLP2023",
+      "ts": "2026-07-06T01:55:55"
+    },
+    "ACL::https://aclanthology.org/events/eacl-2023/": {
+      "name": "EACL2023",
+      "ts": "2026-07-06T01:56:34"
+    },
+    "ACL::https://aclanthology.org/volumes/2023.findings-eacl/": {
+      "name": "EACL2023",
+      "ts": "2026-07-06T01:57:09"
+    },
+    "ACL::https://aclanthology.org/events/eacl-2026/": {
+      "name": "EACL2026",
+      "ts": "2026-07-06T01:57:54"
+    },
+    "ACL::https://aclanthology.org/volumes/2026.findings-eacl/": {
+      "name": "EACL2026",
+      "ts": "2026-07-06T01:58:33"
     }
   }
 }

@@ -1,8 +1,32 @@
 [
   {
     "source": "ACL",
-    "name": "ACL2026",
-    "url": "https://aclanthology.org/volumes/2026.findings-acl/",
-    "error": "empty result for tag='^2026.findings*'"
+    "name": "EMNLP2021",
+    "url": "https://aclanthology.org/volumes/2021.findings-emnlp/",
+    "error": "empty result for tag='^/2021.findings*'"
+  },
+  {
+    "source": "ACL",
+    "name": "ACL2021",
+    "url": "https://aclanthology.org/volumes/2021.findings-acl/",
+    "error": "empty result for tag='^/2021.findings*'"
+  },
+  {
+    "source": "ACL",
+    "name": "EMNLP2020",
+    "url": "https://aclanthology.org/volumes/2020.findings-emnlp/",
+    "error": "empty result for tag='^/2020.findings*'"
+  },
+  {
+    "source": "ACL",
+    "name": "ACL2022",
+    "url": "https://aclanthology.org/volumes/2022.findings-acl/",
+    "error": "empty result for tag='^/2022.findings*'"
+  },
+  {
+    "source": "ACL",
+    "name": "NAACL2022",
+    "url": "https://aclanthology.org/volumes/2022.findings-naacl/",
+    "error": "empty result for tag='^/2022.findings*'"
   }
 ]
