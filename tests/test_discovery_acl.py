@@ -353,9 +353,9 @@ def test_collector_acl_loop_gates_progress_write_on_nonzero_delta():
     # Locate the ACL loop block and its `if after == before:` branch.
     m = re.search(
         r"for conf in tqdm\(acl_conf,.*?\n"
-        r"(?P<block>(?:.*\n){1,80}?)"
-        r"        except Exception as e:\n",
+        r"(?P<block>.*?)(?=^\s*except Exception as e:\n)",
         text,
+        re.MULTILINE | re.DOTALL,
     )
     assert m, "could not locate ACL collection loop in collector.py"
     block = m.group("block")
