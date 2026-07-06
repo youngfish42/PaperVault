@@ -111,7 +111,10 @@ def run(year: str = None, retry_failed: bool = False) -> None:
     # 备份并写回
     if CACHE_FILE.exists():
         shutil.copy2(CACHE_FILE, BACKUP_FILE)
-    tmp_file = CACHE_FILE.with_suffix(".jsonl.gz.tmp")
+    # NOTE: use ``.with_name`` rather than ``.with_suffix`` — the latter only
+    # replaces the last suffix (``.gz``) and would yield the buggy path
+    # ``cache.jsonl.jsonl.gz.tmp`` that then fails the atomic ``os.replace``.
+    tmp_file = CACHE_FILE.with_name(CACHE_FILE.name + ".tmp")
     with gzip.open(tmp_file, "wt", encoding="utf-8") as f:
         for p in papers:
             f.write(json.dumps(p, ensure_ascii=False) + "\n")
