@@ -38,7 +38,7 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 - 📅 **Last Updated**: 2026-06-13
 - 🆕 **New Papers This Update**: 30,986
 - 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 634,975 papers / 120 publication series / 156,109 with abstracts / 25,573 with code
+- 📊 **Database Scale**: 647,320 papers / 120 publication series / 204,060 with abstracts / 30,251 with code
 
 <!-- recent-update-end -->
 
@@ -224,7 +224,7 @@ python app.py            # Start the web search server
 - **LICS** 2000-2025 (26 editions)
 - **SICOMP** 2000-2026 (26 editions)
 - **SODA** 2000-2026 (27 editions)
-- **STOC** 2000-2025 (26 editions)
+- **STOC** 2000-2026 (27 editions)
 - **TIT** 2000-2026 (27 editions)
 
 </details>
