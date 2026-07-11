@@ -328,54 +328,54 @@ def test_canon_url_normalizes_case_and_trailing_slash():
 # ---------------------------------------------------------------------------
 
 def test_collector_acl_loop_gates_progress_write_on_nonzero_delta():
-    """Structural pin: in the ACL collection loop in `collector.py`,
-    the `progress[f"ACL::{url}"] = {...}` write MUST live under the `else`
-    branch of `if after == before:`, not at the same indent level as the
-    `if`/`else`.
+    """Structural pin: inside the unified SOURCE_REGISTRY-driven loop in
+    `collector/pipeline.py`, the ACL-shaped progress write
+    ``progress[f"{spec.key}::{url}"] = {...}`` MUST live under the ``else:``
+    branch of ``if after == before:`` inside the ``if spec.empty_result_soft_fail:``
+    block, not at the same indent level as the ``if``/``else``.
 
-    Rationale: if the write escapes the `else`, the zero-result soft-failure
-    path stamps progress unconditionally and `_should_skip` will then skip
+    Rationale: if the write escapes the ``else``, the zero-result soft-failure
+    path stamps progress unconditionally and ``_should_skip`` will then skip
     the URL on every subsequent run — silently defeating the tag fix on the
     discovery side.
 
-    A behavioural test would need to reload the entire `collect()` pipeline
-    (which reads `conf/*.json` directly, runs `_save_state`'s 5-second
-    debounce, calls `_merge_with_cache` and `add_code_links`, and depends
-    on HF sync). A focused source-shape assertion is the cheapest and most
-    stable regression pin for this specific bug.
+    Post-refactor (SOURCE_REGISTRY): the ACL loop is one iteration of a single
+    outer ``for spec in SOURCE_REGISTRY`` loop, and its zero-result branch is
+    gated by ``spec.empty_result_soft_fail`` (only ACL sets this to True).
+    The behavioural counterpart of this pin lives in
+    ``tests/test_collector_source_registry.py::test_acl_empty_result_soft_fails_and_does_not_write_progress``.
     """
     from pathlib import Path
     import re
 
-    collector_src = Path(__file__).resolve().parent.parent / "collector.py"
+    collector_src = Path(__file__).resolve().parent.parent / "collector" / "pipeline.py"
     text = collector_src.read_text(encoding="utf-8")
 
-    # Locate the ACL loop block and its `if after == before:` branch.
+    # Locate the empty_result_soft_fail branch (ACL-only in SOURCE_REGISTRY).
     m = re.search(
-        r"for conf in tqdm\(acl_conf,.*?\n"
-        r"(?P<block>.*?)(?=^\s*except Exception as e:\n)",
+        r"if spec\.empty_result_soft_fail:\n"
+        r"(?P<block>.*?)(?=^\s{16}else:\n\s+res = search_fn\(url, name, res\))",
         text,
         re.MULTILINE | re.DOTALL,
     )
-    assert m, "could not locate ACL collection loop in collector.py"
+    assert m, "could not locate empty_result_soft_fail branch in collector/pipeline.py"
     block = m.group("block")
 
-    # The progress-write line must appear indented one level deeper than
-    # the `if after == before:` guard — i.e. under `else:`, not at the
-    # `if`/`else` indent.
+    # The progress-write must appear under the ``else:`` of ``if after == before:``.
     assert re.search(
-        r"^            else:\n\s+progress\[f\"ACL::\{url\}\"\]",
+        r"^                    else:\n\s+progress\[f\"\{spec\.key\}::\{url\}\"\]",
         block,
         re.MULTILINE,
     ), (
-        "collector.py ACL loop must write progress[f'ACL::{url}'] under an "
-        "`else:` branch of `if after == before:`; got block:\n" + block
+        "collector/pipeline.py soft-fail branch must write "
+        "progress[f'{spec.key}::{url}'] under an `else:` branch of "
+        "`if after == before:`; got block:\n" + block
     )
 
-    # And it must NOT appear at the outer indent level (which would mean it
-    # runs on the zero-result path too).
+    # And it must NOT appear at the outer (soft-fail-branch) indent level,
+    # which would mean it runs on the zero-result path too.
     assert not re.search(
-        r"^            progress\[f\"ACL::\{url\}\"\]",
+        r"^                progress\[f\"\{spec\.key\}::\{url\}\"\]",
         block,
         re.MULTILINE,
     ), (
