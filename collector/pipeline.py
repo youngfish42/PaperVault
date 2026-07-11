@@ -164,8 +164,14 @@ def collect(cache_file=None, force=False, soft_timeout=None):
 
                 _save_state()
             except Exception as e:
-                print(f"[!] Failed to collect {spec.key} '{conf.get('name', 'unknown')}': {e}")
+                # Keep the human-readable log and the machine-readable
+                # failures.json entry pinned to the *same* source label. The
+                # historical collector.py logged CVF failures as
+                # "openaccess.thecvf" (not the internal registry key
+                # "thecvf"); external log-grep tooling relies on that
+                # spelling, so we compute the label once and reuse it.
                 error_source_label = "openaccess.thecvf" if spec.key == "thecvf" else spec.key
+                print(f"[!] Failed to collect {error_source_label} '{conf.get('name', 'unknown')}': {e}")
                 failures.append({
                     "source": error_source_label,
                     "name": conf.get("name"),
