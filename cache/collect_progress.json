@@ -21463,6 +21463,30 @@
     "ACL::https://aclanthology.org/volumes/2026.findings-eacl/": {
       "name": "EACL2026",
       "ts": "2026-07-06T01:58:33"
+    },
+    "ACL::https://aclanthology.org/volumes/2021.findings-emnlp/": {
+      "name": "EMNLP2021",
+      "ts": "2026-07-11T18:20:14"
+    },
+    "ACL::https://aclanthology.org/volumes/2021.findings-acl/": {
+      "name": "ACL2021",
+      "ts": "2026-07-11T18:20:58"
+    },
+    "ACL::https://aclanthology.org/volumes/2020.findings-emnlp/": {
+      "name": "EMNLP2020",
+      "ts": "2026-07-11T18:21:41"
+    },
+    "ACL::https://aclanthology.org/volumes/2022.findings-acl/": {
+      "name": "ACL2022",
+      "ts": "2026-07-11T18:22:20"
+    },
+    "ACL::https://aclanthology.org/volumes/2022.findings-naacl/": {
+      "name": "NAACL2022",
+      "ts": "2026-07-11T18:22:57"
+    },
+    "DBLP::https://dblp.org/db/conf/infocom/infocom2026.html": {
+      "name": "INFOCOM2026",
+      "ts": "2026-07-11T18:26:11"
     }
   }
 }
