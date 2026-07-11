@@ -16,6 +16,7 @@ from collector.progress import (
     load_collect_progress,
     save_collect_progress,
 )
+from collector.sources import SOURCE_REGISTRY
 from collector.sources.acl import search_from_acl
 from collector.sources.openreview import search_from_iclr
 from collector.sources.thecvf import search_from_thecvf
@@ -30,15 +31,20 @@ def collect(cache_file=None, force=False, soft_timeout=None):
     failures = []
     progress = {} if force else _pkg.load_collect_progress()
 
-    acl_conf = json.load(open("conf/acl_conf.json", "r"))
-    dblp_conf = json.load(open("conf/dblp_conf.json", "r"))
-    nips_conf = json.load(open("conf/nips_conf.json", "r"))
-    iclr_conf = json.load(open("conf/iclr_conf.json", "r"))
-    thecvf_conf = json.load(open("conf/thecvf_conf.json", "r"))
+    with open("conf/acl_conf.json", "r") as f:
+        acl_conf = json.load(f)
+    with open("conf/dblp_conf.json", "r") as f:
+        dblp_conf = json.load(f)
+    with open("conf/nips_conf.json", "r") as f:
+        nips_conf = json.load(f)
+    with open("conf/iclr_conf.json", "r") as f:
+        iclr_conf = json.load(f)
+    with open("conf/thecvf_conf.json", "r") as f:
+        thecvf_conf = json.load(f)
 
     cache_conf = set()
     cache_res = {}
-    gz_path = cache_file + ".gz" if cache_file and not cache_file.endswith(".gz") else cache_file
+    gz_path = _to_gz_path(cache_file) if cache_file else None
     if not force and gz_path is not None and os.path.exists(gz_path):
         cache_res = _pkg.load_cache(cache_file)
         cache_conf = set(cache_res.keys())
@@ -104,8 +110,6 @@ def collect(cache_file=None, force=False, soft_timeout=None):
             progress[key] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "legacy": True}
             return True
         return False
-
-    from collector.sources import SOURCE_REGISTRY
 
     def _dblp_track_collected_name(name):
         collected_dblp_names.add(name)
