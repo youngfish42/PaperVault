@@ -29,7 +29,22 @@ This project was originally forked from [MLNLP-World/AI-Paper-Collector](https:/
 ```
 PaperVault/
 ├── app.py                        # Thin Flask entrypoint: builds `app = create_app(settings)`; no business logic here
-├── collector.py                  # Multi-source data collector for paper metadata
+├── collector/                    # Multi-source data collector package for paper metadata
+│   ├── __init__.py               # Re-exports full legacy public API (HEADERS, SESSION, collect, do_collect, load_cache, save_cache, all search_from_* etc.) for backwards-compat
+│   ├── __main__.py               # `python -m collector` entrypoint (equivalent to the legacy `python collector.py`)
+│   ├── http.py                   # Shared requests.Session singleton + HEADERS (User-Agent) + urllib3 Retry policy; also suppresses BS4 XMLParsedAsHTMLWarning
+│   ├── merge.py                  # Field-level record merge helpers (_better_str/_list/_code, _merge_paper_record, _merge_with_cache)
+│   ├── progress.py               # COLLECT_PROGRESS_FILE / COLLECT_FAILURES_FILE constants + load/save_collect_progress
+│   ├── io.py                     # cache/cache.jsonl.gz reader/writer (load_cache, save_cache, _to_gz_path)
+│   ├── code_links.py             # GitHub link extraction from abstracts (_GITHUB_RE, extract_github_link, add_code_links)
+│   ├── pipeline.py               # Top-level orchestration: collect() drives SOURCE_REGISTRY over all sources; do_collect() wraps cache load/save + HF sync
+│   └── sources/                  # Per-vendor scrapers (one module per data source)
+│       ├── __init__.py           # SourceSpec dataclass + SOURCE_REGISTRY (ACL / ICLR / thecvf / NeurIPS / DBLP)
+│       ├── openreview.py         # OpenReview API v1/v2 + ICLR official schedule (search_from_iclr and helpers)
+│       ├── nips.py               # NeurIPS proceedings pages (search_from_nips, search_abs_from_nips)
+│       ├── acl.py                # ACL Anthology volume pages (_parse_acl_volume, _is_acl_volume_entry, search_from_acl)
+│       ├── dblp.py               # DBLP mixed-venue pages (search_from_dblp, search_abs_from_dblp)
+│       └── thecvf.py             # CVF Open Access pages (search_from_thecvf, search_abs_from_thecvf; deferred import of scripts.cvf_abstract)
 ├── maintain.py                   # README updater, stats renderer, cache refresh utility
 ├── data_artifacts.py             # Hugging Face dataset sync helpers (cache.jsonl.gz upload with parent_commit optimistic locking)
 ├── requirements.txt              # Python dependencies (includes pydantic>=2.6,<3, python-dotenv, openai>=1, anthropic>=0.40, huggingface_hub, tiktoken, …)
@@ -228,7 +243,7 @@ export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
 
 # Any entry point will now fetch the latest cache on startup
 python app.py            # also serves the cache to the web UI
-python collector.py      # incremental collection
+python -m collector      # incremental collection
 python maintain.py       # README + stats rebuild
 ```
 
@@ -322,7 +337,7 @@ Other frontend scripts:
 |---------|-------------|
 | `python app.py` | Start Flask backend server (binds to `HOST:PORT`, defaults `127.0.0.1:5001`) |
 | `pytest -q` | Run the backend test suite (`tests/`). For CI parity also export `PAPERVAULT_OFFLINE=1` so the cache loader skips HF |
-| `python collector.py` | Run collector to update `cache/cache.jsonl.gz` |
+| `python -m collector` | Run collector to update `cache/cache.jsonl.gz` (equivalent to the legacy `python collector.py`; the collector was refactored into the `collector/` package) |
 | `python maintain.py` | Update README conference list & stats from config files |
 | `python maintain.py collect` | Incrementally collect papers for new conferences and update README. Supports `--soft-timeout N` for graceful timeout handling |
 | `python maintain.py force` | Force full cache rebuild and README update |
