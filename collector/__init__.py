@@ -1,18 +1,12 @@
+# NOTE: json/os/time are re-exposed on the package namespace so tests can do
+# ``monkeypatch.setattr(collector.time, "time", ...)`` /
+# ``monkeypatch.setattr("collector.json.load", ...)`` and have the patch reach
+# the code paths inside pipeline.py that access these modules via ``import``.
+# Do NOT remove them just because the shim body doesn't reference them.
 import json
 import os
-import re
-import warnings
-from collections import Counter
-from urllib.parse import urlparse
-import yaml
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import time
-from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
-from tqdm import tqdm
 
-import gzip
 from data_artifacts import ensure_cache_local, sync_cache_artifacts
 
 from .http import HEADERS, SESSION, _create_session
@@ -26,8 +20,6 @@ from .merge import (
 from .progress import COLLECT_PROGRESS_FILE, COLLECT_FAILURES_FILE, load_collect_progress, save_collect_progress
 from .io import _to_gz_path, load_cache, save_cache
 from .code_links import _GITHUB_RE, extract_github_link, add_code_links
-
-# 忽略 ACL Anthology 某些 XML 页面被 HTML 解析器解析时的警告
 
 from .sources.openreview import (
     OPENREVIEW_REJECTED_VENUE_KEYWORDS,
