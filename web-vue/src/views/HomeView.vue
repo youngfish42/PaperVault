@@ -55,24 +55,30 @@ const {
   onToggleRefineMode
 } = refine
 
-const handleSearchAuthor = (data: string): void => {
-  searchContent.query = `AU="${data}"`
-  searchContent.sp_author = ''
+const resetRefineForNewSearch = (): void => {
   refineInResults.value = false
   refineKeyword.value = ''
   searchResult.value?.clearRefineKeyword?.()
+}
+
+const handleSearchAuthor = (data: string): void => {
+  searchContent.query = `AU="${data}"`
+  searchContent.sp_author = ''
+  resetRefineForNewSearch()
   search()
 }
 
 const handleSearchGuess = (data: string): void => {
   searchContent.query = data
   originalTopic.value = data
+  resetRefineForNewSearch()
   search()
 }
 
 const handleSearchGuessMany = (picked: string[]): void => {
   if (!picked.length) return
   searchContent.query = buildOrMerge(searchContent.query, picked)
+  resetRefineForNewSearch()
   search()
 }
 
@@ -83,6 +89,7 @@ const handleAiSearchPick = (payload: {
 }): void => {
   searchContent.query = payload.query
   originalTopic.value = payload.seed
+  resetRefineForNewSearch()
   search()
 }
 

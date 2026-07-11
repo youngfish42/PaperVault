@@ -121,7 +121,10 @@ defineExpose({ searchResult })
         </el-tooltip>
         <el-tooltip placement="bottom" :show-after="120">
           <template #content>
-            <div class="pv-dsl-tip" v-html="t('search.dslTipHtml')" />
+            <div
+              class="pv-dsl-tip pv-syntax-scope"
+              v-html="t('search.dslTipHtml')"
+            />
           </template>
           <el-icon class="pv-dsl-info"><InfoFilled /></el-icon>
         </el-tooltip>
@@ -290,122 +293,6 @@ defineExpose({ searchResult })
   }
 }
 
-.pv-dsl-tip :deep(.pv-syntax-title) {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--el-text-color-primary, #303133);
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
-}
-.pv-dsl-tip :deep(.pv-syntax-section) {
-  margin-bottom: 14px;
-}
-.pv-dsl-tip :deep(.pv-syntax-section:last-child) {
-  margin-bottom: 0;
-}
-.pv-dsl-tip :deep(.pv-syntax-section-title) {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--el-color-primary, #6f5ed3);
-  margin-bottom: 6px;
-}
-.pv-dsl-tip :deep(.pv-syntax-section-desc) {
-  font-size: 12px;
-  color: var(--el-text-color-secondary, #909399);
-  margin-bottom: 8px;
-  line-height: 1.6;
-}
-.pv-dsl-tip :deep(.pv-syntax-table) {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-  background: var(--el-fill-color-lighter, #fafbfc);
-  border-radius: 6px;
-  overflow: hidden;
-}
-.pv-dsl-tip :deep(.pv-syntax-table th) {
-  text-align: left;
-  padding: 6px 12px;
-  background: var(--el-fill-color, #f0f2f5);
-  font-weight: 600;
-  color: var(--el-text-color-regular, #606266);
-  font-size: 12px;
-}
-.pv-dsl-tip :deep(.pv-syntax-table td) {
-  padding: 6px 12px;
-  border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
-  vertical-align: middle;
-}
-.pv-dsl-tip :deep(.pv-syntax-chip-row) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.pv-dsl-tip :deep(.pv-syntax-chip) {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  background: var(--el-color-primary-light-9, #ecf5ff);
-  color: var(--el-color-primary, #6f5ed3);
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 500;
-}
-.pv-dsl-tip :deep(.pv-syntax-chip--muted) {
-  background: var(--el-fill-color, #f0f2f5);
-  color: var(--el-text-color-secondary, #909399);
-}
-.pv-dsl-tip :deep(.pv-syntax-grid) {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 16px;
-  font-size: 12.5px;
-}
-.pv-dsl-tip :deep(.pv-syntax-grid > div) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pv-dsl-tip :deep(.pv-syntax-key) {
-  flex-shrink: 0;
-  width: 64px;
-  font-size: 11.5px;
-  color: var(--el-text-color-secondary, #909399);
-  font-weight: 500;
-}
-.pv-dsl-tip :deep(.pv-syntax-example) {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--el-color-primary-light-9, #ecf5ff);
-  border-left: 3px solid var(--el-color-primary, #6f5ed3);
-  border-radius: 4px;
-}
-.pv-dsl-tip :deep(.pv-syntax-example-label) {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--el-color-primary, #6f5ed3);
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.pv-dsl-tip :deep(.pv-syntax-example code) {
-  background: transparent !important;
-  color: var(--el-text-color-primary, #303133) !important;
-  padding: 0 !important;
-  font-size: 12.5px !important;
-  word-break: break-all;
-}
-.pv-dsl-tip :deep(code) {
-  background: rgba(111, 94, 211, 0.1);
-  color: var(--el-color-primary, #6f5ed3);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-family: 'Fira Code', Consolas, monospace;
-  font-size: 12px;
-}
 .pv-dsl-tip {
   max-width: 460px;
 }
