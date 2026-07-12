@@ -113,6 +113,54 @@ def _get_remote_commit(api, repo_id: str, path_in_repo: str) -> Optional[str]:
     return None
 
 
+def _hf_local_dir_mode() -> bool:
+    """Return True if hf_hub_download should be forced into local_dir mode.
+
+    Motivation: on Windows the default HF cache stores blobs as symlinks,
+    which fails with ``OSError: [WinError 14007]`` on many developer boxes
+    (privilege not held, non-NTFS mount, etc.). Passing ``local_dir=<root>``
+    switches ``huggingface_hub`` to a copy-based layout that has no symlinks
+    at all. We keep the classic cache-dir path on Linux CI to stay in sync
+    with GitHub Actions behaviour.
+    """
+    override = os.getenv("PAPERVAULT_HF_LOCAL_DIR")
+    if override is not None:
+        return override.lower() in ("1", "true", "yes")
+    return os.name == "nt"
+
+
+def _download_with_fallback(
+    *,
+    repo_id: str,
+    filename: str,
+    repo_type: str,
+    token: Optional[str],
+    revision: str,
+    local_dir: Path,
+) -> str:
+    """Thin wrapper around ``hf_hub_download`` with a Windows-safe branch.
+
+    Isolated so tests can assert the exact kwargs we pass. Do NOT inline
+    this back into ``ensure_cache_local`` -- ``tests/test_data_artifacts_download.py``
+    relies on this seam.
+    """
+    from huggingface_hub import hf_hub_download
+
+    kwargs = dict(
+        repo_id=repo_id,
+        filename=filename,
+        repo_type=repo_type,
+        token=token,
+        revision=revision,
+    )
+    if _hf_local_dir_mode():
+        # local_dir lays the file out as <local_dir>/<filename> with a plain
+        # copy instead of a symlink into the shared HF blob cache. That
+        # sidesteps WinError 14007 without needing admin/Developer Mode.
+        kwargs["local_dir"] = str(local_dir)
+    return hf_hub_download(**kwargs)
+
+
 def ensure_cache_local(
     cache_path: PathLike = DEFAULT_CACHE_PATH,
     refresh: bool = True,
@@ -162,7 +210,7 @@ def ensure_cache_local(
         return cache_path, commit
 
     try:
-        from huggingface_hub import hf_hub_download
+        from huggingface_hub import hf_hub_download  # noqa: F401  (imported for ImportError signalling)
         from huggingface_hub.utils import EntryNotFoundError
     except ImportError:
         print("[!] huggingface_hub missing; cannot refresh cache from HF.")
@@ -170,12 +218,13 @@ def ensure_cache_local(
 
     path_in_repo = _path_in_repo(cache_path)
     try:
-        downloaded = hf_hub_download(
+        downloaded = _download_with_fallback(
             repo_id=repo_id,
             filename=path_in_repo,
             repo_type=_hf_repo_type(),
             token=_hf_token(),
             revision="main",
+            local_dir=ROOT,
         )
     except EntryNotFoundError:
         if allow_missing_remote:
@@ -347,6 +396,44 @@ def upload_to_huggingface(paths: Iterable[PathLike], commit_message: str) -> Lis
             "Workflow will continue without aborting."
         )
     return uploaded
+
+
+def upload_progress_only(
+    path: PathLike = DEFAULT_PROGRESS_PATH,
+    *,
+    commit_message: str = "Update abstract backfill progress (local)",
+) -> List[str]:
+    """Whitelisted local uploader for the backfill progress file only.
+
+    This is the single sanctioned entry point for pushing a locally-edited
+    ``cache/abstract_backfill_progress.jsonl.gz`` back to Hugging Face from a
+    developer machine (see AGENTS.md / spec.md ``FR-13`` / ``AC-13``).
+
+    Any other path -- most importantly ``cache/cache.jsonl.gz`` -- is rejected
+    with ``RuntimeError`` so a fat-fingered developer script cannot bypass the
+    "no cache uploads from local" policy. Uploads to the main cache must go
+    through the GitHub Actions workflow.
+    """
+    resolved = Path(path).resolve()
+    try:
+        rel = resolved.relative_to(ROOT).as_posix()
+    except ValueError:
+        rel = resolved.name
+
+    if rel != "cache/abstract_backfill_progress.jsonl.gz":
+        raise RuntimeError(
+            "upload_progress_only refuses to upload "
+            f"{rel!r}: only cache/abstract_backfill_progress.jsonl.gz is "
+            "allowed from a local machine. cache.jsonl.gz uploads must go "
+            "through the GitHub Actions workflow."
+        )
+
+    print(
+        "[*] progress-only upload: pushing "
+        "cache/abstract_backfill_progress.jsonl.gz to Hugging Face "
+        "(cache.jsonl.gz will NOT be touched)."
+    )
+    return upload_to_huggingface([resolved], commit_message=commit_message)
 
 
 def sync_cache_artifacts(
