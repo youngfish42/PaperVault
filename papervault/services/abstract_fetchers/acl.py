@@ -1,13 +1,25 @@
 """ACL Anthology (``aclanthology.org``) abstract fetcher.
 
-Modern paper pages (2019+) expose the abstract in either:
-  * ``<div class="acl-abstract">…</div>`` (semantic block), or
-  * ``<meta name="citation_abstract" content="…">`` (highwire metadata),
-whichever the Hugo template happens to render for that year.
+Verified against real pages on 2026-07-12:
 
-We probe both and take the longer non-empty candidate. Older pages
-(pre-2019 ACL / EMNLP / NAACL) frequently have neither node — the caller
-degrades to CrossRef/S2/arXiv/OpenAlex in that case.
+* Modern pages (2019+, e.g. ``2023.acl-long.1`` / ``P19-1001``) render::
+
+      <div class="card-body acl-abstract">
+        <h5 class="card-title">Abstract</h5>
+        <span>… full abstract prose …</span>
+      </div>
+
+  The heading is ``<h5>`` -- **not** ``<strong>`` -- and the anthology's
+  Hugo template does *not* emit any ``<meta name="citation_abstract">``
+  on these pages (only ``citation_abstract_html_url`` exists).
+
+* Legacy pages (pre-2019, e.g. ``P05-1001``) frequently have neither the
+  ``acl-abstract`` div nor a ``citation_abstract`` meta tag -- the caller
+  degrades to CrossRef/S2/arXiv/OpenAlex in that case.
+
+We still probe both candidates (div + meta) and keep the longer one so
+edge-case revamps of the template continue to work, but the heading
+stripper now covers ``<strong>`` **and** ``<h1>-<h6>`` labels.
 """
 
 from __future__ import annotations
@@ -31,10 +43,13 @@ class _ACLFetcher(Fetcher):
         candidates = []
         div = soup.find("div", class_="acl-abstract")
         if div is not None:
-            # Skip a possible leading ``<strong>Abstract</strong>`` label
-            for strong in div.find_all("strong"):
-                if strong.get_text(strip=True).lower() == "abstract":
-                    strong.extract()
+            # Real modern ACL pages label the block with
+            # ``<h5 class="card-title">Abstract</h5>`` (2019+), while
+            # older / fixture markup sometimes uses ``<strong>``. Strip
+            # both so the returned text starts at the actual prose.
+            for label in div.find_all(["strong", "h1", "h2", "h3", "h4", "h5", "h6"]):
+                if label.get_text(strip=True).lower() == "abstract":
+                    label.extract()
                     break
             candidates.append(clean_text(div.get_text(" ")))
 

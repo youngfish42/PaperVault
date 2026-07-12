@@ -146,6 +146,29 @@ def test_empty_page_falls_through_to_empty_abstract():
     assert res.reason == "empty_abstract"
 
 
+# ---------- ACL: real-DOM structure regression ----------------------------
+
+def test_acl_modern_layout_strips_h5_heading():
+    """Verified against aclanthology.org/2023.acl-long.1/ and /P19-1001/
+    on 2026-07-12: modern ACL pages label the abstract with
+    ``<h5 class="card-title">Abstract</h5>`` (NOT ``<strong>``) and do
+    NOT ship any ``<meta name="citation_abstract">`` tag.
+
+    The fetcher must strip the ``<h5>`` heading so the returned prose
+    does not start with the word "Abstract".
+    """
+    html = _fixture_html("acl_paper.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://aclanthology.org/2099.acl-fixture.1/")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "acl"
+    assert res.abstract is not None
+    # Heading must not leak into the returned text.
+    assert not res.abstract.lower().startswith("abstract ")
+    assert "synthetic method for automated abstract fetching" in res.abstract
+
+
 # ---------- IJCAI: real-DOM structure regression (review issue R3) ---------
 
 def test_ijcai_real_layout_extracts_abstract_and_excludes_keywords():
