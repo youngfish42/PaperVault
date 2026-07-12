@@ -132,6 +132,15 @@ def normalize_reason(text: Optional[str]) -> str:
         return "no_doi"
     if "not found" in lowered or "404" in lowered:
         return "doi_not_found"
+    # Order matters (review issue R2): probe the exact free-text phrase
+    # "no abstract available" BEFORE the generic ``no abstract`` /
+    # ``empty`` bucket, otherwise upstream text such as
+    # "Crossref returned no abstract available for this DOI" would be
+    # misclassified as ``empty_abstract`` (which usually means "the
+    # page loaded but the extractor got an empty string"). The two
+    # buckets are semantically distinct on the analyse dashboard.
+    if "no abstract available" in lowered:
+        return "no_abstract_available"
     if "empty" in lowered or "no abstract" in lowered:
         return "empty_abstract"
     if "title" in lowered and "mismatch" in lowered:
@@ -1472,19 +1481,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--include-legacy",
         dest="include_legacy",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
         help=(
             "Include legacy v3 records (no 'reason' field) in the retry set "
-            "even when --reason-in is set. This is the default; use "
-            "--no-include-legacy to strictly honour the whitelist."
+            "even when --reason-in is set. Enabled by default; pass "
+            "--no-include-legacy to strictly honour the whitelist. "
+            "(Review issue R4: refactored from a manual store_true / "
+            "store_false pair to BooleanOptionalAction for a cleaner "
+            "--help surface.)"
         ),
-    )
-    parser.add_argument(
-        "--no-include-legacy",
-        dest="include_legacy",
-        action="store_false",
-        help="Strictly honour --reason-in and skip legacy v3 records.",
     )
     args = parser.parse_args()
     reason_in_set: Optional[Set[str]] = None

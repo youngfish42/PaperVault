@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import gzip
 import json
+import sys
 from pathlib import Path
 
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
 
 from scripts import fetch_abstracts as fa
 
@@ -90,6 +93,19 @@ def test_reason_enum_covers_spec_vocabulary():
         # must classify as ``no_doi`` — not ``doi_not_found``.
         ("missing doi info: not found upstream", "no_doi"),
         ("nodoi", "no_doi"),
+        # Regression guard for review issue R2 (second-pass review):
+        # the free-text phrase "no abstract available" must classify
+        # as ``no_abstract_available`` (a distinct bucket added to
+        # REASON_ENUM in the R#7 3xx fix) — NOT the generic
+        # ``empty_abstract`` bucket. Ordering inside normalize_reason
+        # must probe this specific phrase before the generic
+        # ``"no abstract"`` / ``"empty"`` fallback.
+        ("no abstract available", "no_abstract_available"),
+        ("Crossref returned no abstract available for this DOI", "no_abstract_available"),
+        # The generic bucket must still catch plain "empty abstract"
+        # phrasing so upstream code that already writes that message
+        # (e.g. Semantic Scholar 200 with empty body) is unaffected.
+        ("empty abstract", "empty_abstract"),
     ],
 )
 def test_normalize_reason_maps_known_blurbs(raw, expected):
@@ -122,3 +138,29 @@ def test_v3_fixture_loads_without_field_loss(tmp_path, monkeypatch):
     assert bad["ts"] == "2024-01-01T00:00:02"
     # v3 records do NOT carry `reason`; we must not fabricate one on read.
     assert "reason" not in bad
+
+
+def test_include_legacy_boolean_optional_action():
+    """R4 regression: ``--include-legacy`` / ``--no-include-legacy`` are
+    now driven by :class:`argparse.BooleanOptionalAction` (Python 3.9+).
+
+    We invoke the script with ``--help`` in a subprocess to:
+      * confirm both flag surfaces are still advertised (backwards-compat
+        with any operator muscle memory / GitHub Actions invocations);
+      * verify the parser accepts the module import without raising,
+        i.e. ``BooleanOptionalAction`` is available on the CI Python
+        (3.10, per ``.github/workflows/ci.yml``).
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "fetch_abstracts.py"), "--help"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    # ``--help`` must succeed and both flag forms must appear.
+    assert result.returncode == 0, result.stderr
+    combined = result.stdout + result.stderr
+    assert "--include-legacy" in combined
+    assert "--no-include-legacy" in combined

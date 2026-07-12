@@ -178,6 +178,28 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     print(f"[rescue_short_success] Rewrote {args.progress} with {len(hits)} demoted records.")
 
     if current_mode == "upload":
+        # Guardrail (review issue R1): ``data_artifacts.upload_progress_only``
+        # accepts *only* the canonical repo path
+        # (``ROOT/cache/abstract_backfill_progress.jsonl.gz``). Piping a
+        # custom ``--progress`` path straight into it would surface as a
+        # raw ``RuntimeError`` at the very last step. Fail fast here with
+        # a user-friendly message so the operator understands the CLI
+        # contract instead of chasing a stack trace.
+        from data_artifacts import DEFAULT_PROGRESS_PATH
+
+        canonical = Path(DEFAULT_PROGRESS_PATH).resolve()
+        if args.progress.resolve() != canonical:
+            print(
+                "[rescue_short_success] --upload requires the canonical "
+                "progress file location:\n"
+                f"    expected: {canonical}\n"
+                f"    got:      {args.progress.resolve()}\n"
+                "Run this script against the default --progress path, or "
+                "drop --upload and push via the GitHub Actions workflow.",
+                file=sys.stderr,
+            )
+            return 2
+
         # Deferred import: keep dry-run / apply modes free of any HF
         # side-effect risk (never even import the uploader).
         from data_artifacts import upload_progress_only

@@ -118,6 +118,11 @@ def test_main_upload_invokes_upload_progress_only(tmp_path, monkeypatch):
         return ["cache/abstract_backfill_progress.jsonl.gz"]
 
     monkeypatch.setattr(data_artifacts, "upload_progress_only", _fake_upload)
+    # R1 guardrail: rescue_short_success now refuses to invoke the
+    # uploader unless ``--progress`` matches ``DEFAULT_PROGRESS_PATH``.
+    # Redirect the canonical anchor to our tmp file so the happy path
+    # can still be exercised end-to-end here.
+    monkeypatch.setattr(data_artifacts, "DEFAULT_PROGRESS_PATH", path)
     # Explicitly forbid any other uploader.
     def _boom(*a, **kw):
         raise AssertionError("rescue_short_success must NEVER upload cache.jsonl.gz")
@@ -158,3 +163,37 @@ def test_upload_only_accepts_the_progress_file(tmp_path):
     other.write_bytes(b"gz")
     with pytest.raises(RuntimeError, match="refuses to upload"):
         upload_progress_only(other)
+
+
+def test_rescue_upload_rejects_non_canonical_progress(tmp_path, monkeypatch, capsys):
+    """R1 regression: --upload with a non-canonical --progress path must
+    fail fast with a friendly stderr message and rc == 2, without ever
+    invoking ``upload_progress_only`` (which would surface a raw
+    ``RuntimeError`` from the whitelist)."""
+    path = _write_progress(tmp_path, [
+        {"url": "https://a", "status": "success", "chars": 5},
+    ])
+
+    import data_artifacts
+
+    def _forbidden_upload(*a, **kw):
+        raise AssertionError(
+            "R1: rescue_short_success must NOT call upload_progress_only "
+            "when --progress is not the canonical path."
+        )
+
+    monkeypatch.setattr(data_artifacts, "upload_progress_only", _forbidden_upload)
+    # Deliberately point the canonical anchor somewhere *else* so the
+    # tmp_path passed via --progress does not match.
+    monkeypatch.setattr(
+        data_artifacts,
+        "DEFAULT_PROGRESS_PATH",
+        tmp_path / "somewhere_else" / "abstract_backfill_progress.jsonl.gz",
+    )
+
+    rc = rss.main(["--progress", str(path), "--upload"])
+    assert rc == 2
+    captured = capsys.readouterr()
+    assert "canonical" in captured.err.lower()
+    assert "expected:" in captured.err
+    assert "got:" in captured.err

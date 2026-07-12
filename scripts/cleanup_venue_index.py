@@ -127,6 +127,27 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     print(f"[cleanup_venue_index] Rewrote {args.progress} — removed {len(victims)} venue-index records.")
 
     if current_mode == "upload":
+        # Guardrail (review issue R1): ``upload_progress_only`` is a
+        # strict whitelist that accepts *only* the canonical
+        # ``ROOT/cache/abstract_backfill_progress.jsonl.gz``. Trying to
+        # upload a custom ``--progress`` path would blow up with a bare
+        # ``RuntimeError`` at the very last step. Fail fast with a
+        # friendly message so the operator can adjust the invocation.
+        from data_artifacts import DEFAULT_PROGRESS_PATH
+
+        canonical = Path(DEFAULT_PROGRESS_PATH).resolve()
+        if args.progress.resolve() != canonical:
+            print(
+                "[cleanup_venue_index] --upload requires the canonical "
+                "progress file location:\n"
+                f"    expected: {canonical}\n"
+                f"    got:      {args.progress.resolve()}\n"
+                "Run this script against the default --progress path, or "
+                "drop --upload and push via the GitHub Actions workflow.",
+                file=sys.stderr,
+            )
+            return 2
+
         from data_artifacts import upload_progress_only
 
         upload_progress_only(

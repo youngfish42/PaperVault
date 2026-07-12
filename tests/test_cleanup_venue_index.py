@@ -97,6 +97,11 @@ def test_main_upload_invokes_upload_progress_only(tmp_path, monkeypatch):
         return ["cache/abstract_backfill_progress.jsonl.gz"]
 
     monkeypatch.setattr(data_artifacts, "upload_progress_only", _fake)
+    # R1 guardrail: cleanup_venue_index now refuses to invoke the
+    # uploader unless ``--progress`` matches ``DEFAULT_PROGRESS_PATH``.
+    # Redirect the canonical anchor to the tmp file so the happy path
+    # can still be exercised end-to-end here.
+    monkeypatch.setattr(data_artifacts, "DEFAULT_PROGRESS_PATH", path)
 
     def _boom(*a, **kw):
         raise AssertionError("cleanup_venue_index must NEVER upload cache.jsonl.gz")
@@ -114,3 +119,35 @@ def test_main_missing_file_returns_nonzero(tmp_path):
     missing = tmp_path / "nope.jsonl.gz"
     rc = cvi.main(["--progress", str(missing), "--apply"])
     assert rc == 1
+
+
+def test_cleanup_upload_rejects_non_canonical_progress(tmp_path, monkeypatch, capsys):
+    """R1 regression: --upload with a non-canonical --progress path must
+    fail fast with a friendly stderr message and rc == 2, without ever
+    invoking ``upload_progress_only`` (which would otherwise surface a
+    raw ``RuntimeError`` from the whitelist)."""
+    path = _write_progress(tmp_path, [
+        {"url": _VENUE_INDEX[0], "status": "failed", "reason": "empty_abstract"},
+    ])
+
+    import data_artifacts
+
+    def _forbidden(*a, **kw):
+        raise AssertionError(
+            "R1: cleanup_venue_index must NOT call upload_progress_only "
+            "when --progress is not the canonical path."
+        )
+
+    monkeypatch.setattr(data_artifacts, "upload_progress_only", _forbidden)
+    monkeypatch.setattr(
+        data_artifacts,
+        "DEFAULT_PROGRESS_PATH",
+        tmp_path / "somewhere_else" / "abstract_backfill_progress.jsonl.gz",
+    )
+
+    rc = cvi.main(["--progress", str(path), "--upload"])
+    assert rc == 2
+    captured = capsys.readouterr()
+    assert "canonical" in captured.err.lower()
+    assert "expected:" in captured.err
+    assert "got:" in captured.err
