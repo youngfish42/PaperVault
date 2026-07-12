@@ -126,3 +126,32 @@ def test_openreview_venue_index_urls(url):
 def test_unknown_domains_return_unknown(url):
     assert classify_paper_url(url) == "unknown"
     assert not is_venue_index(url or "")
+
+
+# ---------- IJCAI proceedings (fourth review pass, issue #4) --------------
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.ijcai.org/proceedings/2020/0001",
+        "https://www.ijcai.org/proceedings/2023/42",
+        "https://www.ijcai.org/proceedings/2019/100/",
+        "https://ijcai.org/proceedings/2024/007",
+    ],
+)
+def test_ijcai_paper_urls(url):
+    assert classify_paper_url(url) == "paper"
+    assert not is_venue_index(url)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.ijcai.org/proceedings/2020",
+        "https://www.ijcai.org/proceedings/2020/",
+        "https://www.ijcai.org/proceedings/",
+        "https://www.ijcai.org/proceedings",
+    ],
+)
+def test_ijcai_venue_index_urls(url):
+    assert classify_paper_url(url) == "venue-index"
+    assert is_venue_index(url)

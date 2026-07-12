@@ -18,6 +18,14 @@ Sections rendered (spec AC-9):
   4. **Monthly Progress** — record-write timestamps bucketed by month.
 
 Corresponds to Task 8 of the abstract-backfill-repair spec.
+
+TODO(review #10, fourth pass): this report is currently only regenerated
+on demand (locally, or manually via ``workflow_dispatch``). Consider
+wiring it into ``backfill_abstracts.yml`` as a final read-only step so
+every 6-hourly run refreshes ``docs/abstract_backfill_report.md``
+alongside the progress ledger. Not doing it today because the report is
+already 100 % deterministic from the progress file (which *is* pushed to
+HF) so any operator can regenerate it locally in seconds.
 """
 
 from __future__ import annotations

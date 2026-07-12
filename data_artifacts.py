@@ -27,6 +27,24 @@ PathLike = Union[str, Path]
 
 
 _HF_PARENT_COMMITS: dict = {}
+# TODO(review #3, fourth pass): ``_HF_PARENT_COMMITS`` is a plain module
+# global and its readers/writers currently run only from the main thread
+# (Flask request handlers touch it serially, GH Actions jobs are
+# single-process). If we ever expose the upload path to a
+# ``ThreadPoolExecutor`` (e.g. parallel per-file HF pushes) this dict
+# needs a ``threading.Lock`` — otherwise a racy read-then-write can
+# stamp an older ``parent_commit`` back over a newer one and re-trigger
+# the 412 rebase loop unnecessarily. Not a bug today; noting it here so
+# the invariant is explicit for the next reader.
+#
+# TODO(review #7, fourth pass): the dict is keyed by ``path_in_repo``
+# (cache vs. progress) but the underlying HF API's ``list_repo_commits``
+# only returns the *dataset-wide* HEAD — so the values for two
+# different keys always resolve to the same commit id. That's fine for
+# correctness (any commit that touched *any* file in the dataset
+# invalidates the local snapshot of *every* file) but it means the
+# per-key granularity is cosmetic. If HF ever exposes per-path
+# revisions we can tighten the invalidation set.
 
 
 def _hf_repo_id() -> Optional[str]:

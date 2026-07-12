@@ -155,6 +155,15 @@ jobs:
         # ``delegated_to_specialised_fetcher`` are permanently skipped by
         # this whitelist so the retry budget is not wasted on them.
         #
+        # ``--no-include-legacy`` (fourth review pass, issue #5): the
+        # default ``--include-legacy`` semantics let every v3 record
+        # (which has no ``reason`` field) into the retry set — that
+        # completely defeats the whitelist for our current progress
+        # ledger (which is still mostly v3). Forcing the strict form
+        # here means only records that we *know* failed with a
+        # recoverable reason (v4 records with an in-whitelist ``reason``
+        # field) are retried, matching the workflow's stated intent.
+        #
         # ``timeout-minutes: 70`` is a hard step-level cap that matches
         # ``--soft-timeout 3600`` (60 min) plus 10 min slack for the
         # graceful save / HF upload. See review issue #10 for the
@@ -165,9 +174,9 @@ jobs:
         timeout-minutes: 70
         run: |
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
-            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract"
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy
           else
-            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract"
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy
           fi
 
       - name: Backfill CVF Open Access abstracts

@@ -114,6 +114,30 @@ def _classify_openreview(path: str, query: str) -> UrlKind:
     return "unknown"
 
 
+# ---------- IJCAI proceedings ---------------------------------------------
+# Individual papers live at ``/proceedings/YYYY/NNN`` where ``NNN`` is the
+# per-paper sequence id (e.g. ``/proceedings/2020/0001``). The bare
+# ``/proceedings/YYYY[/]`` path is the year landing / TOC page and never
+# contains a single abstract — the IJCAI fetcher would otherwise happily
+# match some unrelated ``<div class="col-md-12">`` on that page and
+# return a spurious body (fourth review pass, issue #4).
+_IJCAI_PAPER_RE = re.compile(r"^/proceedings/\d{4}/\d+/?$")
+_IJCAI_LANDING_RE = re.compile(r"^/proceedings/\d{4}/?$")
+
+
+def _classify_ijcai(path: str) -> UrlKind:
+    if not path or path == "/":
+        return "venue-index"
+    if _IJCAI_PAPER_RE.match(path):
+        return "paper"
+    if _IJCAI_LANDING_RE.match(path):
+        return "venue-index"
+    # ``/proceedings`` (no year) is the top-level catalog.
+    if path.rstrip("/") == "/proceedings":
+        return "venue-index"
+    return "unknown"
+
+
 def classify_paper_url(url: str) -> UrlKind:
     """Classify a paper URL into one of ``paper`` / ``venue-index`` / ``unknown``.
 
@@ -135,6 +159,8 @@ def classify_paper_url(url: str) -> UrlKind:
         return _classify_thecvf(path)
     if host.endswith("openreview.net"):
         return _classify_openreview(path, parsed.query or "")
+    if host.endswith("ijcai.org"):
+        return _classify_ijcai(path)
 
     return "unknown"
 

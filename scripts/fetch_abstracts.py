@@ -591,6 +591,36 @@ def fetch_abstract_for_paper(
     # Try the dedicated conference-site fetchers before the DOI chain.
     # A success here short-circuits with ``source == <domain>`` and no
     # further HTTP is issued.
+    #
+    # Review issue #1 (fourth pass): when the domain fetcher fails with
+    # a *concrete* reason (e.g. VLDB/CEUR short-circuit to
+    # ``no_abstract_available``, an IJCAI page whose DOM yielded no
+    # abstract block returns ``empty_abstract``), we remember that
+    # ``domain_reason`` / ``domain_source`` so the DOI-chain fall-through
+    # can surface it verbatim on final failure instead of degrading it
+    # into a generic ``empty_abstract`` / ``network`` bucket.
+    #
+    # IMPORTANT: only preserve the reason when the URL actually matched a
+    # *registered* domain fetcher — the dispatcher returns
+    # ``reason="no_abstract_available"`` both for "no fetcher claimed
+    # this URL" *and* for "matched fetcher chose not to try" (e.g. VLDB /
+    # CEUR PDF-only). If we surfaced the reason unconditionally, every
+    # unknown-domain URL (``example.org``, ``doi.org``, ...) would
+    # incorrectly stamp ``no_abstract_available`` on top of the more
+    # specific ``no_doi`` / ``empty_abstract`` / ``title_mismatch``
+    # deductions below. We therefore probe the registry membership first.
+    from papervault.services.abstract_fetchers import FETCHER_REGISTRY as _FETCHER_REGISTRY
+
+    def _matched_registered_fetcher(u: str) -> bool:
+        if not u:
+            return False
+        host = (urlparse(u).netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host in _FETCHER_REGISTRY
+
+    domain_reason = ""
+    domain_source = ""
     if url:
         dispatched = _dispatch_domain_fetcher(url)
         if dispatched.ok and dispatched.abstract:
@@ -599,6 +629,9 @@ def fetch_abstract_for_paper(
         # chain. We do *not* return early because e.g. an older ACL page
         # without a ``.acl-abstract`` block can still be recovered via
         # CrossRef.
+        if dispatched.reason and _matched_registered_fetcher(url):
+            domain_reason = dispatched.reason
+            domain_source = dispatched.source or ""
 
     doi = extract_doi(url)
     abstract = None
@@ -621,11 +654,17 @@ def fetch_abstract_for_paper(
         # every DOI-based candidate either failed or was dropped due to a
         # title mismatch. We don't have per-source http_status right here
         # (the underlying fetchers only surface ``abstract, api_title,
-        # new_time``), so ``last_source`` is best-effort: it's whichever
-        # source we know actually had a chance to run (all three did) —
-        # we prefer the priority head ``crossref`` when nothing succeeded.
+        # new_time``), so ``last_source`` is best-effort.
+        #
+        # Review issue #6 (fourth pass): the previous implementation
+        # hard-coded ``last_source = "crossref"`` here, which is
+        # misleading — the three DOI sources run concurrently via
+        # ``as_completed`` and the *actual* last-attempted source is
+        # unpredictable. Use ``doi_chain`` as an honest summary so the
+        # analyse dashboard doesn't blame crossref for every DOI-chain
+        # failure.
         if not abstract:
-            last_source = "crossref"
+            last_source = "doi_chain"
 
     if not abstract and title:
         arxiv_abs, api_title, last_time["arxiv"] = fetch_arxiv_abstract(
@@ -644,6 +683,19 @@ def fetch_abstract_for_paper(
         return abstract, last_time, source, {}
 
     # ---- Synthesise a machine-readable failure reason. ------------------
+    # Review issue #1 (fourth pass): if the domain fetcher produced a
+    # *concrete* reason (e.g. VLDB/CEUR ``no_abstract_available``, IJCAI
+    # DOM empty ``empty_abstract``) we surface it as the primary
+    # explanation — it is more informative than the generic DOI-chain
+    # deductions below and keeps the analyse dashboard's reason
+    # breakdown honest.
+    if domain_reason:
+        err_info["reason"] = normalize_reason(domain_reason)
+        err_info["last_source"] = domain_source or last_source
+        if title_mismatch:
+            err_info["title_mismatch"] = True
+        return None, last_time, source, err_info
+
     if not doi and not title:
         err_info["reason"] = "no_doi"
     elif not doi:
@@ -768,6 +820,16 @@ def _load_jsonl_gz(path: Path) -> Tuple[Dict[str, dict], int]:
                 # 后写覆盖前写：天然实现事件溯源式去重
                 progress[url] = _record_to_meta(obj)
     except (OSError, EOFError, gzip.BadGzipFile) as exc:
+        # TODO(review #8, fourth pass): ``backup`` embeds an integer
+        # ``time.time()`` for uniqueness. In the extraordinarily unlikely
+        # case that two processes race into corruption recovery within
+        # the same wall-clock second the second ``os.replace`` will
+        # clobber the first backup. Not fixing today because (a) all
+        # cache-mutating workflows already share the ``papervault-cache``
+        # concurrency group so this is impossible in CI and (b) local
+        # dev virtually never hits corruption. If we ever loosen the
+        # concurrency guard, switch to ``time.time_ns()`` or a uuid4
+        # suffix.
         backup = path.with_name(f"{path.name}.broken-{int(time.time())}")
         try:
             os.replace(path, backup)
@@ -852,6 +914,14 @@ def _append_progress(records: List[dict]) -> None:
     特殊情况：若 PROGRESS_FILE 还不存在，则改走 ``_compact_progress`` 的原子
     路径（``.tmp + os.replace``）而不是直接 ``gzip.open("ab")``——后者在写到
     一半被打断时会留下一个 *只含半段 gzip 流* 的文件，导致下次启动加载失败。
+
+    Review issue #2 (fourth pass): any OSError / gzip failure during the
+    append **must propagate**. The caller (:func:`save_progress`) uses
+    ``_last_saved_snapshot`` as an in-memory mirror of "what's on disk";
+    if we swallow a write failure here the snapshot stays behind, the
+    next save re-appends the same diff, and physical_lines silently
+    balloons until the next compact. Log + raise so the operator sees
+    the failure and progress remains coherent.
     """
     if not records:
         return
@@ -866,17 +936,27 @@ def _append_progress(records: List[dict]) -> None:
             seed[url] = _record_to_meta(rec)
         _compact_progress(seed)
         return
-    with gzip.open(PROGRESS_FILE, "ab") as raw:
-        # gzip.open ab 不直接接受 text；自己手工编码以保证可控
-        buf_lines = []
-        for rec in records:
-            buf_lines.append(json.dumps(rec, ensure_ascii=False))
-        payload = ("\n".join(buf_lines) + "\n").encode("utf-8")
-        raw.write(payload)
-        try:
-            raw.flush()
-        except Exception:
-            pass
+    try:
+        with gzip.open(PROGRESS_FILE, "ab") as raw:
+            # gzip.open ab 不直接接受 text；自己手工编码以保证可控
+            buf_lines = []
+            for rec in records:
+                buf_lines.append(json.dumps(rec, ensure_ascii=False))
+            payload = ("\n".join(buf_lines) + "\n").encode("utf-8")
+            raw.write(payload)
+            try:
+                raw.flush()
+            except Exception:
+                pass
+    except (OSError, gzip.BadGzipFile) as exc:
+        # Do NOT update physical_lines / _last_saved_snapshot -- caller
+        # relies on those two mirrors staying in lock-step with disk.
+        print(
+            f"[!] _append_progress: failed to append {len(records)} record(s) "
+            f"to {PROGRESS_FILE.name}: {exc!r}. Snapshot NOT advanced; the "
+            "next save() will re-attempt the same diff."
+        )
+        raise
     _progress_runtime["physical_lines"] += len(records)
 
 
@@ -1020,9 +1100,23 @@ def list_pending_confs(papers: List[dict]) -> List[Tuple[str, dict]]:
 
 
 def update_conf_progress_md(conf: str, total: int, success: int, failed: int, elapsed_sec: float):
-    """更新 docs/abstract_backfill_progress.md，将指定 conf 从'待处理'移到'已完成'。"""
+    """更新 docs/abstract_backfill_progress.md，将指定 conf 从'待处理'移到'已完成'。
+
+    Review issue #9 (fourth pass): the previous silent-return path
+    (``if not md_path.exists(): return``) was fine at unit level but hid
+    a legitimate operational signal — a fresh clone or a workflow that
+    ran ``rm docs/abstract_backfill_progress.md`` would silently stop
+    receiving progress updates. We now log the miss (once per invocation,
+    stdout only — never raise) so an operator watching the CI log can
+    diagnose the drop quickly.
+    """
     md_path = Path("docs/abstract_backfill_progress.md")
     if not md_path.exists():
+        print(
+            f"[i] update_conf_progress_md: {md_path} missing; skipping "
+            f"markdown update for conf={conf} (success={success}/{total}, "
+            f"failed={failed}). This is fine locally but unexpected in CI."
+        )
         return
 
     with open(md_path, "r", encoding="utf-8") as f:
