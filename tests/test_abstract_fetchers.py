@@ -167,6 +167,14 @@ def test_acl_modern_layout_strips_h5_heading():
     # Heading must not leak into the returned text.
     assert not res.abstract.lower().startswith("abstract ")
     assert "synthetic method for automated abstract fetching" in res.abstract
+    # Real modern ACL abstracts are natural-language prose only -- they
+    # never contain literal HTML tags or entity references. Guard the
+    # fixture against regressing back to embedded ``&lt;h5&gt;`` /
+    # ``&lt;span&gt;`` markers, which would drift away from the actual
+    # aclanthology.org DOM the fixture is meant to mirror.
+    assert "<" not in res.abstract
+    assert "&lt;" not in res.abstract
+    assert "&quot;" not in res.abstract
 
 
 # ---------- IJCAI: real-DOM structure regression (review issue R3) ---------

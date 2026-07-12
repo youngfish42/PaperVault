@@ -47,8 +47,13 @@ class _ACLFetcher(Fetcher):
             # ``<h5 class="card-title">Abstract</h5>`` (2019+), while
             # older / fixture markup sometimes uses ``<strong>``. Strip
             # both so the returned text starts at the actual prose.
+            #
+            # ``startswith`` (rather than strict equality) keeps us in
+            # lockstep with :mod:`.aaai` and :mod:`.mlr` and tolerates
+            # future template variants such as ``Abstract:`` /
+            # ``Abstract .``.
             for label in div.find_all(["strong", "h1", "h2", "h3", "h4", "h5", "h6"]):
-                if label.get_text(strip=True).lower() == "abstract":
+                if label.get_text(strip=True).lower().startswith("abstract"):
                     label.extract()
                     break
             candidates.append(clean_text(div.get_text(" ")))
