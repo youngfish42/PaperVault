@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from collector.http import SESSION, HEADERS
 from collector.merge import _merge_paper_record
+from collector.url_types import is_venue_index
 
 
 # OpenReview venue 过滤关键字（统一来源，供 collector 与 discovery 共用）
@@ -204,6 +205,12 @@ def search_from_iclr_openreview(url, name, res):
                     "paper_abstract": abstract,
                     "paper_code": "#",
                 }
+                # Defensive: a malformed ``forum_id`` (or an empty one from
+                # a badly-shaped API response) would otherwise create a
+                # URL like ``https://openreview.net/pdf?id=`` that is a
+                # venue landing page in disguise.
+                if not forum_id or is_venue_index(record["paper_url"]):
+                    continue
                 prior = seen_ids.get(forum_id) if forum_id else None
                 if prior is not None:
                     # Same forum_id reappeared (offset boundary, v1->v2
@@ -330,6 +337,12 @@ def search_from_iclr_official(url, name, res):
         # 统一为 pdf 链接，与 OpenReview API 方式保持一致
         if "openreview.net/forum?id=" in paper_url:
             paper_url = paper_url.replace("openreview.net/forum?id=", "openreview.net/pdf?id=")
+
+        # Skip venue landing pages that sometimes bubble up through the
+        # ICLR official schedule when a session card links to a
+        # ``group?id=...`` root instead of a specific ``forum?id=...``.
+        if is_venue_index(paper_url):
+            continue
 
         # 解析作者：ICLR 官网用中间点 "·" 分隔
         authors = []

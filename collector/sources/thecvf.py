@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 
 from collector.http import SESSION, HEADERS
 from collector.merge import _merge_paper_record
+from collector.url_types import is_venue_index
 
 
 def search_abs_from_thecvf(url):
@@ -34,6 +35,11 @@ def search_from_thecvf(url, name, res):
         if url_postfix.startswith('/'):
             url_postfix = url_postfix[1:]
         paper_url = "https://openaccess.thecvf.com/" + href
+        # Skip venue landing pages that occasionally appear as ``<a>`` items
+        # inside ALL.py / day1.py / day2.py listings (e.g. cross-year
+        # navigation stubs). Real paper hrefs always end in ``_paper.html``.
+        if is_venue_index(paper_url):
+            continue
         paper = a_tag.string if a_tag.string else a_tag.get_text(strip=True)
 
         authors = []

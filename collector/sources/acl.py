@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 
 from collector.http import SESSION, HEADERS
 from collector.merge import _merge_paper_record
+from collector.url_types import is_venue_index
 
 
 def _parse_acl_volume(volume_url: str, tag: str, name: str, res: dict):
@@ -42,6 +43,13 @@ def _parse_acl_volume(volume_url: str, tag: str, name: str, res: dict):
             continue
 
         paper_url = "https://aclanthology.org" + href
+
+        # Belt-and-braces filter: even though the regex above already
+        # excludes front-matter ``.0/`` volumes via ``\d+`` matching, keep
+        # a call into the shared classifier so anything the regex misses
+        # (e.g. weird historical hrefs) still can't land as a paper URL.
+        if is_venue_index(paper_url):
+            continue
 
         # 作者：在 strong 的父容器中查找 people 链接
         container = strong.find_parent()
