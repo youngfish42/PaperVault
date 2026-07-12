@@ -136,15 +136,14 @@ PaperVault/
 │   ├── src/
 │   │   ├── main.ts               # App entry point
 │   │   ├── App.vue               # Root component
-│   │   ├── router/index.ts       # Vue Router (hash mode); routes `/`, `/advanced`, `/settings` (`/about` is currently commented out)
+│   │   ├── router/index.ts       # Vue Router (hash mode); routes `/`, `/advanced`, `/settings`
 │   │   ├── api/
 │   │   │   ├── paper.ts          # Axios calls against the v1 surface: `/api/v1/papers`, `/api/v1/confs`, legacy `/api/v1/suggest` shim
 │   │   │   └── ai.ts             # P2/P3 AI endpoints: `listAiProviders` (`GET /v1/ai/providers`), `suggestKeywordsWithSettings` (`POST /v1/suggest` with per-request provider/API key, 120s timeout)
 │   │   ├── views/
 │   │   │   ├── HomeView.vue              # Landing + Smart Search (DSL-aware single-box); also owns the AI search + rerank flow
 │   │   │   ├── AdvancedSearchView.vue    # Visual query builder that compiles to the WoS-style DSL
-│   │   │   ├── SettingsView.vue          # AI provider settings page (P2-C shell + P2-D `AiSuggestSection`)
-│   │   │   └── AboutView.vue             # About / info page (route currently commented out in `router/index.ts`)
+│   │   │   └── SettingsView.vue          # AI provider settings page (P2-C shell + P2-D `AiSuggestSection`)
 │   │   ├── components/
 │   │   │   ├── MainNavBar.vue            # Top navigation bar shared across Home / Advanced / Settings
 │   │   │   ├── SearchResultList.vue      # Results display with pagination / export

@@ -107,11 +107,11 @@ conf/*.json  ──►  collector.py  ──►  cache/cache.jsonl.gz
 ```
 src/
 ├── api/paper.ts               # /v1/papers /v1/confs /v1/suggest 类型化请求
-├── router/index.ts            # 路由：/ 与 /advanced
+├── router/index.ts            # 路由：/、/advanced、/settings
 ├── views/
 │   ├── HomeView.vue           # 智能搜索：统一搜索框、语法速查、结果区
 │   ├── AdvancedSearchView.vue # 高级搜索：行式条件构建器 + DSL 预览
-│   └── AboutView.vue          # 关于（暂未启用）
+│   └── SettingsView.vue       # AI 提供方设置
 ├── components/
 │   ├── SearchResultList.vue   # 结果分页 / 排序 / 研究领域·会议·年份 facet / 摘要折叠 / 导出
 │   ├── ConfsTree.vue          # 会议-年份树形筛选
