@@ -21487,6 +21487,10 @@
     "DBLP::https://dblp.org/db/conf/infocom/infocom2026.html": {
       "name": "INFOCOM2026",
       "ts": "2026-07-11T18:26:11"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/nier2026.html": {
+      "name": "ICSE2026",
+      "ts": "2026-07-12T10:45:54"
     }
   }
 }
