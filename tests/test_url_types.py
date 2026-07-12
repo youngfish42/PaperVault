@@ -97,6 +97,14 @@ def test_openreview_paper_urls(url):
     [
         "https://openreview.net/group?id=ICLR.cc/2021/Conference",
         "https://openreview.net/",
+        # Review issue #3: an empty ``id=`` value must classify as venue-index
+        # so the pipeline never issues a real HTTP for a landing page.
+        "https://openreview.net/pdf?id=",
+        "https://openreview.net/forum?id=",
+        "https://openreview.net/pdf?id=&foo=1",
+        # No query string at all.
+        "https://openreview.net/pdf",
+        "https://openreview.net/forum",
     ],
 )
 def test_openreview_venue_index_urls(url):

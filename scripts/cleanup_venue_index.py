@@ -120,14 +120,10 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     for url in victims:
         progress.pop(url, None)
 
-    import scripts.fetch_abstracts as fa
-
-    original = fa.PROGRESS_FILE
-    try:
-        fa.PROGRESS_FILE = args.progress
-        _compact_progress(progress)
-    finally:
-        fa.PROGRESS_FILE = original
+    # Review issue #6: same fix as rescue_short_success -- use the
+    # explicit ``path=`` kwarg to compact into the caller-selected
+    # file, avoiding a race-prone monkey-patch of ``fa.PROGRESS_FILE``.
+    _compact_progress(progress, path=args.progress)
     print(f"[cleanup_venue_index] Rewrote {args.progress} — removed {len(victims)} venue-index records.")
 
     if current_mode == "upload":

@@ -34,6 +34,17 @@ def http_get(url: str, timeout: float = 20.0) -> Tuple[Optional[requests.Respons
     status = resp.status_code
     if 200 <= status < 300:
         return resp, None
+    if 300 <= status < 400:
+        # Review issue #7: SESSION should already follow redirects, so
+        # a bare 3xx surfacing here means the server pointed us at a
+        # non-fetchable resource (an interstitial, a login wall, etc.).
+        # Treat it as "no abstract available" instead of hiding it in
+        # the generic ``network`` bucket -- otherwise the analyse
+        # dashboard cannot distinguish a genuine outage from a soft
+        # deny.
+        return None, AbstractResult(
+            ok=False, url=url, reason="no_abstract_available", http_status=status
+        )
     if status == 429:
         return None, AbstractResult(ok=False, url=url, reason="rate_limited", http_status=status)
     if status in (500, 502, 503, 504):

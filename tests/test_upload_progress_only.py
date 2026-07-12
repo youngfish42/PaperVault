@@ -61,3 +61,17 @@ def test_upload_progress_only_rejects_arbitrary_path(tmp_path):
             data_artifacts.upload_progress_only(other)
 
     assert mock_upload.call_count == 0
+
+
+def test_upload_progress_only_rejects_spoofed_basename(tmp_path):
+    """Review issue #5: an out-of-tree file whose basename happens to be
+    ``abstract_backfill_progress.jsonl.gz`` must NOT bypass the whitelist.
+    """
+    spoofed = tmp_path / "abstract_backfill_progress.jsonl.gz"
+    spoofed.write_bytes(b"")
+
+    with patch.object(data_artifacts, "upload_to_huggingface") as mock_upload:
+        with pytest.raises(RuntimeError):
+            data_artifacts.upload_progress_only(spoofed)
+
+    assert mock_upload.call_count == 0

@@ -46,8 +46,13 @@ _ACL_FRONT_MATTER_RE = re.compile(r"^/\d{4}\.[A-Za-z0-9-]+\.0/?$")
 # enumerate volumes but do not carry a single abstract themselves.
 _ACL_VOLUME_CATALOG_RE = re.compile(r"^/(volumes|events)/")
 # A single-paper URL looks like ``/2023.acl-long.42/`` or ``/P05-1001/``.
+# The trailing sequence-number is at least 1 (``.0`` is reserved for the
+# front-matter stub, already caught by ``_ACL_FRONT_MATTER_RE``). We
+# still tighten the regex here so a future reordering of the checks in
+# ``_classify_aclanthology`` cannot silently regress and label ``.0`` as
+# a paper URL.
 _ACL_PAPER_RE = re.compile(
-    r"^/(?:\d{4}\.[A-Za-z0-9-]+\.\d+|[A-Za-z]\d{2}-\d+)/?$"
+    r"^/(?:\d{4}\.[A-Za-z0-9-]+\.(?:0*[1-9][0-9]*)|[A-Za-z]\d{2}-\d+)/?$"
 )
 
 
@@ -91,7 +96,16 @@ def _classify_thecvf(path: str) -> UrlKind:
 # Individual paper: ``/forum?id=<forum_id>`` or ``/pdf?id=<forum_id>``.
 # Conference root:  ``/group?id=ICLR.cc/2021/Conference``.
 def _classify_openreview(path: str, query: str) -> UrlKind:
-    if path in ("/forum", "/pdf") and "id=" in query:
+    # A ``/forum`` or ``/pdf`` path with an empty ``id=`` (or no query at
+    # all) is a landing page in disguise (spec Task 4, review issue #3):
+    # the abstract pipeline would otherwise waste a real HTTP request on
+    # a URL that can never yield a paper.
+    if path in ("/forum", "/pdf"):
+        if not query or "id=" not in query:
+            return "venue-index"
+        # Reject ``?id=`` with an empty value (``id=&foo=1`` or ``id=``).
+        if re.search(r"(?:^|&)id=(?:&|$)", query):
+            return "venue-index"
         return "paper"
     if path == "/group":
         return "venue-index"

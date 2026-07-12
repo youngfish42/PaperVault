@@ -125,6 +125,9 @@ def normalize_reason(text: Optional[str]) -> str:
         return "rate_limited"
     if "timeout" in lowered or "timed out" in lowered:
         return "timeout"
+    # Order matters: probe "missing/no doi" *before* the generic
+    # "not found" branch — otherwise a message like "missing doi info:
+    # not found upstream" would be misclassified as ``doi_not_found``.
     if "no doi" in lowered or "missing doi" in lowered or lowered == "nodoi":
         return "no_doi"
     if "not found" in lowered or "404" in lowered:
@@ -799,10 +802,22 @@ def load_progress() -> Dict[str, dict]:
     return {}
 
 
-def _compact_progress(progress: Dict[str, dict]) -> None:
-    """整文件原子重写：丢弃历史 append，只保留每个 url 的最新状态。"""
-    PROGRESS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = PROGRESS_FILE.with_suffix(PROGRESS_FILE.suffix + ".tmp")
+def _compact_progress(
+    progress: Dict[str, dict],
+    *,
+    path: Optional[Path] = None,
+) -> None:
+    """整文件原子重写：丢弃历史 append，只保留每个 url 的最新状态。
+
+    ``path`` defaults to the module-level ``PROGRESS_FILE`` but can be
+    overridden (spec Task 12, review issue #6) so downstream one-shot
+    scripts (``rescue_short_success`` / ``cleanup_venue_index``) can
+    reuse the compaction primitive without monkey-patching module state
+    -- which is not thread-safe when the pipeline runs alongside them.
+    """
+    target = Path(path) if path is not None else PROGRESS_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(target.suffix + ".tmp")
     try:
         with gzip.open(tmp, "wt", encoding="utf-8") as f:
             meta = _meta_line()
@@ -811,14 +826,15 @@ def _compact_progress(progress: Dict[str, dict]) -> None:
             for url, rec_meta in progress.items():
                 rec = _meta_to_record(url, rec_meta)
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        os.replace(tmp, PROGRESS_FILE)
+        os.replace(tmp, target)
     finally:
         if tmp.exists():
             try:
                 tmp.unlink()
             except OSError:
                 pass
-    _progress_runtime["physical_lines"] = len(progress)
+    if target == PROGRESS_FILE:
+        _progress_runtime["physical_lines"] = len(progress)
 
 
 def _append_progress(records: List[dict]) -> None:
@@ -1083,13 +1099,21 @@ def _process_targets(
     max_failed_attempts: int = 3,
     progress: Dict[str, dict] = None,
     reason_in: Optional[Set[str]] = None,
+    include_legacy: bool = True,
 ) -> Tuple[int, int, bool]:
     """处理一组目标论文，返回 (success_count, failed_count, timed_out)。
 
     ``reason_in`` (spec AC-7 / Task 7) — when set, and ``retry_failed`` is
     active, only re-attempt papers whose *previous* failure ``reason`` is
-    in this set. Records without a ``reason`` field (legacy v3 progress
-    entries) are conservatively included so old runs stay retryable.
+    in this set.
+
+    ``include_legacy`` (review issue #9): controls how legacy v3 progress
+    entries (records without a ``reason`` field) interact with the
+    ``reason_in`` whitelist. Default ``True`` keeps the historical
+    behaviour (legacy records are always retryable). Pass ``False`` in
+    workflows that must strictly honour the reason whitelist — e.g. the
+    Actions retry step which is intentionally scoped to recoverable
+    failures only.
     """
     if progress is None:
         progress = load_progress()
@@ -1111,15 +1135,26 @@ def _process_targets(
         if reason_in is not None:
             # ``normalize_reason`` guarantees an in-vocab value; records
             # that were written under schema v3 (no ``reason`` at all)
-            # are kept — they predate the whitelist and callers may
-            # legitimately want to sweep them on a retry pass.
+            # are included by default (``include_legacy=True``) so
+            # legacy runs stay retryable. Set ``include_legacy=False``
+            # to strictly honour the whitelist.
             reason_norm = {normalize_reason(r) for r in reason_in}
-            failed_urls = {
-                url for url in failed_urls
-                if "reason" not in progress[url]
-                or normalize_reason(progress[url].get("reason")) in reason_norm
-            }
-            print(f"[*] Retry filter: reason_in={sorted(reason_norm)} -> {len(failed_urls)} urls remain")
+            if include_legacy:
+                failed_urls = {
+                    url for url in failed_urls
+                    if "reason" not in progress[url]
+                    or normalize_reason(progress[url].get("reason")) in reason_norm
+                }
+            else:
+                failed_urls = {
+                    url for url in failed_urls
+                    if "reason" in progress[url]
+                    and normalize_reason(progress[url].get("reason")) in reason_norm
+                }
+            print(
+                f"[*] Retry filter: reason_in={sorted(reason_norm)} "
+                f"include_legacy={include_legacy} -> {len(failed_urls)} urls remain"
+            )
         targets = [p for p in targets if p.get("paper_url") in failed_urls]
         print(f"[*] Retry failed mode: {len(targets)} failed papers to retry (max_attempts={max_failed_attempts})")
 
@@ -1222,6 +1257,7 @@ def run(
     soft_timeout: float = None,
     max_failed_attempts: int = 3,
     reason_in: Optional[Set[str]] = None,
+    include_legacy: bool = True,
 ) -> None:
     global_start = time.time()
     # Pull the latest cache from Hugging Face before reading/writing anything.
@@ -1344,6 +1380,7 @@ def run(
             max_failed_attempts=max_failed_attempts,
             progress=progress,
             reason_in=reason_in,
+            include_legacy=include_legacy,
         )
         if success > 0:
             sync_artifacts_after_cache_update("Update PaperVault data artifacts after abstract backfill")
@@ -1379,7 +1416,7 @@ def run(
         success, failed, timed_out = _process_targets(
             conf_papers, all_papers, chunk_size, retry_failed, retry_partial, query_doi_by_title,
             start_time=global_start, soft_timeout=soft_timeout, max_failed_attempts=max_failed_attempts,
-            progress=progress, reason_in=reason_in,
+            progress=progress, reason_in=reason_in, include_legacy=include_legacy,
         )
         attempted = success + failed
         processed_total += attempted
@@ -1429,8 +1466,25 @@ if __name__ == "__main__":
         help=(
             "Whitelist of failure reasons to retry (comma-separated). "
             "Requires --retry-failed. Recommended: 'rate_limited,timeout,network,empty_abstract'. "
-            "Legacy v3 records without a 'reason' field are always included."
+            "Legacy v3 records without a 'reason' field are handled per --include-legacy."
         ),
+    )
+    parser.add_argument(
+        "--include-legacy",
+        dest="include_legacy",
+        action="store_true",
+        default=True,
+        help=(
+            "Include legacy v3 records (no 'reason' field) in the retry set "
+            "even when --reason-in is set. This is the default; use "
+            "--no-include-legacy to strictly honour the whitelist."
+        ),
+    )
+    parser.add_argument(
+        "--no-include-legacy",
+        dest="include_legacy",
+        action="store_false",
+        help="Strictly honour --reason-in and skip legacy v3 records.",
     )
     args = parser.parse_args()
     reason_in_set: Optional[Set[str]] = None
@@ -1450,4 +1504,5 @@ if __name__ == "__main__":
         soft_timeout=args.soft_timeout,
         max_failed_attempts=args.max_failed_attempts,
         reason_in=reason_in_set,
+        include_legacy=args.include_legacy,
     )

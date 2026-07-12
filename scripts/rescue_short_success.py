@@ -170,17 +170,11 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         return 0
 
     demote_records(progress, hits)
-    # Patch the module-global PROGRESS_FILE so ``_compact_progress`` writes
-    # to the caller-selected path. We restore it right after so we don't
-    # leak the override to other importers of ``fetch_abstracts``.
-    import scripts.fetch_abstracts as fa
-
-    original = fa.PROGRESS_FILE
-    try:
-        fa.PROGRESS_FILE = args.progress
-        _compact_progress(progress)
-    finally:
-        fa.PROGRESS_FILE = original
+    # Review issue #6: pass ``path=`` through explicitly instead of the
+    # historical monkey-patch of ``fa.PROGRESS_FILE`` -- the latter is
+    # not thread-safe if another importer of ``fetch_abstracts`` is
+    # active, and it silently mutated global state on failure.
+    _compact_progress(progress, path=args.progress)
     print(f"[rescue_short_success] Rewrote {args.progress} with {len(hits)} demoted records.")
 
     if current_mode == "upload":

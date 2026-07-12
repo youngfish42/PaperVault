@@ -415,17 +415,19 @@ def upload_progress_only(
     through the GitHub Actions workflow.
     """
     resolved = Path(path).resolve()
-    try:
-        rel = resolved.relative_to(ROOT).as_posix()
-    except ValueError:
-        rel = resolved.name
-
-    if rel != "cache/abstract_backfill_progress.jsonl.gz":
+    # Strict whitelist: the path *must* live inside the repo root at the
+    # canonical location. This closes review issue #5 (a
+    # ``ValueError`` from ``relative_to`` used to fall back to
+    # ``resolved.name``, letting any file named
+    # ``abstract_backfill_progress.jsonl.gz`` bypass the check).
+    expected = (ROOT / "cache" / "abstract_backfill_progress.jsonl.gz").resolve()
+    if resolved != expected:
         raise RuntimeError(
             "upload_progress_only refuses to upload "
-            f"{rel!r}: only cache/abstract_backfill_progress.jsonl.gz is "
-            "allowed from a local machine. cache.jsonl.gz uploads must go "
-            "through the GitHub Actions workflow."
+            f"{resolved!s}: only "
+            f"{expected!s} is allowed from a local machine. "
+            "cache.jsonl.gz uploads must go through the GitHub Actions "
+            "workflow."
         )
 
     print(

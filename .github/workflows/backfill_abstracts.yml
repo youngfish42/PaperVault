@@ -155,7 +155,14 @@ jobs:
         # ``delegated_to_specialised_fetcher`` are permanently skipped by
         # this whitelist so the retry budget is not wasted on them.
         #
+        # ``timeout-minutes: 70`` is a hard step-level cap that matches
+        # ``--soft-timeout 3600`` (60 min) plus 10 min slack for the
+        # graceful save / HF upload. See review issue #10 for the
+        # rationale (defence-in-depth against a wedged HTTP client).
+        #
         # See spec AC-7 / Task 7 and Task 11 for the design rationale.
+        if: success() || failure()
+        timeout-minutes: 70
         run: |
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
             python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract"

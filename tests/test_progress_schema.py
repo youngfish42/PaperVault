@@ -85,6 +85,11 @@ def test_reason_enum_covers_spec_vocabulary():
         (None, "network"),
         ("", "network"),
         ("rate_limited", "rate_limited"),
+        # Regression guard for review issue #1: a message that *starts*
+        # by declaring the DOI is missing but also contains "not found"
+        # must classify as ``no_doi`` — not ``doi_not_found``.
+        ("missing doi info: not found upstream", "no_doi"),
+        ("nodoi", "no_doi"),
     ],
 )
 def test_normalize_reason_maps_known_blurbs(raw, expected):
