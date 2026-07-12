@@ -142,9 +142,25 @@ jobs:
       - name: Run abstract backfill
         run: |
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
-            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 18000 --max-failed-attempts 3
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3
           else
-            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 18000 --max-failed-attempts 3
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3
+          fi
+
+      - name: Retry recoverable failures (--reason-in whitelist)
+        # After the main pass we spend up to one extra hour retrying only
+        # the failure reasons that *can* actually recover on a re-attempt
+        # (transient upstream state). Structural failures such as
+        # ``no_doi`` / ``doi_not_found`` / ``venue_index`` /
+        # ``delegated_to_specialised_fetcher`` are permanently skipped by
+        # this whitelist so the retry budget is not wasted on them.
+        #
+        # See spec AC-7 / Task 7 and Task 11 for the design rationale.
+        run: |
+          if [ -n "${{ github.event.inputs.target_conf }}" ]; then
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract"
+          else
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract"
           fi
 
       - name: Backfill CVF Open Access abstracts
