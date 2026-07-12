@@ -146,6 +146,64 @@ def test_empty_page_falls_through_to_empty_abstract():
     assert res.reason == "empty_abstract"
 
 
+# ---------- IJCAI: real-DOM structure regression (review issue R3) ---------
+
+def test_ijcai_real_layout_extracts_abstract_and_excludes_keywords():
+    """Verified against ijcai.org/proceedings/{2017,2019,2023,2024}/0001
+    on 2026-07-12: the abstract sits inside its own <div class="col-md-12">
+    with no heading and no "Abstract" prefix, immediately followed by
+    a second col-md-12 that only holds <div class="keywords">.
+
+    The fetcher MUST return the abstract prose and MUST NOT leak any
+    text from the keywords block into it.
+    """
+    html = _fixture_html("ijcai_paper.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://ijcai.org/proceedings/2023/0001")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "ijcai"
+    assert res.abstract is not None
+    # Keywords / topic labels must never bleed into the abstract text.
+    assert "Keywords:" not in res.abstract
+    assert "Fixture Topic" not in res.abstract
+    assert "Another Fixture Topic" not in res.abstract
+    # Abstract prose must actually be present.
+    assert "synthetic IJCAI proceedings abstract" in res.abstract
+
+
+def test_ijcai_heading_fallback_stops_at_next_heading():
+    """Fallback path (mirror / archived pages that DO carry an explicit
+    <h2>Abstract</h2>) must break at the *next* heading so BibTeX /
+    References / footer nav stay strictly outside the returned text.
+
+    This is the direct regression for review issue R3 -- the previous
+    implementation iterated find_next_siblings() with no stop
+    condition and would slurp every following sibling.
+    """
+    html = _fixture_html("ijcai_paper_heading.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://ijcai.org/proceedings/mirror/heading-style")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "ijcai"
+    assert res.abstract is not None
+    # Prose from BOTH abstract paragraphs must be captured.
+    assert "mirror-style fixture" in res.abstract
+    assert "multi-paragraph abstracts" in res.abstract
+    # Content that appears ONLY past the next <h2> heading must NOT
+    # leak in. (The words "BibTeX"/"References" themselves appear as
+    # ordinary prose inside the abstract paragraphs of this fixture,
+    # so we assert on markers that are unique to the following
+    # sections: the @inproceedings entry key, the reference list
+    # items, and the footer nav string.)
+    assert "fixture2026" not in res.abstract
+    assert "@inproceedings" not in res.abstract
+    assert "Fixture Reference One" not in res.abstract
+    assert "Fixture Reference Two" not in res.abstract
+    assert "Home | Contact | About" not in res.abstract
+
+
 # ---------- Guard: no PDF / OCR dependency leak ----------------------------
 
 def test_no_pdf_deps_leak():
