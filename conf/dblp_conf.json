@@ -6104,6 +6104,10 @@
         "url": "https://dblp.org/db/conf/sigir/sigir2023.html"
     },
     {
+        "name": "SIGIR2026",
+        "url": "https://dblp.org/db/conf/sigir/sigir2026.html"
+    },
+    {
         "name": "ECIR2023",
         "url": "https://dblp.org/db/conf/ecir/ecir2023-1.html"
     },
@@ -13682,6 +13686,10 @@
     {
         "name": "HPDC2025",
         "url": "https://dblp.org/db/conf/hpdc/hpdc2025.html"
+    },
+    {
+        "name": "HPDC2026",
+        "url": "https://dblp.org/db/conf/hpdc/hpdc2026.html"
     },
     {
         "name": "CCS2000",
