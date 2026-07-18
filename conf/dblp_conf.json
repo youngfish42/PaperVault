@@ -7568,6 +7568,10 @@
         "url": "https://dblp.org/db/conf/sp/sp2025.html"
     },
     {
+        "name": "SP2026",
+        "url": "https://dblp.org/db/conf/sp/sp2026.html"
+    },
+    {
         "name": "STOC2000",
         "url": "https://dblp.org/db/conf/stoc/stoc2000.html"
     },
@@ -12234,6 +12238,10 @@
     {
         "name": "SIGGRAPH2025",
         "url": "https://dblp.org/db/conf/siggraph/siggraph2025.html"
+    },
+    {
+        "name": "SIGGRAPH2026",
+        "url": "https://dblp.org/db/conf/siggraph/siggraph2026.html"
     },
     {
         "name": "ICDE2019",
