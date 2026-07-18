@@ -1,39 +1,106 @@
 """JMLR (``jmlr.org``) abstract fetcher.
 
-Verified against real pages on 2026-07-18 (e.g.
-``https://www.jmlr.org/papers/v22/17-679.html``, ``/v25/23-1044.html``):
+Verified against real pages on 2026-07-18 across three structural
+generations of JMLR paper pages:
 
-* The abstract sits inside::
+Modern layout (verified on v10 → v25, i.e. JMLR 2009-2025)::
 
-      <h3>Abstract</h3>
-      <p class="abstract">
-        ... full abstract prose ...
-      </p>
+    <h3>Abstract</h3>
+    <p class="abstract">
+      ... full abstract prose ...
+    </p>
 
-  There is no ``<meta name="citation_abstract">`` on JMLR pages, and the
-  ``citation_abstract_html_url`` meta only points back to the paper URL
-  itself. The ``<p class="abstract">`` node is stable across at least
-  volumes 22-26 (JMLR 2021-2025).
+The ``<p class="abstract">`` node is stable; primary selector is a
+single ``soup.find("p", class_="abstract")``.
 
-* Some very old JMLR volumes (pre v10) render abstracts inside::
+Legacy layout (verified on v1 ``meila00a`` and v5 ``evendar03a`` /
+``lanckriet04a``)::
 
-      <b>Abstract:</b><br>... prose ...
+    <h3>Abstract</h3>
+    plain text nodes with the full abstract prose,
+    possibly interleaved with inline <i>/<sup> children ...
+    <font color="gray"><p>[abs]</p></font>
+    [<a href="...pdf">pdf</a>] ...
 
-  which we detect as a defensive fallback so those legacy pages don't
-  drop into ``empty_abstract``.
+Crucially the abstract prose sits as **raw NavigableString / inline
+element** children of the parent (the ``<h3>``'s siblings), *not*
+inside a wrapping ``<p>``. Iterating ``heading.find_next_siblings()``
+skips all NavigableString nodes and would return empty; instead we
+walk ``heading.next_siblings`` and stop when we hit the download-links
+block, which is signalled by any of:
 
-Both ``www.jmlr.org`` and ``jmlr.org`` are accepted; the ACL/MLR
-convention of canonicalising to the ``www``-stripped host lives in the
-dispatcher (:mod:`papervault.services.abstract_fetchers`), so we only
-need to list the canonical form here.
+* another heading (``<h1..h6>``)
+* a ``<font>`` (JMLR wraps ``[abs]`` in ``<font color="gray">``)
+* a ``<p>`` (JMLR wraps ``[pdf]/[ps]`` in a ``<p>``)
+* a leading ``[`` in a text sibling — this catches the bare ``[pdf]``
+  block that some pages emit without the ``<font>`` wrapper.
+
+We deliberately drop the previous ``<b>Abstract:</b>`` fallback: none
+of the pages we sampled across v1..v25 use that layout. If a genuine
+edge case emerges later it should come with a real URL / fixture so we
+know what we are targeting.
+
+Host handling: both ``www.jmlr.org`` and ``jmlr.org`` are accepted;
+the dispatcher already strips a leading ``www.``, so we only list the
+canonical form.
 """
 
 from __future__ import annotations
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 from .base import AbstractResult, Fetcher, MIN_ABSTRACT_CHARS
 from ._http import clean_text, http_get
+
+
+_HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
+_STOP_TAGS = _HEADING_TAGS | {"font", "p"}
+
+
+def _collect_between_heading_and_links(heading) -> str:
+    """Walk siblings after ``heading`` collecting text until the JMLR
+    download-links block starts.
+
+    Handles the legacy ``<h3>Abstract</h3>`` + raw text-node layout used
+    on volumes v1..v5 as well as any future page that keeps the text
+    outside an explicit ``<p>``. The modern layout already matches the
+    primary ``<p class="abstract">`` selector, so this helper is only
+    invoked as a fallback and is expected to be defensive.
+    """
+    parts: list[str] = []
+    for node in heading.next_siblings:
+        # 1) Raw text node: keep it.
+        if isinstance(node, NavigableString):
+            piece = clean_text(str(node))
+            if piece:
+                # Some legacy pages leave a stray ``[`` at the start of
+                # the download-links row *outside* the <font> wrapper.
+                # If we see one before we have accumulated any prose,
+                # skip it; if we see one after prose has started, treat
+                # it as a stop signal.
+                if piece.startswith("["):
+                    if parts:
+                        break
+                    continue
+                parts.append(piece)
+            continue
+
+        # 2) Element node.
+        name = getattr(node, "name", None)
+        if name is None:
+            continue
+        if name in _STOP_TAGS:
+            # New section (heading) or the JMLR link block (<font>/<p>).
+            break
+
+        # 3) Inline element such as <i>, <sup>, <em>, <b>, <span>. Some
+        # legacy JMLR abstracts have inline math markup. Keep the text
+        # but stop if the element itself is empty (defensive).
+        piece = clean_text(node.get_text(" "))
+        if piece:
+            parts.append(piece)
+
+    return " ".join(parts).strip()
 
 
 class _JMLRFetcher(Fetcher):
@@ -48,35 +115,20 @@ class _JMLRFetcher(Fetcher):
 
         text = ""
 
+        # Modern layout: <p class="abstract">
         node = soup.find("p", class_="abstract")
         if node is not None:
             text = clean_text(node.get_text(" "))
 
+        # Legacy layout: raw text between <h3>Abstract</h3> and the
+        # download-links block. Only entered if the primary selector
+        # didn't match or produced nothing.
         if not text:
-            for heading in soup.find_all(["h2", "h3", "h4"]):
-                if heading.get_text(strip=True).lower().startswith("abstract"):
-                    parts = []
-                    for sibling in heading.find_next_siblings():
-                        name = getattr(sibling, "name", None)
-                        if name in ("h1", "h2", "h3", "h4", "h5", "h6"):
-                            break
-                        piece = clean_text(sibling.get_text(" "))
-                        if piece:
-                            parts.append(piece)
-                    text = " ".join(parts).strip()
-                    if text:
-                        break
-
-        if not text:
-            for b in soup.find_all("b"):
-                label = b.get_text(strip=True).lower().rstrip(":")
-                if label != "abstract":
+            for heading in soup.find_all(list(_HEADING_TAGS)):
+                label = heading.get_text(strip=True).lower()
+                if not label.startswith("abstract"):
                     continue
-                parent = b.parent
-                if parent is None:
-                    continue
-                b.extract()
-                text = clean_text(parent.get_text(" "))
+                text = _collect_between_heading_and_links(heading)
                 if text:
                     break
 

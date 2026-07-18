@@ -20,6 +20,13 @@ Verified against real pages on 2026-07-18 (e.g.
 We accept ``isca-archive.org`` as the canonical host. The dispatcher
 already strips a leading ``www.``, so both bare and www-prefixed URLs
 route to this fetcher.
+
+Design note: we intentionally do NOT fall back to ``<meta
+name="description">`` -- ISCA description metas are auto-truncated to
+~150-200 chars and would silently pass the ``MIN_ABSTRACT_CHARS`` gate,
+poisoning the cache with snippets while marking the record ``ok=True``.
+When ``<div id="abstract">`` is missing we return ``empty_abstract`` so
+the outer pipeline can degrade to the DOI-based fallback chain instead.
 """
 
 from __future__ import annotations
@@ -49,11 +56,6 @@ class _IscaFetcher(Fetcher):
                     label.extract()
                     break
             text = clean_text(node.get_text(" "))
-
-        if not text:
-            meta = soup.find("meta", attrs={"name": "description"})
-            if meta is not None:
-                text = clean_text(meta.get("content", ""))
 
         if not text or len(text) < MIN_ABSTRACT_CHARS:
             return AbstractResult(

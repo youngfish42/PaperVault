@@ -37,16 +37,23 @@ def _make_response(html: str, status: int = 200) -> MagicMock:
 
 # ---------- Registry & dispatch --------------------------------------------
 
-def test_registry_contains_all_six_domains():
+def test_registry_contains_all_expected_domains():
+    """Mirror of :data:`FETCHER_REGISTRY` — must be updated whenever a
+    fetcher is added or a legacy host alias is dropped. Using ``==``
+    (not ``.issubset``) so a silent drop of e.g. legacy ``aaai.org``
+    would fail this test loudly rather than being masked."""
     hosts = set(af.FETCHER_REGISTRY.keys())
-    assert {
+    assert hosts == {
         "aclanthology.org",
         "proceedings.mlr.press",
         "ojs.aaai.org",
+        "aaai.org",
         "ijcai.org",
         "vldb.org",
         "ceur-ws.org",
-    }.issubset(hosts)
+        "jmlr.org",
+        "isca-archive.org",
+    }
 
 
 def test_registry_contains_new_p1_domains():
@@ -116,6 +123,83 @@ def test_aaai_legacy_host_routes_to_same_fetcher():
     assert res.source == "aaai"
     assert res.abstract is not None
     assert len(res.abstract) >= MIN_ABSTRACT_CHARS
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://aaai.org/",
+        "https://aaai.org/conference/aaai/aaai-24/",
+        "https://www.aaai.org/about/",
+    ],
+)
+def test_aaai_legacy_host_non_article_paths_short_circuit(url):
+    """Post-review fix: adding ``aaai.org`` to ``allowed_hosts`` also
+    exposes non-article pages (conference home, news, membership) to
+    the AAAI fetcher. Those must be rejected *before* the network call
+    with reason=``no_abstract_available`` so we do not (a) burn HTTP
+    quota, and (b) pollute the ``empty_abstract`` diagnostic bucket."""
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.side_effect = AssertionError(
+            "AAAI fetcher must NOT hit the network for non-article aaai.org URLs"
+        )
+        res = af.dispatch(url)
+    assert res.ok is False
+    assert res.source == "aaai"
+    assert res.reason == "no_abstract_available"
+
+
+def test_isca_meta_only_page_returns_empty_abstract():
+    """Post-review fix: <meta name="description"> on ISCA pages is
+    typically an auto-truncated 150-char snippet. Silently accepting
+    it as a full abstract would (a) poison the cache with truncated
+    prose and (b) permanently block the DOI fallback chain. The
+    fetcher must return ``empty_abstract`` instead so the outer
+    pipeline can degrade to Crossref / S2 / arXiv / OpenAlex."""
+    html = _fixture_html("isca_meta_only.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch(
+            "https://www.isca-archive.org/interspeech_2099/fixture_metaonly.html"
+        )
+    assert res.ok is False
+    assert res.source == "isca"
+    assert res.reason == "empty_abstract"
+
+
+def test_jmlr_legacy_layout_captures_text_between_heading_and_links():
+    """Verified against real JMLR pages (v1 meila00a, v5 evendar03a /
+    lanckriet04a) on 2026-07-18: the pre-v10 layout puts the abstract
+    prose as **raw text nodes** immediately after ``<h3>Abstract</h3>``
+    (interleaved with inline ``<i>/<sup>`` math markup), followed by a
+    ``<font color="gray"><p>[abs]</p></font>`` download-links block.
+
+    The fetcher's legacy branch must:
+
+    * walk ``heading.next_siblings`` (which includes NavigableString)
+      instead of ``find_next_siblings()`` (which skips text nodes),
+    * capture inline elements such as ``<i>`` and ``<sup>``,
+    * stop before the ``<font>`` / ``<p>`` link block so ``[abs]``,
+      ``[pdf]``, ``[ps.gz]`` markers never leak in.
+    """
+    html = _fixture_html("jmlr_legacy.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://www.jmlr.org/papers/v05/legacy01.html")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "jmlr"
+    assert res.abstract is not None
+    # Abstract prose is present.
+    assert "raw text nodes right after" in res.abstract
+    # Inline <i>/<sup> math markup was picked up.
+    assert "t" in res.abstract and "ω" in res.abstract
+    # Download-links markers must NOT leak in.
+    assert "[abs]" not in res.abstract
+    assert "[pdf]" not in res.abstract
+    assert "[ps.gz]" not in res.abstract
+    # Author byline (which appears BEFORE the heading) must not appear.
+    assert "Alice Fixture" not in res.abstract
+    assert "Bob Placeholder" not in res.abstract
 
 
 # ---------- PDF-only sites short-circuit without HTTP ----------------------

@@ -12,9 +12,19 @@ on 2026-07-18 against ``view/4093``. Because ``requests.Session``
 follows 3xx redirects by default, listing ``aaai.org`` in
 ``allowed_hosts`` is enough to route those legacy URLs through the same
 selector without any extra HTTP plumbing.
+
+Path guard: ``aaai.org`` also serves conference landing pages, news,
+and other non-article content that share the host. To avoid burning
+one HTTP request per non-article URL (and polluting the ``empty_abstract``
+reason bucket in the diagnostic dashboard), we short-circuit before the
+network call when the path does not look like an OJS article route.
+The ``ojs.aaai.org`` host is trusted wholesale because it exclusively
+hosts the OJS instance.
 """
 
 from __future__ import annotations
+
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -22,11 +32,33 @@ from .base import AbstractResult, Fetcher, MIN_ABSTRACT_CHARS
 from ._http import clean_text, http_get
 
 
+def _looks_like_ojs_article(url: str) -> bool:
+    """Return True iff ``url`` is (or 301-redirects to) an OJS article page.
+
+    Both the modern ``ojs.aaai.org/index.php/AAAI/article/view/<id>`` and
+    the legacy ``aaai.org/ojs/index.php/AAAI/article/view/<id>`` shapes
+    contain the ``/article/view/`` suffix, so a single substring check
+    is enough. We intentionally do NOT match on ``/ojs/`` alone because
+    that also covers OJS admin / feed pages which have no abstract.
+    """
+    path = (urlparse(url).path or "").lower()
+    return "/article/view/" in path
+
+
 class _AAAIFetcher(Fetcher):
     allowed_hosts = ("ojs.aaai.org", "aaai.org")
     source = "aaai"
 
     def fetch(self, url: str) -> AbstractResult:
+        host = (urlparse(url).netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host == "aaai.org" and not _looks_like_ojs_article(url):
+            return AbstractResult(
+                ok=False, url=url, source=self.source,
+                reason="no_abstract_available",
+            )
+
         resp, err = http_get(url)
         if err is not None:
             return err
