@@ -49,6 +49,14 @@ def test_registry_contains_all_six_domains():
     }.issubset(hosts)
 
 
+def test_registry_contains_new_p1_domains():
+    """P1 (2026-07): JMLR + ISCA-Archive + legacy AAAI host must be
+    registered so the diagnostic-report shortlist stops falling into
+    the DOI fallback chain for these venues."""
+    hosts = set(af.FETCHER_REGISTRY.keys())
+    assert {"jmlr.org", "isca-archive.org", "aaai.org"}.issubset(hosts)
+
+
 def test_dispatch_unknown_host_returns_no_abstract_available():
     res = af.dispatch("https://example.com/paper")
     assert isinstance(res, AbstractResult)
@@ -78,6 +86,8 @@ def test_dispatch_strips_www_prefix():
         ("https://proceedings.mlr.press/v202/foo23a.html", "mlr_paper.html", "mlr"),
         ("https://ojs.aaai.org/index.php/AAAI/article/view/12345", "aaai_paper.html", "aaai"),
         ("https://ijcai.org/proceedings/2023/456", "ijcai_paper.html", "ijcai"),
+        ("https://www.jmlr.org/papers/v25/23-1044.html", "jmlr_paper.html", "jmlr"),
+        ("https://www.isca-archive.org/interspeech_2023/gong23c_interspeech.html", "isca_paper.html", "isca"),
     ],
 )
 def test_domain_fetchers_extract_abstract(url, fixture, expected_source):
@@ -91,6 +101,21 @@ def test_domain_fetchers_extract_abstract(url, fixture, expected_source):
     assert len(res.abstract) >= MIN_ABSTRACT_CHARS
     # Sanity: fetcher should have stripped the leading "Abstract" label
     assert not res.abstract.lower().startswith("abstract ")
+
+
+def test_aaai_legacy_host_routes_to_same_fetcher():
+    """Legacy ``aaai.org/ojs/index.php/AAAI/article/view/<id>`` URLs
+    301-redirect to ``ojs.aaai.org/...``. requests.Session follows the
+    redirect transparently, so the *dispatched* fetcher is still the
+    AAAI one and it must succeed on the same fixture HTML."""
+    html = _fixture_html("aaai_paper.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://aaai.org/ojs/index.php/AAAI/article/view/4093")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "aaai"
+    assert res.abstract is not None
+    assert len(res.abstract) >= MIN_ABSTRACT_CHARS
 
 
 # ---------- PDF-only sites short-circuit without HTTP ----------------------

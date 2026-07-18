@@ -35,6 +35,8 @@ from .aaai import AAAI_FETCHER
 from .ijcai import IJCAI_FETCHER
 from .vldb import VLDB_FETCHER
 from .ceur import CEUR_FETCHER
+from .jmlr import JMLR_FETCHER
+from .isca import ISCA_FETCHER
 
 __all__ = [
     "AbstractResult",
@@ -59,6 +61,8 @@ FETCHER_REGISTRY: dict = _register(
     IJCAI_FETCHER,
     VLDB_FETCHER,
     CEUR_FETCHER,
+    JMLR_FETCHER,
+    ISCA_FETCHER,
 )
 
 

@@ -1,9 +1,17 @@
-"""AAAI OJS (``ojs.aaai.org``) abstract fetcher.
+"""AAAI OJS (``ojs.aaai.org`` + legacy ``aaai.org``) abstract fetcher.
 
 The OJS 3 theme AAAI switched to in 2020 renders abstracts inside a
 ``<section class="item abstract">`` element that also contains a
 leading ``<h2>Abstract</h2>`` heading. We strip the heading and return
 whatever prose is left.
+
+Legacy URLs under ``aaai.org/ojs/index.php/AAAI/article/view/<id>``
+(collected for AAAI 2019 and earlier) 301-redirect to the corresponding
+``ojs.aaai.org/index.php/AAAI/article/view/<id>`` page — verified live
+on 2026-07-18 against ``view/4093``. Because ``requests.Session``
+follows 3xx redirects by default, listing ``aaai.org`` in
+``allowed_hosts`` is enough to route those legacy URLs through the same
+selector without any extra HTTP plumbing.
 """
 
 from __future__ import annotations
@@ -15,7 +23,7 @@ from ._http import clean_text, http_get
 
 
 class _AAAIFetcher(Fetcher):
-    allowed_hosts = ("ojs.aaai.org",)
+    allowed_hosts = ("ojs.aaai.org", "aaai.org")
     source = "aaai"
 
     def fetch(self, url: str) -> AbstractResult:
