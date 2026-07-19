@@ -40,6 +40,15 @@ of the pages we sampled across v1..v25 use that layout. If a genuine
 edge case emerges later it should come with a real URL / fixture so we
 know what we are targeting.
 
+Fallback gating: the modern selector wins whenever it produces at
+least :data:`MIN_ABSTRACT_CHARS` of prose. If it matches but returns
+a shorter string (a corner case on hybrid pages that carry both an
+empty ``<p class="abstract">`` shell and a legacy sibling layout), we
+retry the legacy walk and keep whichever branch produced the longer
+text. This mirrors the pipeline's own MIN_ABSTRACT_CHARS gate so we
+never silently accept a truncated modern hit while a fuller legacy
+version is sitting one branch away.
+
 Host handling: both ``www.jmlr.org`` and ``jmlr.org`` are accepted;
 the dispatcher already strips a leading ``www.``, so we only list the
 canonical form.
@@ -121,15 +130,26 @@ class _JMLRFetcher(Fetcher):
             text = clean_text(node.get_text(" "))
 
         # Legacy layout: raw text between <h3>Abstract</h3> and the
-        # download-links block. Only entered if the primary selector
-        # didn't match or produced nothing.
-        if not text:
+        # download-links block. Entered when the primary selector did
+        # not match OR produced prose shorter than MIN_ABSTRACT_CHARS —
+        # some hybrid pages (e.g. a v1..v5 URL rehosted with a
+        # near-empty modern shell) match ``<p class="abstract">`` but
+        # keep the real prose in the legacy sibling layout, so treating
+        # "matched but too short" as "no modern hit" gives the legacy
+        # branch a chance to recover the content.
+        if not text or len(text) < MIN_ABSTRACT_CHARS:
             for heading in soup.find_all(list(_HEADING_TAGS)):
                 label = heading.get_text(strip=True).lower()
                 if not label.startswith("abstract"):
                     continue
-                text = _collect_between_heading_and_links(heading)
-                if text:
+                legacy_text = _collect_between_heading_and_links(heading)
+                if legacy_text and len(legacy_text) >= len(text):
+                    # Only replace the modern result if legacy actually
+                    # improves on it (defensive: avoid overwriting a
+                    # short-but-real abstract with an empty legacy walk
+                    # that stopped immediately at the modern <p>).
+                    text = legacy_text
+                if text and len(text) >= MIN_ABSTRACT_CHARS:
                     break
 
         if not text or len(text) < MIN_ABSTRACT_CHARS:

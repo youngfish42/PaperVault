@@ -37,12 +37,25 @@ def _looks_like_ojs_article(url: str) -> bool:
 
     Both the modern ``ojs.aaai.org/index.php/AAAI/article/view/<id>`` and
     the legacy ``aaai.org/ojs/index.php/AAAI/article/view/<id>`` shapes
-    contain the ``/article/view/`` suffix, so a single substring check
-    is enough. We intentionally do NOT match on ``/ojs/`` alone because
-    that also covers OJS admin / feed pages which have no abstract.
+    end with the path segments ``.../article/view/<id>[/<galley>]``.
+
+    We match on *path segments* (not a bare ``"/article/view/" in path``
+    substring) so that pathological URLs like
+    ``/somepage?next=/article/view/1`` or a hypothetical
+    ``/newsarticle/viewer/...`` cannot smuggle themselves past the
+    guard. We also intentionally do NOT match on ``/ojs/`` alone because
+    that would also cover OJS admin / feed pages which have no abstract.
     """
     path = (urlparse(url).path or "").lower()
-    return "/article/view/" in path
+    # Normalise: drop empty leading/trailing segments so ``/a/b/`` and
+    # ``/a/b`` both split into ``["a", "b"]``.
+    segments = [seg for seg in path.split("/") if seg]
+    # Look for the exact consecutive pair ``article`` -> ``view`` followed
+    # by at least one more segment (the article id).
+    for i in range(len(segments) - 2):
+        if segments[i] == "article" and segments[i + 1] == "view":
+            return True
+    return False
 
 
 class _AAAIFetcher(Fetcher):
@@ -79,8 +92,12 @@ class _AAAIFetcher(Fetcher):
 
         # AAAI OJS templates occasionally emit multiple "Abstract" labels
         # (an outer <h2> plus an in-body <strong>) — use ``all_matches``
-        # so both get stripped from the prose.
-        strip_abstract_label(section, tags=("h1", "h2", "h3", "h4"), all_matches=True)
+        # so both get stripped from the prose. We fall back to the
+        # default ``tags`` tuple in _http.py because it already includes
+        # ``strong``; overriding it here previously dropped ``strong``
+        # from the label list and let ``<strong>Abstract</strong>``
+        # leak into the returned prose.
+        strip_abstract_label(section, all_matches=True)
 
         text = clean_text(section.get_text(" "))
         if not text or len(text) < MIN_ABSTRACT_CHARS:

@@ -130,6 +130,14 @@ def test_aaai_legacy_host_routes_to_same_fetcher():
         "https://aaai.org/",
         "https://aaai.org/conference/aaai/aaai-24/",
         "https://www.aaai.org/about/",
+        # Post-second-review fix: the previous substring check
+        # ``"/article/view/" in path`` would have LET THESE PASS the
+        # guard (and then wasted an HTTP request only to return
+        # ``empty_abstract``). The segment-anchored matcher rejects
+        # them cleanly at the guard.
+        "https://aaai.org/somepage?next=/article/view/1",
+        "https://aaai.org/newsarticle/viewer/1234/",
+        "https://aaai.org/misc/article-view-index.html",
     ],
 )
 def test_aaai_legacy_host_non_article_paths_short_circuit(url):
@@ -208,6 +216,53 @@ def test_jmlr_legacy_layout_captures_text_between_heading_and_links():
     # Author byline (which appears BEFORE the heading) must not appear.
     assert "Alice Fixture" not in res.abstract
     assert "Bob Placeholder" not in res.abstract
+
+
+def test_jmlr_hybrid_short_modern_falls_back_to_legacy():
+    """Post-second-review fix: when the modern ``<p class="abstract">``
+    selector matches but the shell only carries a short placeholder
+    (e.g. ``TBD`` on rehosted v1..v5 URLs), the fetcher must retry the
+    legacy walk and keep whichever branch produced the longer prose.
+
+    The previous gate ``if not text:`` skipped the legacy branch as
+    soon as modern matched *anything* (even a 3-char stub), silently
+    reporting ``empty_abstract`` when a full legacy abstract was
+    sitting one branch away."""
+    html = _fixture_html("jmlr_hybrid_short_modern.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://www.jmlr.org/papers/v12/hybrid01.html")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "jmlr"
+    assert res.abstract is not None
+    assert len(res.abstract) >= MIN_ABSTRACT_CHARS
+    # Real legacy prose must be surfaced …
+    assert "legacy-layout abstract that sits as raw text nodes" in res.abstract
+    # … and the empty modern shell must NOT be the returned value.
+    assert res.abstract.strip() != "TBD"
+
+
+def test_aaai_double_label_strips_h2_and_strong():
+    """Post-second-review fix: on AAAI OJS pages that emit BOTH an
+    ``<h2>Abstract</h2>`` heading and an in-body ``<strong>Abstract</strong>``
+    label, both labels must be stripped so the returned prose does
+    not carry the literal word ``Abstract`` as its prefix.
+
+    The previous implementation passed an explicit
+    ``tags=("h1","h2","h3","h4")`` tuple to ``strip_abstract_label``
+    which silently dropped ``strong`` from the default tuple, letting
+    the second label leak into the abstract."""
+    html = _fixture_html("aaai_double_label.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://ojs.aaai.org/index.php/AAAI/article/view/99999")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "aaai"
+    assert res.abstract is not None
+    # Neither label should survive at the start of the prose.
+    assert not res.abstract.lower().startswith("abstract")
+    # Sanity: real prose is present.
+    assert "synthetic AAAI OJS page" in res.abstract
 
 
 # ---------- PDF-only sites short-circuit without HTTP ----------------------
