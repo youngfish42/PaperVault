@@ -21499,6 +21499,14 @@
     "DBLP::https://dblp.org/db/conf/hpdc/hpdc2026.html": {
       "name": "HPDC2026",
       "ts": "2026-07-18T00:59:00"
+    },
+    "DBLP::https://dblp.org/db/conf/sp/sp2026.html": {
+      "name": "SP2026",
+      "ts": "2026-07-19T13:38:48"
+    },
+    "DBLP::https://dblp.org/db/conf/siggraph/siggraph2026.html": {
+      "name": "SIGGRAPH2026",
+      "ts": "2026-07-19T13:39:38"
     }
   }
 }
