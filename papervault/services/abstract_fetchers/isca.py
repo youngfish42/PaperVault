@@ -34,7 +34,7 @@ from __future__ import annotations
 from bs4 import BeautifulSoup
 
 from .base import AbstractResult, Fetcher, MIN_ABSTRACT_CHARS
-from ._http import clean_text, http_get
+from ._http import clean_text, http_get, strip_abstract_label
 
 
 class _IscaFetcher(Fetcher):
@@ -51,10 +51,9 @@ class _IscaFetcher(Fetcher):
 
         node = soup.find("div", id="abstract")
         if node is not None:
-            for label in node.find_all(["h1", "h2", "h3", "h4", "h5", "h6", "strong"]):
-                if label.get_text(strip=True).lower().startswith("abstract"):
-                    label.extract()
-                    break
+            # ISCA pages ship exactly one "Abstract" label inside the
+            # container, so first-match semantics are enough.
+            strip_abstract_label(node)
             text = clean_text(node.get_text(" "))
 
         if not text or len(text) < MIN_ABSTRACT_CHARS:

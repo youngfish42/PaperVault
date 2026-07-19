@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 from .base import AbstractResult, Fetcher, MIN_ABSTRACT_CHARS
-from ._http import clean_text, http_get
+from ._http import clean_text, http_get, strip_abstract_label
 
 
 def _looks_like_ojs_article(url: str) -> bool:
@@ -64,18 +64,23 @@ class _AAAIFetcher(Fetcher):
             return err
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        section = soup.find("section", class_=lambda c: c and "abstract" in c.split())
+        # ``class_="abstract"`` matches any element whose class attribute
+        # contains ``abstract`` as a whitespace-separated token (e.g.
+        # ``class="item abstract"``) — same semantics as the previous
+        # lambda but without a callable per parse.
+        section = soup.find("section", class_="abstract")
         if section is None:
-            section = soup.find("div", class_=lambda c: c and "abstract" in c.split())
+            section = soup.find("div", class_="abstract")
         if section is None:
             return AbstractResult(
                 ok=False, url=url, source=self.source,
                 reason="empty_abstract", http_status=resp.status_code,
             )
 
-        for h in section.find_all(["h1", "h2", "h3", "h4"]):
-            if h.get_text(strip=True).lower().startswith("abstract"):
-                h.extract()
+        # AAAI OJS templates occasionally emit multiple "Abstract" labels
+        # (an outer <h2> plus an in-body <strong>) — use ``all_matches``
+        # so both get stripped from the prose.
+        strip_abstract_label(section, tags=("h1", "h2", "h3", "h4"), all_matches=True)
 
         text = clean_text(section.get_text(" "))
         if not text or len(text) < MIN_ABSTRACT_CHARS:

@@ -41,7 +41,14 @@ def test_registry_contains_all_expected_domains():
     """Mirror of :data:`FETCHER_REGISTRY` — must be updated whenever a
     fetcher is added or a legacy host alias is dropped. Using ``==``
     (not ``.issubset``) so a silent drop of e.g. legacy ``aaai.org``
-    would fail this test loudly rather than being masked."""
+    would fail this test loudly rather than being masked.
+
+    P1 (2026-07): ``jmlr.org``, ``isca-archive.org`` and the legacy
+    ``aaai.org`` host were added so the diagnostic-report shortlist
+    stops falling into the DOI fallback chain for those venues; the
+    equality assertion below is the single source of truth for that
+    invariant.
+    """
     hosts = set(af.FETCHER_REGISTRY.keys())
     assert hosts == {
         "aclanthology.org",
@@ -54,14 +61,6 @@ def test_registry_contains_all_expected_domains():
         "jmlr.org",
         "isca-archive.org",
     }
-
-
-def test_registry_contains_new_p1_domains():
-    """P1 (2026-07): JMLR + ISCA-Archive + legacy AAAI host must be
-    registered so the diagnostic-report shortlist stops falling into
-    the DOI fallback chain for these venues."""
-    hosts = set(af.FETCHER_REGISTRY.keys())
-    assert {"jmlr.org", "isca-archive.org", "aaai.org"}.issubset(hosts)
 
 
 def test_dispatch_unknown_host_returns_no_abstract_available():
@@ -181,6 +180,13 @@ def test_jmlr_legacy_layout_captures_text_between_heading_and_links():
     * capture inline elements such as ``<i>`` and ``<sup>``,
     * stop before the ``<font>`` / ``<p>`` link block so ``[abs]``,
       ``[pdf]``, ``[ps.gz]`` markers never leak in.
+
+    The fixture uses distinctive ``MATH_TOKEN_*`` sentinels that only
+    appear inside the ``<i>`` and ``<sup>`` elements, so the assertions
+    below genuinely witness the inline-capture branch of
+    ``_collect_between_heading_and_links`` (a bare letter like ``t`` or
+    a common word would be entailed by the surrounding prose and would
+    give a false positive).
     """
     html = _fixture_html("jmlr_legacy.html")
     with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
@@ -191,8 +197,10 @@ def test_jmlr_legacy_layout_captures_text_between_heading_and_links():
     assert res.abstract is not None
     # Abstract prose is present.
     assert "raw text nodes right after" in res.abstract
-    # Inline <i>/<sup> math markup was picked up.
-    assert "t" in res.abstract and "ω" in res.abstract
+    # Inline <i> and <sup> math markup were picked up (unique sentinels
+    # that appear ONLY inside those inline elements in the fixture).
+    assert "MATH_TOKEN_XI" in res.abstract
+    assert "MATH_TOKEN_SUP_ETA" in res.abstract
     # Download-links markers must NOT leak in.
     assert "[abs]" not in res.abstract
     assert "[pdf]" not in res.abstract
@@ -347,20 +355,38 @@ def test_ijcai_heading_fallback_stops_at_next_heading():
 # ---------- Guard: no PDF / OCR dependency leak ----------------------------
 
 def test_no_pdf_deps_leak():
-    """spec AC-4 Non-Goals: this iteration must not import PDF/OCR libs."""
+    """spec AC-4 Non-Goals: this iteration must not import PDF/OCR libs.
+
+    ``pdfminer.six`` is the PyPI *distribution* name, not an importable
+    module name (the top-level package it installs is just ``pdfminer``),
+    so we only guard the actual import roots here.
+
+    The fresh-import dance mutates ``sys.modules`` — we must snapshot the
+    entries we remove and restore them in ``finally`` so later tests that
+    ``patch("papervault.services.abstract_fetchers._http.SESSION")`` keep
+    seeing the same module object the test file bound at import time
+    (otherwise the module-level ``af`` alias would point at a stale copy).
+    """
     forbidden = {
         "pdfminer",
-        "pdfminer.six",
         "pypdf",
         "PyPDF2",
         "grobid_client",
         "grobid",
         "pytesseract",
     }
-    # Force fresh import of the whole package
-    for name in list(sys.modules):
-        if name.startswith("papervault.services.abstract_fetchers"):
+    prefix = "papervault.services.abstract_fetchers"
+    saved = {name: sys.modules[name] for name in list(sys.modules) if name.startswith(prefix)}
+    try:
+        for name in saved:
             del sys.modules[name]
-    import papervault.services.abstract_fetchers  # noqa: F401
-    leaked = forbidden.intersection(sys.modules.keys())
-    assert not leaked, f"forbidden PDF/OCR modules imported: {leaked}"
+        import papervault.services.abstract_fetchers  # noqa: F401
+        leaked = forbidden.intersection(sys.modules.keys())
+        assert not leaked, f"forbidden PDF/OCR modules imported: {leaked}"
+    finally:
+        # Drop any freshly-imported copy and restore the originals so
+        # downstream tests keep patching the same module objects.
+        for name in list(sys.modules):
+            if name.startswith(prefix):
+                del sys.modules[name]
+        sys.modules.update(saved)
