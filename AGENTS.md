@@ -71,7 +71,19 @@ PaperVault/
 │       ├── suggest.py            # `suggest_keywords` (multi-provider dispatch, provider resolution)
 │       ├── rerank.py             # `rank_papers` (LLM relevance scoring; JSON output parsing, score normalisation)
 │       ├── ai_clients.py         # Vendor-neutral SDK dispatch: `call_openai_compatible`, `call_anthropic` (with StepFun `thinking:disabled` compatibility)
-│       └── ai_providers.py       # `ProviderPreset` catalog: openai / deepseek / anthropic / qwen / glm / stepfun / custom
+│       ├── ai_providers.py       # `ProviderPreset` catalog: openai / deepseek / anthropic / qwen / glm / stepfun / custom
+│       └── abstract_fetchers/    # Domain-specific abstract fetchers (routed by host via `FETCHER_REGISTRY`; called *before* the DOI/title chain in `scripts/fetch_abstracts.py`)
+│           ├── __init__.py       # `dispatch(url)` + `FETCHER_REGISTRY` (host → Fetcher). Adds `no_abstract_available` degrade for unmatched hosts
+│           ├── base.py           # `Fetcher` base class, `AbstractResult` dataclass, `MIN_ABSTRACT_CHARS` length gate
+│           ├── _http.py          # Shared HTTP helper (`http_get`), `clean_text`, and `strip_abstract_label` (first-match / all-matches label removal)
+│           ├── acl.py            # `aclanthology.org`
+│           ├── mlr.py            # `proceedings.mlr.press` (PMLR / ICML / AISTATS / UAI …)
+│           ├── jmlr.py           # `jmlr.org` (modern `<p class="abstract">` + legacy v1..v5 heading-sibling walk, with short-modern → legacy fallback)
+│           ├── isca.py           # `isca-archive.org` (Interspeech / Odyssey; no meta-description fallback to avoid truncated snippets)
+│           ├── aaai.py           # `ojs.aaai.org` + legacy `aaai.org` (path-segment guarded; strips both `<h2>` and `<strong>` Abstract labels)
+│           ├── ijcai.py          # `ijcai.org`
+│           ├── vldb.py           # `vldb.org`
+│           └── ceur.py           # `ceur-ws.org`
 ├── tests/                        # Backend pytest suite (runs offline against fixture cache via `PAPERVAULT_OFFLINE=1`)
 │   ├── __init__.py
 │   ├── conftest.py               # `client_with_sample` fixture and sample-cache factories
@@ -259,8 +271,14 @@ How synchronisation works:
 `cache/abstract_backfill_progress.json` (which was a ~14 MB pretty-printed JSON
 tracked via Git LFS). The new format:
 
-- First line is a metadata header (`{"_meta": true, "schema": "abstract_backfill_progress/v3", ...}`).
-- Each subsequent line is one record: `{"url": ..., "status": ..., "source": ..., "chars": ..., "attempts": ..., "ts": ...}`.
+- First line is a metadata header (`{"_meta": true, "schema": "abstract_backfill_progress/v4", ...}`).
+  Schema v4 (introduced 2026-Q2) adds a standardised `reason` enum on
+  failed records (e.g. `timeout`, `http_429`, `http_5xx`, `parse_error`,
+  `empty_abstract`, `no_abstract_available`) so the diagnostic
+  dashboards can bucket failures by root cause instead of by raw
+  exception text. Legacy v3 records (`reason=null`) are still readable
+  and treated as pre-schema-v3 legacy data by the analysers.
+- Each subsequent line is one record: `{"url": ..., "status": ..., "source": ..., "chars": ..., "attempts": ..., "ts": ..., "reason": ...}`.
 - Same `url` written multiple times — the latest write wins (event-sourcing).
   `load_progress()` collapses to `{url: latest_record}` in memory.
 - `save_progress()` appends only diffs since the previous save (cheap on hot
@@ -361,6 +379,7 @@ Other frontend scripts:
 - **Python**: Follow PEP 8. Use type hints where practical. Prefer module-level constants and `pathlib.Path` for filesystem operations (see `data_artifacts.py`).
 - **Backend layout**: New endpoints **must** be added as Flask blueprints under `papervault/api/v1/*`, mounted in `papervault/api/v1/__init__.py:register_blueprints` (**not** in `create_app` directly). Validate inputs with **Pydantic v2** schemas in `papervault/schemas.py`; raise `papervault.errors.ApiError` (or let `werkzeug.exceptions.HTTPException` propagate) so the unified JSON envelope handler picks it up — never `return jsonify({"error": ...}), 400` ad hoc. Read settings via `current_app.extensions["settings"]` or `get_settings()`; do **not** import `os.environ` inside handlers.
 - **AI / LLM code**: Vendor SDK calls live in `papervault/services/ai_clients.py` only. Adding a new provider is a *catalog* change (`papervault/services/ai_providers.py`) — do not introduce a third dispatcher. When adding a preset, mirror it in `web-vue/src/constants/aiProviders.ts` (camelCase) and update `normalizeProviderPreset` in `web-vue/src/api/ai.ts` only if the wire schema itself grows.
+- **Abstract fetchers**: Adding a new publisher = one new module under `papervault/services/abstract_fetchers/<host>.py` that subclasses `Fetcher`, declares its `allowed_hosts` / `source`, and is registered in `abstract_fetchers/__init__.py:FETCHER_REGISTRY`. Do **not** open a second dispatcher or bypass the registry. Any "Abstract" label stripping (heading + inline label) **must** go through `_http.strip_abstract_label` (first-match by default, `all_matches=True` when the template emits duplicates) — do not open-code `re.sub` / lambdas per fetcher. Every new fetcher **must** ship at least one real-page fixture under `tests/fixtures/abstract_fetchers/` and one regression case in `tests/test_abstract_fetchers.py`; layout variants (modern vs legacy, short-modern → legacy fallback, meta-only pages, non-article path guards) each get their own fixture so a template change fails a specific test rather than the whole suite.
 - **Vue/TypeScript**: Use Composition API with `<script setup>` syntax. Component names use PascalCase. Element Plus components and icons are auto-imported (no manual imports needed for most usage). `auto-imports.d.ts` and `components.d.ts` are generated by `unplugin-*` and **must not** be hand-edited.
 - **API Endpoints**: All backend API routes are versioned under `/api/v1/*` in production (proxied via Vite's dev server in development). Legacy `/api/search` and `/api/get_guess_you_like` have been removed — do not re-introduce unversioned endpoints.
 - **Query DSL**: User-visible search syntax (Smart Search box and Advanced Search builder) is defined in `web-vue/src/utils/queryDsl.ts` + `fields.ts`; any change to the grammar or field set **must** be paired with a new case in `web-vue/src/utils/__tests__/queryDsl.test.mjs` to prevent the kind of regression that the existing suite already pins down (e.g. `AU="Xiaowen Jiang"` → empty-result). OR-merge helpers for AI-picked keywords are isolated in `web-vue/src/utils/queryMerge.ts` and reused by `AiSearchDialog` / `AiSuggestPanel`.
@@ -403,6 +422,25 @@ Abstract backfill sources (`scripts/fetch_abstracts.py`):
 - [Semantic Scholar](https://www.semanticscholar.org/) (by DOI)
 - [arXiv](https://arxiv.org/) (by title)
 - [OpenAlex](https://openalex.org/) (by DOI)
+
+Domain-specific abstract fetchers (`papervault/services/abstract_fetchers/`):
+The DOI/title chain above is preceded by a host-routed fetcher registry
+(`FETCHER_REGISTRY` in `papervault/services/abstract_fetchers/__init__.py`)
+that scrapes conference publisher pages directly. This is the fast path
+for URLs that never had a DOI (JMLR / ISCA / early AAAI issues) and
+avoids sending the DOI chain a request it will only ever reject. If no
+fetcher claims the URL the dispatcher returns
+`AbstractResult(ok=False, reason="no_abstract_available")` and the DOI
+chain takes over. Currently registered hosts:
+
+- [ACL Anthology](https://aclanthology.org/) (`aclanthology.org`)
+- [PMLR](https://proceedings.mlr.press/) (`proceedings.mlr.press` — ICML / AISTATS / UAI …)
+- [JMLR](https://jmlr.org/) (`jmlr.org` — both modern `<p class="abstract">` and legacy v1..v5 heading-sibling layouts)
+- [ISCA Archive](https://isca-archive.org/) (`isca-archive.org` — Interspeech / Odyssey; no `<meta name="description">` fallback so truncated snippets never enter the cache)
+- [AAAI OJS](https://ojs.aaai.org/) (`ojs.aaai.org` and legacy `aaai.org/ojs/…/article/view/<id>` — path-segment guarded so non-article `aaai.org` pages short-circuit before the network call)
+- [IJCAI](https://ijcai.org/) (`ijcai.org`)
+- [VLDB](https://vldb.org/) (`vldb.org`)
+- [CEUR-WS](https://ceur-ws.org/) (`ceur-ws.org`)
 
 Code links are enriched from [MLNLP-World/Top-AI-Conferences-Paper-with-Code](https://github.com/MLNLP-World/Top-AI-Conferences-Paper-with-Code) and via regex extraction from abstracts (`scripts/fetch_code_links.py`).
 
