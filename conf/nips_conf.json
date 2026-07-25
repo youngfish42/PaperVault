@@ -130,5 +130,9 @@
     {
         "name": "MLSys2023",
         "url": "https://proceedings.mlsys.org/paper/2023"
+    },
+    {
+        "name": "MLSys2026",
+        "url": "https://proceedings.mlsys.org/paper/2026"
     }
 ]
