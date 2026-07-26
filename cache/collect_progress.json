@@ -21511,6 +21511,14 @@
     "DBLP::https://dblp.org/db/conf/colt/colt2026.html": {
       "name": "COLT2026",
       "ts": "2026-07-22T22:05:27"
+    },
+    "NeurIPS::https://proceedings.mlsys.org/paper/2026": {
+      "name": "MLSys2026",
+      "ts": "2026-07-26T11:08:09"
+    },
+    "DBLP::https://dblp.org/db/conf/lics/lics2026.html": {
+      "name": "LICS2026",
+      "ts": "2026-07-26T11:09:58"
     }
   }
 }
