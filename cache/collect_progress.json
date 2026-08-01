@@ -21519,6 +21519,23 @@
     "DBLP::https://dblp.org/db/conf/lics/lics2026.html": {
       "name": "LICS2026",
       "ts": "2026-07-26T11:09:58"
+    },
+    "DBLP::https://dblp.org/db/conf/cav/cav2026-1.html": {
+      "name": "CAV2026",
+      "ts": "2026-08-01T15:37:35"
+    },
+    "DBLP::https://dblp.org/db/conf/cav/cav2026-2.html": {
+      "name": "CAV2026",
+      "ts": "2026-08-01T15:39:18"
+    },
+    "DBLP::https://dblp.org/db/conf/cav/cav2026-3.html": {
+      "name": "CAV2026",
+      "ts": "2026-08-01T15:40:43"
+    },
+    "DBLP::https://dblp.org/db/journals/pieee/pieee114.html": {
+      "name": "PROCIEEE2026",
+      "ts": "2026-08-01T15:41:47",
+      "legacy": true
     }
   }
 }
