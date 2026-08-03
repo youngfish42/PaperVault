@@ -1203,6 +1203,7 @@ def _process_targets(
     progress: Dict[str, dict] = None,
     reason_in: Optional[Set[str]] = None,
     include_legacy: bool = True,
+    force: bool = False,
 ) -> Tuple[int, int, bool]:
     """处理一组目标论文，返回 (success_count, failed_count, timed_out)。
 
@@ -1217,11 +1218,24 @@ def _process_targets(
     workflows that must strictly honour the reason whitelist — e.g. the
     Actions retry step which is intentionally scoped to recoverable
     failures only.
+
+    ``force`` — when ``True``, retry papers that previously failed to fetch
+    an abstract, including those whose ``attempts`` have reached
+    ``max_failed_attempts``. Papers already marked as successful are still
+    skipped.
     """
     if progress is None:
         progress = load_progress()
     if not retry_failed and not retry_partial:
-        targets = [p for p in targets if p.get("paper_url") not in progress]
+        if force:
+            # 强制模式：只跳过已成功论文，失败论文继续尝试
+            targets = [
+                p for p in targets
+                if p.get("paper_url") not in progress
+                or progress[p.get("paper_url")].get("status") != "success"
+            ]
+        else:
+            targets = [p for p in targets if p.get("paper_url") not in progress]
     elif retry_partial:
         cache_has_abs = {p.get("paper_url", ""): (p.get("paper_abstract") or "").strip() for p in all_papers}
         partial_urls = {
@@ -1233,7 +1247,7 @@ def _process_targets(
     else:
         failed_urls = {
             url for url, meta in progress.items()
-            if meta.get("status") == "failed" and meta.get("attempts", 0) < max_failed_attempts
+            if meta.get("status") == "failed" and (force or meta.get("attempts", 0) < max_failed_attempts)
         }
         if reason_in is not None:
             # ``normalize_reason`` guarantees an in-vocab value; records
@@ -1363,6 +1377,7 @@ def run(
     include_legacy: bool = True,
     no_sync: bool = False,
     offline: bool = False,
+    force: bool = False,
 ) -> None:
     global_start = time.time()
     # Pull the latest cache from Hugging Face before reading/writing anything.
@@ -1381,6 +1396,8 @@ def run(
     if soft_timeout:
         print(f"[*] Soft timeout: {soft_timeout}s ({soft_timeout/3600:.1f}h)")
     print(f"[*] Max failed attempts before permanently skipping: {max_failed_attempts}")
+    if force:
+        print("[*] Force mode: ENABLED — will retry papers that previously failed to fetch an abstract")
 
     # 1. 读取所有论文
     all_papers = []
@@ -1411,6 +1428,7 @@ def run(
                 skip_urls.add(url)
             elif (
                 not retry_partial
+                and not force
                 and meta.get("status") == "failed"
                 and meta.get("attempts", 0) >= max_failed_attempts
             ):
@@ -1453,7 +1471,7 @@ def run(
         if top_n:
             target_confs = target_confs[:top_n]
         # 预过滤：提前剔除所有论文都已在 progress 中的会议，避免空转
-        if not retry_failed and not retry_partial:
+        if not retry_failed and not retry_partial and not force:
             progress = load_progress()
             target_confs = [
                 conf for conf in target_confs
@@ -1490,6 +1508,7 @@ def run(
             progress=progress,
             reason_in=reason_in,
             include_legacy=include_legacy,
+            force=force,
         )
         if success > 0:
             if no_sync or offline:
@@ -1535,6 +1554,7 @@ def run(
             conf_papers, all_papers, chunk_size, retry_failed, retry_partial, query_doi_by_title,
             start_time=global_start, soft_timeout=soft_timeout, max_failed_attempts=max_failed_attempts,
             progress=progress, reason_in=reason_in, include_legacy=include_legacy,
+            force=force,
         )
         attempted = success + failed
         processed_total += attempted
@@ -1631,6 +1651,16 @@ if __name__ == "__main__":
             "refreshed the local copy in the same shell)."
         ),
     )
+    parser.add_argument(
+        "--force",
+        dest="force",
+        action="store_true",
+        help=(
+            "Force retry: also attempt papers whose abstract fetch previously "
+            "failed, including those that have reached --max-failed-attempts. "
+            "Does NOT re-fetch papers that already have a non-empty abstract."
+        ),
+    )
     args = parser.parse_args()
     reason_in_set: Optional[Set[str]] = None
     if args.reason_in:
@@ -1652,4 +1682,5 @@ if __name__ == "__main__":
         include_legacy=args.include_legacy,
         no_sync=args.no_sync,
         offline=args.offline,
+        force=args.force,
     )
