@@ -188,6 +188,7 @@ def build_task(
     year_filter: Optional[Set[int]],
     retry_failed: bool,
     progress: dict,
+    force: bool = False,
 ) -> List[Tuple[int, str]]:
     filled_set = set(progress.get("filled", []))
     tried_set = set(progress.get("tried", []))
@@ -204,9 +205,9 @@ def build_task(
             continue
         if year_filter and conf_year(conf_name) not in year_filter:
             continue
-        if url in filled_set:
+        if not force and url in filled_set:
             continue
-        if not retry_failed and url in tried_set:
+        if not retry_failed and not force and url in tried_set:
             continue
         tasks.append((idx, url))
     return tasks
@@ -230,6 +231,8 @@ def run(args) -> int:
     print(f"[*] Loading cache: {CACHE_FILE}")
     records = load_cache(CACHE_FILE)
     print(f"    Loaded {len(records)} records")
+    if args.force:
+        print("[*] Force mode: ENABLED — will retry CVF papers that previously failed to fetch an abstract")
 
     progress = load_progress()
     conf_filter = set(args.conf) if args.conf else None
@@ -241,6 +244,7 @@ def run(args) -> int:
         year_filter=year_filter,
         retry_failed=args.retry_failed,
         progress=progress,
+        force=args.force,
     )
 
     per_conf: Dict[str, int] = {}
@@ -462,6 +466,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="只打印任务集，不发起请求、不写文件")
     p.add_argument("--retry-failed", action="store_true",
                    help="重试之前 tried 但未拿到 abstract 的 URL")
+    p.add_argument("--force", action="store_true",
+                   help="强制重试：即使 URL 之前 tried 过也再次尝试获取 abstract（不覆盖已有摘要）")
     p.add_argument("--always-flush", action="store_true",
                    help="即使本轮无新增，也写一次 cache（默认仅在有新增时写）")
     p.add_argument("--no-sync", action="store_true",

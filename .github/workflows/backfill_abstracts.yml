@@ -10,14 +10,19 @@ env:
 
 on:
   schedule:
-    # 每 6 小时运行一次 (UTC 00:00 / 06:00 / 12:00 / 18:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）
-    - cron: "0 */6 * * *"
+    # 每天运行一次 (UTC 00:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       target_conf:
         description: "手动指定 conf（如 AAAI2020），留空则自动处理最高优先级论文，直到时间耗尽"
         required: false
         default: ""
+      force:
+        description: "强制获取摘要：即使论文之前获取摘要失败也继续尝试（默认关闭；不会覆盖已有摘要）"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   # Shared with collect_papers / update_readme to serialise every workflow
@@ -141,10 +146,14 @@ jobs:
 
       - name: Run abstract backfill
         run: |
+          force_flag=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            force_flag="--force"
+          fi
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
-            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3 $force_flag
           else
-            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3 $force_flag
           fi
 
       - name: Retry recoverable failures (--reason-in whitelist)
@@ -173,10 +182,14 @@ jobs:
         if: success() || failure()
         timeout-minutes: 70
         run: |
+          force_flag=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            force_flag="--force"
+          fi
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
-            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy $force_flag
           else
-            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy $force_flag
           fi
 
       - name: Backfill CVF Open Access abstracts
@@ -188,11 +201,15 @@ jobs:
         # within the same job. `--soft-timeout 2400` (40 min) keeps the total
         # workflow well under the 330 min hard cap.
         run: |
+          force_flag=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            force_flag="--force"
+          fi
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
             read -r -a confs <<< "${{ github.event.inputs.target_conf }}"
-            python scripts/fetch_cvf_abstracts.py --conf "${confs[@]}" --soft-timeout 2400
+            python scripts/fetch_cvf_abstracts.py --conf "${confs[@]}" --soft-timeout 2400 $force_flag
           else
-            python scripts/fetch_cvf_abstracts.py --soft-timeout 2400
+            python scripts/fetch_cvf_abstracts.py --soft-timeout 2400 $force_flag
           fi
 
       - name: Scan GitHub code links from newly backfilled abstracts
