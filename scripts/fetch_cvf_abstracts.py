@@ -205,7 +205,7 @@ def build_task(
             continue
         if year_filter and conf_year(conf_name) not in year_filter:
             continue
-        if url in filled_set:
+        if not force and url in filled_set:
             continue
         if not retry_failed and not force and url in tried_set:
             continue
