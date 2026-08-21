@@ -21536,6 +21536,10 @@
       "name": "PROCIEEE2026",
       "ts": "2026-08-01T15:41:47",
       "legacy": true
+    },
+    "DBLP::https://dblp.org/db/conf/sigcomm/sigcomm2026.html": {
+      "name": "SIGCOMM2026",
+      "ts": "2026-08-21T13:49:30"
     }
   }
 }
