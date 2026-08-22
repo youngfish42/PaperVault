@@ -130,13 +130,17 @@ The image uses a multi-stage build: Node.js compiles the Vue frontend, then Guni
 docker build \
   --build-arg VITE_GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX \
   --build-arg VITE_GOOGLE_SITE_VERIFICATION=xxxxxxxxxxxxxxxx \
+  --build-arg VITE_BAIDU_ANALYTICS_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
   -t papervault .
 docker run --rm -p 5001:5001 --env-file .env papervault
 ```
 
 Open `http://127.0.0.1:5001` after startup. The health endpoint is `http://127.0.0.1:5001/api/v1/healthz`. Tune the server with `GUNICORN_WORKERS`, `GUNICORN_THREADS`, and `GUNICORN_TIMEOUT`; defaults are documented in `.env.example`.
 
-Google Analytics and Search Console are optional, and the committed production environment leaves both values unset. Without these build arguments, the app does not load GA or inject a site-verification tag. For non-Docker builds, export the same variables before running `npm run build`.
+Google Analytics, Search Console, and Baidu Analytics are optional, and the committed production environment leaves these values unset. Without these build arguments, the app does not load the corresponding scripts or inject a site-verification tag. For non-Docker builds, export the same variables before running `npm run build`.
+
+- Google Analytics: `VITE_GOOGLE_ANALYTICS_ID` (build-time) / `GOOGLE_ANALYTICS_ID` (container runtime).
+- Baidu Analytics: `VITE_BAIDU_ANALYTICS_ID` (build-time) / `BAIDU_ANALYTICS_ID` (container runtime).
 
 ## :open_book: Coverage
 

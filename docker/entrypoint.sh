@@ -6,12 +6,19 @@ set -eu
 INDEX="/app/static/dist/index.html"
 GA_ID="${GOOGLE_ANALYTICS_ID:-}"
 SITE_VERIFICATION="${GOOGLE_SITE_VERIFICATION:-}"
+BA_ID="${BAIDU_ANALYTICS_ID:-}"
 
 if [ -f "$INDEX" ]; then
   if [ -n "$GA_ID" ]; then
     sed -i "s/__GA_ID__/$GA_ID/g" "$INDEX"
   else
     sed -i 's/__GA_ID__//g' "$INDEX"
+  fi
+
+  if [ -n "$BA_ID" ]; then
+    sed -i "s/__BA_ID__/$BA_ID/g" "$INDEX"
+  else
+    sed -i 's/__BA_ID__//g' "$INDEX"
   fi
 
   if [ -n "$SITE_VERIFICATION" ]; then
