@@ -92,8 +92,10 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.settings': '设置',
     'settings.pageTitle': '设置',
     'settings.intro':
-      '配置 LLM 提供方、API 密钥和默认参数。设置仅保存在本地，不会上传。',
+      '本页配置「AI 关键词推荐」与「AI 结果重排」所需的 LLM 提供方、API 密钥和默认参数。除 API 密钥保存在会话中（关闭浏览器即清除）外，其余设置保存在浏览器本地；留空时将使用服务端默认环境变量。',
     'settings.aiSuggest.title': 'AI 关键词推荐',
+    'settings.aiSuggest.description':
+      '下方的参数会用于首页搜索框的「AI 搜索」按钮，以及搜索结果右侧的 AI 推荐面板。选择提供方后会自动填入默认接口地址、模型与协议；你可以在此基础上修改，也可以完全留空以使用服务端默认配置。',
     'settings.aiSuggest.form.provider': '提供方',
     'settings.aiSuggest.form.baseUrl': '接口地址',
     'settings.aiSuggest.form.model': '模型',
@@ -108,16 +110,17 @@ const messages: Record<Lang, Record<string, string>> = {
     'settings.aiSuggest.saved': '✓ 已保存',
     'settings.aiSuggest.hint.apiKey':
       '密钥仅存于本会话（关闭浏览器即清除），不会上传到服务器。',
-    'settings.aiSuggest.test.title': '测一下',
+    'settings.aiSuggest.hint.provider':
+      '选择提供方后会自动填入默认接口地址、模型与协议，你仍可手动修改。',
+    'settings.aiSuggest.test.title': '功能测试',
+    'settings.aiSuggest.test.description':
+      '输入一段研究描述，点击「生成关键词」，验证当前配置能否正常调用 LLM。',
     'settings.aiSuggest.test.queryPh': '输入一段描述…',
     'settings.aiSuggest.test.button': '生成关键词',
     'settings.aiSuggest.test.empty': '暂无返回关键词',
     'settings.aiSuggest.test.errorQuery': '请输入测试用的查询内容',
     'settings.aiSuggest.test.errorProvider': '请先选择提供方',
     'settings.aiSuggest.test.errorUnknown': '请求失败',
-    'settings.about.title': '关于此页面',
-    'settings.about.body':
-      '本页是 P2-C 阶段交付的设置面板外壳，负责承载 P2-D 接入的 AI 提供方配置、模型选择与默认参数。',
     'tips.title': '搜索小贴士',
     'tips.desc':
       '① 直接输入关键词即可，默认按主题（标题 + 摘要 + 关键词）匹配；② 可使用 Web of Science 风格语法精确限定字段，如 AU="Yang Liu" SO=ICLR,NeurIPS PY=2023-2026；③ 想要可视化组合多条件？点击「高级搜索」打开行式表单，自动生成检索式；④ 点击作者名可一键检索其所有论文。',
@@ -274,8 +277,10 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.settings': 'Settings',
     'settings.pageTitle': 'Settings',
     'settings.intro':
-      'Configure the LLM provider, API key, and defaults. Settings live in your browser only.',
+      'Configure the LLM provider, API key, and defaults used by AI keyword suggestions and AI result reranking. The API key is kept in this session only (wiped when the browser closes); everything else is stored locally in your browser. Leave fields empty to fall back to the server-side defaults.',
     'settings.aiSuggest.title': 'AI keyword suggestions',
+    'settings.aiSuggest.description':
+      'These parameters are used by the AI Search button on the home page and the AI suggestion panel in the result list. Picking a provider auto-fills the default endpoint, model, and protocol; you can still edit them, or leave everything empty to use the server defaults.',
     'settings.aiSuggest.form.provider': 'Provider',
     'settings.aiSuggest.form.baseUrl': 'Endpoint URL',
     'settings.aiSuggest.form.model': 'Model',
@@ -290,16 +295,17 @@ const messages: Record<Lang, Record<string, string>> = {
     'settings.aiSuggest.saved': '✓ Saved',
     'settings.aiSuggest.hint.apiKey':
       'Key lives only in this session (wiped on browser close) and is never sent to our servers.',
-    'settings.aiSuggest.test.title': 'Test it',
+    'settings.aiSuggest.hint.provider':
+      'Picking a provider auto-fills the default endpoint, model, and protocol; you can still edit them.',
+    'settings.aiSuggest.test.title': 'Test connection',
+    'settings.aiSuggest.test.description':
+      'Enter a research description and click Generate to verify that the current settings can reach the LLM.',
     'settings.aiSuggest.test.queryPh': 'Enter a description…',
     'settings.aiSuggest.test.button': 'Generate',
     'settings.aiSuggest.test.empty': 'No keywords returned',
     'settings.aiSuggest.test.errorQuery': 'Please enter a query to test',
     'settings.aiSuggest.test.errorProvider': 'Please pick a provider first',
     'settings.aiSuggest.test.errorUnknown': 'Request failed',
-    'settings.about.title': 'About this page',
-    'settings.about.body':
-      'This page is the P2-C settings panel shell. It will host the P2-D AI provider configuration, model selection, and default-parameter controls.',
     'tips.title': 'Search Tips',
     'tips.desc':
       '① Just type keywords — the default Topic search matches title + abstract + author keywords. ② Use Web of Science style field tags for precision, e.g. AU="Yang Liu" SO=ICLR,NeurIPS PY=2023-2026. ③ Need a visual builder? Open "Advanced search" to add rows and auto-generate the expression. ④ Click any author name to instantly list all their papers.',

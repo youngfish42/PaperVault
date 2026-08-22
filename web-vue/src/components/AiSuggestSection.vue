@@ -181,6 +181,8 @@ const handleTest = async (): Promise<void> => {
       </div>
     </template>
 
+    <p class="pv-ai-description">{{ t('settings.aiSuggest.description') }}</p>
+
     <el-form :label-position="'top'" class="pv-ai-form">
       <el-form-item :label="t('settings.aiSuggest.form.provider')">
         <el-select v-model="form.provider" filterable style="width: 100%">
@@ -191,6 +193,9 @@ const handleTest = async (): Promise<void> => {
             :value="p.key"
           />
         </el-select>
+        <div class="pv-ai-hint">
+          {{ t('settings.aiSuggest.hint.provider') }}
+        </div>
         <div v-if="preset?.note" class="pv-ai-hint">{{ preset.note }}</div>
       </el-form-item>
 
@@ -280,6 +285,9 @@ const handleTest = async (): Promise<void> => {
     <h3 class="pv-ai-test-title">
       {{ t('settings.aiSuggest.test.title') }}
     </h3>
+    <p class="pv-ai-test-description">
+      {{ t('settings.aiSuggest.test.description') }}
+    </p>
     <div class="pv-ai-test-row">
       <el-input
         v-model="testQuery"
@@ -341,6 +349,21 @@ const handleTest = async (): Promise<void> => {
   font-size: 12px;
   font-weight: 600;
   color: var(--el-color-success, #67c23a);
+}
+.pv-settings-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+}
+.pv-ai-description,
+.pv-ai-test-description {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular, #4c4d4f);
+  margin: 0 0 16px;
+}
+.pv-ai-test-description {
+  margin: 0 0 10px;
 }
 .pv-ai-form :deep(.el-form-item) {
   margin-bottom: 14px;
