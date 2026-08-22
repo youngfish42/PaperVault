@@ -85,7 +85,4 @@ jobs:
               echo "GOOGLE_SITE_VERIFICATION=${{ vars.VITE_GOOGLE_SITE_VERIFICATION }}"
             } > .env
             chmod 600 .env
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-            docker pull ghcr.io/youngfish42/papervault:latest
-            docker compose up -d
-            docker image prune -f
+            GITHUB_TOKEN="$GITHUB_TOKEN" ./deploy.sh
