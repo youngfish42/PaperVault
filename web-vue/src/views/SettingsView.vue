@@ -5,9 +5,13 @@ import MainNavBar from '@/components/MainNavBar.vue'
 import { useI18n } from '@/utils/i18n'
 
 /**
- * P2-C Settings page shell + P2-D AI Suggest section. The AI Suggest
- * card (``<AiSuggestSection />``) replaces the P2-C ``<el-alert>``
- * placeholder and consumes P2-B's settings + API wrappers end-to-end.
+ * Settings page for PaperVault.
+ *
+ * Lets users configure the LLM provider, API key, and defaults used by the
+ * AI keyword suggestion dialog on the home page, the AI suggestion panel
+ * in search results, and AI-powered result reranking. All values are kept
+ * in browser storage (localStorage for non-secrets, sessionStorage for the
+ * API key) and are never uploaded to our servers.
  */
 
 const isDark = useDark()
@@ -28,15 +32,6 @@ const { t } = useI18n()
       <p class="pv-settings-intro">{{ t('settings.intro') }}</p>
 
       <AiSuggestSection />
-
-      <el-card shadow="never" class="pv-settings-card">
-        <template #header>
-          <span class="pv-settings-card-title">
-            {{ t('settings.about.title') }}
-          </span>
-        </template>
-        <p class="pv-settings-about-body">{{ t('settings.about.body') }}</p>
-      </el-card>
     </section>
   </main>
 </template>
@@ -64,16 +59,5 @@ const { t } = useI18n()
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
   border-radius: 10px;
   background: var(--el-bg-color, #fff);
-}
-.pv-settings-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--el-text-color-primary, #303133);
-}
-.pv-settings-about-body {
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: var(--el-text-color-regular, #4c4d4f);
-  margin: 0;
 }
 </style>
