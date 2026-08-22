@@ -1,12 +1,15 @@
 <p align="center">
-<h1 align="center"> <img src="./pics/icon/ai.png" width="30" /> PaperVault</h1>
+<h1 align="center"> <a href="https://papervault.top"><img src="./pics/icon/ai.png" width="30" /> PaperVault</a></h1>
 </p>
 <p align="center">
   <a href="README.en.md">English</a> | <strong>简体中文</strong>
 </p>
+<p align="center">
+  🌐 线上访问：<a href="https://papervault.top"><strong>papervault.top</strong></a>
+</p>
 
 <p align="center">
-  <img src="./pics/screenshot/web.jpg" alt="PaperVault Web 检索界面" width="850" />
+  <a href="https://papervault.top"><img src="./pics/screenshot/web.jpg" alt="PaperVault Web 检索界面" width="850" /></a>
 </p>
 
 ## :jack_o_lantern: 项目简介

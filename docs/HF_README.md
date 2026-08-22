@@ -31,6 +31,8 @@ configs:
 PaperVault 是一份**持续自动更新**的统一论文元数据库，覆盖自然语言处理、计算机视觉、机器学习、数据挖掘、数据库、语音、系统、网络、安全、理论计算机科学、人机交互、计算机图形学与多媒体等方向的顶级会议与期刊。PaperVault is a **continuously-updated, unified metadata database** of papers from top-tier conferences and journals across NLP, Computer Vision, Machine Learning, Data Mining, Databases, Speech, Systems, Networking, Security, Theory, HCI, Graphics, and Multimedia.
 
 > 🌐 源仓库 / Source: **[github.com/youngfish42/PaperVault](https://github.com/youngfish42/PaperVault)** — Web UI、REST API、采集流水线、Issues / PRs 全部在那里 · Web UI, REST API, crawling pipelines and issues/PRs all live there.
+>
+> 🌐 在线搜索 / Live search: **[papervault.top](https://papervault.top)** — 直接使用 Web 检索界面，无需下载数据 · Use the web search UI directly without downloading the dataset.
 
 ---
 
@@ -146,6 +148,15 @@ huggingface-cli download youngfish42/PaperVault \
 | `update_readme` | 仅手动触发 (`workflow_dispatch`) · Manual only (`workflow_dispatch`) | 默认仅刷新 README 与统计；当输入参数 `mode=force` 时执行全量重建 · Refreshes the README and statistics by default; performs a full rebuild only when invoked with `mode=force` |
 
 每次推送都使用 Hugging Face 的 `parent_commit` 乐观锁机制，避免并发覆盖。Each push uses Hugging Face's `parent_commit` optimistic-lock mechanism to avoid silently overwriting concurrent updates.
+
+---
+
+## 🌐 线上服务 · Live Service
+
+无需下载数据集即可直接体验 Web 检索：
+No need to download the dataset — try the web search directly:
+
+👉 **[papervault.top](https://papervault.top)**
 
 ---
 
