@@ -21540,6 +21540,18 @@
     "DBLP::https://dblp.org/db/conf/sigcomm/sigcomm2026.html": {
       "name": "SIGCOMM2026",
       "ts": "2026-08-21T13:49:30"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-1.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-22T14:14:43"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-5.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-22T14:15:49"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-7.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-22T14:16:59"
     }
   }
 }
