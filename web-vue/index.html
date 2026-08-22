@@ -10,7 +10,9 @@
     <script>
       (function () {
         var baiduId = "__BA_ID__";
-        if (!baiduId || baiduId === "__BA_ID__") return;
+        // 运行时拼接占位符，避免被 entrypoint.sh 的全局 sed 替换改写守卫字面量
+        var placeholder = "_" + "_BA_" + "ID_" + "_";
+        if (!baiduId || baiduId === placeholder) return;
         window._hmt = window._hmt || [];
         var hm = document.createElement("script");
         hm.src = "https://hm.baidu.com/hm.js?" + encodeURIComponent(baiduId);
