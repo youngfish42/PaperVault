@@ -12,33 +12,11 @@ import { compression } from 'vite-plugin-compression2'
 export default defineConfig(({ mode }) => {
   const ENV = loadEnv(mode, process.cwd(), '')
   const devProxyTarget = ENV.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:5001'
-  const googleSiteVerification = (
-    process.env.VITE_GOOGLE_SITE_VERIFICATION ||
-    ENV.VITE_GOOGLE_SITE_VERIFICATION ||
-    ''
-  ).trim()
 
   return {
     base: './',
     envPrefix: ['VITE', 'VUE'],
     plugins: [
-      {
-        name: 'google-site-verification',
-        transformIndexHtml() {
-          if (!googleSiteVerification) return
-
-          return [
-            {
-              tag: 'meta',
-              attrs: {
-                name: 'google-site-verification',
-                content: googleSiteVerification
-              },
-              injectTo: 'head'
-            }
-          ]
-        }
-      },
       vue(),
       vueJsx(),
       AutoImport({

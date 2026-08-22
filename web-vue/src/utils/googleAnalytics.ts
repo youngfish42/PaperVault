@@ -5,10 +5,14 @@ declare global {
   interface Window {
     dataLayer: unknown[]
     gtag: (...args: unknown[]) => void
+    // Injected at container start by docker/entrypoint.sh (see index.html placeholder).
+    __PAPERVAULT_GA_ID__?: string
   }
 }
 
-const measurementId = import.meta.env.VITE_GOOGLE_ANALYTICS_ID?.trim()
+const measurementId = (
+  window.__PAPERVAULT_GA_ID__ || import.meta.env.VITE_GOOGLE_ANALYTICS_ID || ''
+).trim()
 
 function trackPageView() {
   window.gtag('event', 'page_view', {

@@ -60,9 +60,6 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            VITE_GOOGLE_ANALYTICS_ID=${{ vars.VITE_GOOGLE_ANALYTICS_ID }}
-            VITE_GOOGLE_SITE_VERIFICATION=${{ vars.VITE_GOOGLE_SITE_VERIFICATION }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -81,7 +78,12 @@ jobs:
           envs: GITHUB_TOKEN,HF_TOKEN
           script: |
             cd /srv/papervault
-            printf 'HF_TOKEN=%s\nPAPERVAULT_HF_REPO_ID=youngfish42/PaperVault\n' "$HF_TOKEN" > .env
+            {
+              echo "HF_TOKEN=$HF_TOKEN"
+              echo "PAPERVAULT_HF_REPO_ID=youngfish42/PaperVault"
+              echo "GOOGLE_ANALYTICS_ID=${{ vars.VITE_GOOGLE_ANALYTICS_ID }}"
+              echo "GOOGLE_SITE_VERIFICATION=${{ vars.VITE_GOOGLE_SITE_VERIFICATION }}"
+            } > .env
             chmod 600 .env
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             docker pull ghcr.io/youngfish42/papervault:latest
