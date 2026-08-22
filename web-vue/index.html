@@ -6,8 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google-site-verification" content="__GOOGLE_SITE_VERIFICATION__" data-runtime-config />
     <script>window.__PAPERVAULT_GA_ID__ = "__GA_ID__"</script>
-    <script>window.__PAPERVAULT_BA_ID__ = "__BA_ID__"</script>
     <title>PaperVault</title>
+    <script>
+      (function () {
+        var baiduId = "__BA_ID__";
+        // 运行时拼接占位符，避免被 entrypoint.sh 的全局 sed 替换改写守卫字面量
+        var placeholder = "_" + "_BA_" + "ID_" + "_";
+        if (!baiduId || baiduId === placeholder) return;
+        window._hmt = window._hmt || [];
+        var hm = document.createElement("script");
+        hm.src = "https://hm.baidu.com/hm.js?" + encodeURIComponent(baiduId);
+        var s = document.getElementsByTagName("script")[0];
+        s.parentNode.insertBefore(hm, s);
+      })();
+    </script>
   </head>
   <body>
     <div id="app">
