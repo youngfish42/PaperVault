@@ -10,10 +10,6 @@ declare global {
   }
 }
 
-const measurementId = (
-  window.__PAPERVAULT_GA_ID__ || import.meta.env.VITE_GOOGLE_ANALYTICS_ID || ''
-).trim()
-
 function trackPageView() {
   window.gtag('event', 'page_view', {
     page_title: document.title,
@@ -22,7 +18,16 @@ function trackPageView() {
 }
 
 export function installGoogleAnalytics(router: Router) {
-  if (!measurementId || typeof window === 'undefined') return
+  if (typeof window === 'undefined') return
+
+  const rawMeasurementId =
+    window.__PAPERVAULT_GA_ID__ ||
+    import.meta.env.VITE_GOOGLE_ANALYTICS_ID ||
+    ''
+  const measurementId =
+    rawMeasurementId === '__GA_ID__' ? '' : rawMeasurementId.trim()
+
+  if (!measurementId) return
 
   window.dataLayer = window.dataLayer || []
   window.gtag =

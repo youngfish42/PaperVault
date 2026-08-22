@@ -130,13 +130,17 @@ Docker 镜像使用多阶段构建：先用 Node.js 编译 Vue 前端，再由 P
 docker build \
   --build-arg VITE_GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX \
   --build-arg VITE_GOOGLE_SITE_VERIFICATION=xxxxxxxxxxxxxxxx \
+  --build-arg VITE_BAIDU_ANALYTICS_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
   -t papervault .
 docker run --rm -p 5001:5001 --env-file .env papervault
 ```
 
 启动后访问 `http://127.0.0.1:5001`，健康检查地址为 `http://127.0.0.1:5001/api/v1/healthz`。可通过 `GUNICORN_WORKERS`、`GUNICORN_THREADS` 和 `GUNICORN_TIMEOUT` 调整服务参数；默认值见 `.env.example`。
 
-Google Analytics 与 Search Console 均为可选项，仓库提交的生产环境配置不会设置这两个值：不传上述构建参数时不会加载 GA，也不会注入站点验证标签。非 Docker 构建可在运行 `npm run build` 前导出同名环境变量。
+Google Analytics、Search Console 与 Baidu Analytics 均为可选项，仓库提交的生产环境配置不会设置这些值：不传上述构建参数时不会加载对应脚本，也不会注入站点验证标签。非 Docker 构建可在运行 `npm run build` 前导出同名环境变量。
+
+- Google Analytics：`VITE_GOOGLE_ANALYTICS_ID`（构建时）/ `GOOGLE_ANALYTICS_ID`（容器运行时）。
+- Baidu Analytics：`VITE_BAIDU_ANALYTICS_ID`（构建时）/ `BAIDU_ANALYTICS_ID`（容器运行时）。
 
 ## :open_book: 收录会议范围
 

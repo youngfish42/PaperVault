@@ -7,6 +7,9 @@ COPY web-vue/package.json web-vue/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY web-vue/ ./
+ARG VITE_GOOGLE_ANALYTICS_ID
+ARG VITE_GOOGLE_SITE_VERIFICATION
+ARG VITE_BAIDU_ANALYTICS_ID
 RUN npm run build
 
 
