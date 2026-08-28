@@ -21552,6 +21552,30 @@
     "DBLP::https://dblp.org/db/conf/crypto/crypto2026-7.html": {
       "name": "CRYPTO2026",
       "ts": "2026-08-22T14:16:59"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-2.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-28T08:50:54"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-3.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-28T08:52:00"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-6.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-28T08:53:07"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-8.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-28T08:54:13"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-9.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-28T08:55:19"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-10.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-08-28T08:56:25"
     }
   }
 }
