@@ -104,10 +104,11 @@ def _git_cwd_args() -> list:
 def _git_run(args: list, **kwargs) -> subprocess.CompletedProcess:
     """在仓库根目录运行 git 命令，返回 CompletedProcess（含 stdout/stderr）。
 
-    固定 LC_ALL=C，避免 git 的 fatal 消息随 locale 本地化，确保下游对
-    stderr 文本的匹配在所有环境中一致。
+    固定 LC_ALL=C 并将 LANGUAGE 置空，避免 git 的 fatal 消息随 locale 本地化。
+    GNU gettext 优先级为 LANGUAGE > LC_ALL，因此必须同时处理两者，才能保证
+    下游对 stderr 文本的匹配在所有环境中一致。
     """
-    env = {**os.environ, "LC_ALL": "C"}
+    env = {**os.environ, "LC_ALL": "C", "LANGUAGE": ""}
     return subprocess.run(
         ["git", *_git_cwd_args(), *args],
         capture_output=True,

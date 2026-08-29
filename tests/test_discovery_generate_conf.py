@@ -360,14 +360,16 @@ def test_git_run_forces_c_locale(monkeypatch: pytest.MonkeyPatch):
     generate_conf._git_run(["status"])
 
     assert captured.get("env", {}).get("LC_ALL") == "C"
+    assert captured.get("env", {}).get("LANGUAGE") == ""
 
 
 def test_resolve_inherit_refs_degrades_under_non_english_locale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """父进程 locale 非英文时，远程无该分支仍应优雅降级（git 子进程 stderr 被固定为英文）。"""
     # 强制父进程使用非英文 locale（若系统不支持，git 仍会回退英文；关键是
-    # 我们显式设置 LC_ALL=C 的子进程不应受父进程 locale 影响）
+    # 我们显式设置 LC_ALL=C / LANGUAGE="" 的子进程不应受父进程 locale 影响）
     monkeypatch.setenv("LC_ALL", "zh_CN.UTF-8")
     monkeypatch.setenv("LANG", "zh_CN.UTF-8")
+    monkeypatch.setenv("LANGUAGE", "zh_CN.UTF-8")
 
     remote = tmp_path / "remote.git"
     repo = tmp_path / "repo"
