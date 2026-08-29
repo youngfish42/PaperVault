@@ -3,6 +3,11 @@ name: Discover and Update Conference Configs
 env:
   PYTHON_VERSION: "3.10"
 
+concurrency:
+  # 防止多个 discover 实例并发读写 auto-discover-confs 分支，避免竞态覆盖未合并发现
+  group: papervault-discover
+  cancel-in-progress: false
+
 on:
   schedule:
     # 每天北京时间 02:00 (UTC 18:00) 运行 
@@ -76,7 +81,7 @@ jobs:
           if [ -n "${{ github.event.inputs.end_year }}" ]; then
             END_ARG="--end-year ${{ github.event.inputs.end_year }}"
           fi
-          python -m discovery.generate_conf $START_ARG $END_ARG --soft-timeout 18000
+          python -m discovery.generate_conf $START_ARG $END_ARG --soft-timeout 18000 --inherit-branch auto-discover-confs
           echo "changed=$(git diff --name-only -- conf/ | wc -l)" >> "$GITHUB_OUTPUT"
 
       - name: Setup GIT user

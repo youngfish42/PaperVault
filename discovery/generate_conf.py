@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
@@ -91,12 +92,94 @@ def merge_conf(existing: list, new: list, key: str = "url") -> list:
     return merged
 
 
+def _git_cwd_args() -> list:
+    """返回让 git 在 conf/ 所在仓库根目录执行所需的 -C 参数列表。"""
+    return ["-C", str(CONF_DIR.parent)]
+
+
+def _load_conf_from_ref(ref: str, filename: str) -> list:
+    """从指定 git 引用读取 conf 文件内容（失败返回空列表）。"""
+    try:
+        output = subprocess.check_output(
+            ["git", *_git_cwd_args(), "show", f"{ref}:{CONF_DIR.name}/{filename}"],
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+        return json.loads(output.decode("utf-8"))
+    except Exception:
+        return []
+
+
+def _resolve_inherit_refs(branch: str) -> list:
+    """把用户提供的 branch 参数解析成候选 git 引用列表。
+
+    - 若参数本身已是完整 ref（如 origin/auto-discover-confs），直接返回。
+    - 否则先尝试 origin/<branch>；若解析失败再回落到本地 <branch>。
+      在 CI 环境中会先执行 git fetch origin <branch> 来确保远程引用存在。
+    """
+    if "/" in branch:
+        return [branch]
+
+    refs = [f"origin/{branch}", branch]
+
+    # 在 CI 中通常需要先从 origin fetch；本地测试/无 remote 时静默失败
+    try:
+        subprocess.run(
+            ["git", *_git_cwd_args(), "fetch", "origin", branch],
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+    except Exception:
+        pass
+
+    return refs
+
+
+def inherit_from_branch(branch: str, dry_run: bool = False):
+    """把指定分支上 conf/*.json 的未合并发现合并到当前工作区。
+
+    通过 git show 读取分支文件，使用 merge_conf() 按 url 去重合并，
+    避免直接 git merge 带来的冲突风险。
+    """
+    if not branch:
+        return
+
+    refs = _resolve_inherit_refs(branch)
+    print(f"[*] Inheriting unmerged conf entries from {branch}")
+
+    inherited_any = False
+    for path in sorted(CONF_DIR.glob("*.json")):
+        filename = path.name
+        branch_conf = []
+        for ref in refs:
+            branch_conf = _load_conf_from_ref(ref, filename)
+            if branch_conf:
+                break
+        if not branch_conf:
+            continue
+        inherited_any = True
+        existing = load_conf(filename)
+        merged = merge_conf(existing, branch_conf)
+        added = len(merged) - len(existing)
+        if added > 0:
+            if dry_run:
+                print(f"    + {filename}: would inherit {added} entries (dry-run)")
+            else:
+                save_conf(filename, merged)
+                print(f"    + {filename}: inherited {added} entries")
+
+    if not inherited_any:
+        print(f"    Branch/ref {branch} not found or contains no conf files; nothing to inherit.")
+
+
 def run(
     start_year: int = None,
     end_year: int = None,
     dry_run: bool = False,
     only: str = None,
     soft_timeout: float = None,
+    inherit_branch: str = None,
 ):
     if end_year is None:
         end_year = datetime.now().year
@@ -122,6 +205,11 @@ def run(
         if only and filename != only:
             continue
         grouped.setdefault(filename, []).append(cls)
+
+    # 若存在未合并的自动发现分支，先把其中的会议清单合并进来，
+    # 避免 create-pull-request 重置分支后覆盖旧发现。
+    if inherit_branch:
+        inherit_from_branch(inherit_branch, dry_run=dry_run)
 
     start_time = time.time()
 
@@ -174,7 +262,7 @@ def run(
             break
 
 
-if __name__ == "__main__":
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Auto-discover conference configs")
     parser.add_argument("--start-year", type=int, help="Start year (inclusive)")
     parser.add_argument("--end-year", type=int, help="End year (inclusive)")
@@ -182,7 +270,13 @@ if __name__ == "__main__":
     parser.add_argument("--only", type=str, help="Only process one conf file, e.g. acl_conf.json")
     parser.add_argument("--soft-timeout", type=float, default=None,
                         help="Soft timeout in seconds. Save progress and exit gracefully when reached (e.g. 18000 for 5h)")
-    args = parser.parse_args()
+    parser.add_argument("--inherit-branch", type=str, default=None,
+                        help="Inherit unmerged conf entries from this git branch/ref before discovering (e.g. auto-discover-confs)")
+    return parser
+
+
+if __name__ == "__main__":
+    args = _build_parser().parse_args()
 
     run(
         start_year=args.start_year,
@@ -190,4 +284,5 @@ if __name__ == "__main__":
         dry_run=args.dry_run,
         only=args.only,
         soft_timeout=args.soft_timeout,
+        inherit_branch=getattr(args, "inherit_branch"),
     )
