@@ -232,7 +232,117 @@ def test_inherit_from_branch_dry_run_does_not_write(tmp_path: Path, monkeypatch:
 
 
 # ---------------------------------------------------------------------------
-# 4. CLI argument wiring
+# 4. Resolving refs with origin remote (CI path) and fetch failures
+# ---------------------------------------------------------------------------
+
+
+def _add_origin_remote(repo: Path, bare_remote: Path):
+    """把 bare_remote 作为 origin 远程配置到 repo。"""
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare_remote)],
+        cwd=repo, check=True, capture_output=True,
+    )
+
+
+def test_resolve_inherit_refs_prefers_local_branch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """本地分支存在时，不尝试 fetch origin，直接返回本地引用。"""
+    repo = _init_git_repo(tmp_path)
+    conf_dir = repo / "conf"
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(generate_conf, "CONF_DIR", conf_dir)
+
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-b", "auto-discover-confs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "main"], cwd=repo, check=True, capture_output=True)
+
+    refs = generate_conf._resolve_inherit_refs("auto-discover-confs")
+    assert refs == ["auto-discover-confs"]
+
+
+def test_resolve_inherit_refs_fetches_from_origin_in_ci(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """模拟 CI 环境：本地无目标分支，但 origin 远程有，应 fetch 后返回 origin/<branch>。"""
+    remote = tmp_path / "remote.git"
+    repo = tmp_path / "repo"
+    remote.mkdir()
+    repo.mkdir()
+
+    # 初始化 bare remote
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+
+    # 在 repo 中创建 main + auto-discover-confs，并推送到 origin
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True, capture_output=True)
+
+    conf_dir = repo / "conf"
+    monkeypatch.setattr(generate_conf, "CONF_DIR", conf_dir)
+    _write_conf(conf_dir, "dblp_conf.json", [
+        {"name": "ICDE2018", "url": "https://dblp.org/db/conf/icde/icde2018.html"},
+    ])
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "main"], cwd=repo, check=True, capture_output=True)
+
+    subprocess.run(["git", "checkout", "-b", "auto-discover-confs"], cwd=repo, check=True, capture_output=True)
+    _write_conf(conf_dir, "dblp_conf.json", [
+        {"name": "ICDE2018", "url": "https://dblp.org/db/conf/icde/icde2018.html"},
+        {"name": "ICDE2026", "url": "https://dblp.org/db/conf/icde/icde2026.html"},
+    ])
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "discover"], cwd=repo, check=True, capture_output=True)
+
+    subprocess.run(["git", "checkout", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-u", str(remote), "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-u", str(remote), "auto-discover-confs"], cwd=repo, check=True, capture_output=True)
+
+    # 删除本地 auto-discover-confs，模拟 CI fresh checkout
+    subprocess.run(["git", "branch", "-D", "auto-discover-confs"], cwd=repo, check=True, capture_output=True)
+
+    _add_origin_remote(repo, remote)
+
+    refs = generate_conf._resolve_inherit_refs("auto-discover-confs")
+    assert "origin/auto-discover-confs" in refs
+
+    # 验证从 origin 读取并合并成功
+    generate_conf.inherit_from_branch("auto-discover-confs")
+    merged = _read_conf(conf_dir, "dblp_conf.json")
+    assert any(item["name"] == "ICDE2026" for item in merged)
+
+
+def test_resolve_inherit_refs_fails_fast_on_fetch_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """origin 存在但 fetch 失败时，应抛出 InheritBranchError 而不是静默降级。"""
+    repo = _init_git_repo(tmp_path)
+    conf_dir = repo / "conf"
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(generate_conf, "CONF_DIR", conf_dir)
+
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo, check=True, capture_output=True)
+
+    # 配置一个指向不存在路径的 origin，使 fetch 必然失败
+    fake_remote = tmp_path / "nonexistent-remote.git"
+    _add_origin_remote(repo, fake_remote)
+
+    with pytest.raises(generate_conf.InheritBranchError):
+        generate_conf._resolve_inherit_refs("auto-discover-confs")
+
+
+def test_main_exits_on_inherit_branch_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """main() 入口在遇到 InheritBranchError 时应以非零码退出。"""
+    repo = _init_git_repo(tmp_path)
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo, check=True, capture_output=True)
+    fake_remote = tmp_path / "nonexistent-remote.git"
+    _add_origin_remote(repo, fake_remote)
+
+    monkeypatch.setattr(generate_conf, "CONF_DIR", repo / "conf")
+
+    with pytest.raises(SystemExit) as exc_info:
+        generate_conf.main(["--inherit-branch", "auto-discover-confs"])
+
+    assert exc_info.value.code == 1
+
+
+# ---------------------------------------------------------------------------
+# 5. CLI argument wiring
 # ---------------------------------------------------------------------------
 
 

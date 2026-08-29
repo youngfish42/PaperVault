@@ -92,13 +92,31 @@ def merge_conf(existing: list, new: list, key: str = "url") -> list:
     return merged
 
 
+class InheritBranchError(RuntimeError):
+    """继承未合并发现分支失败且不应静默降级时抛出。"""
+
+
 def _git_cwd_args() -> list:
     """返回让 git 在 conf/ 所在仓库根目录执行所需的 -C 参数列表。"""
     return ["-C", str(CONF_DIR.parent)]
 
 
+def _git_run(args: list, **kwargs) -> subprocess.CompletedProcess:
+    """在仓库根目录运行 git 命令，返回 CompletedProcess（含 stdout/stderr）。"""
+    return subprocess.run(
+        ["git", *_git_cwd_args(), *args],
+        capture_output=True,
+        text=True,
+        **kwargs,
+    )
+
+
 def _load_conf_from_ref(ref: str, filename: str) -> list:
-    """从指定 git 引用读取 conf 文件内容（失败返回空列表）。"""
+    """从指定 git 引用读取 conf 文件内容。
+
+    - 引用/文件不存在：返回空列表（可接受，首次运行）。
+    - 超时或其它意外错误：抛出 InheritBranchError，避免静默降级。
+    """
     try:
         output = subprocess.check_output(
             ["git", *_git_cwd_args(), "show", f"{ref}:{CONF_DIR.name}/{filename}"],
@@ -106,34 +124,63 @@ def _load_conf_from_ref(ref: str, filename: str) -> list:
             timeout=30,
         )
         return json.loads(output.decode("utf-8"))
-    except Exception:
+    except subprocess.TimeoutExpired as exc:
+        raise InheritBranchError(
+            f"git show {ref}:{CONF_DIR.name}/{filename} timed out after {exc.timeout}s; "
+            "refusing to continue to avoid overwriting unmerged discoveries"
+        ) from exc
+    except subprocess.CalledProcessError:
+        # 引用不存在或文件在该引用中不存在，属于正常情况
         return []
+    except json.JSONDecodeError as exc:
+        raise InheritBranchError(
+            f"Invalid JSON in {ref}:{CONF_DIR.name}/{filename}: {exc}; "
+            "refusing to continue to avoid overwriting unmerged discoveries"
+        ) from exc
+
+
+def _has_local_ref(branch: str) -> bool:
+    """检查本地是否存在指定分支/引用。"""
+    result = _git_run(["rev-parse", "--verify", branch], timeout=10)
+    return result.returncode == 0
+
+
+def _has_origin_remote() -> bool:
+    """检查仓库是否配置了 origin 远程。"""
+    result = _git_run(["remote", "get-url", "origin"], timeout=10)
+    return result.returncode == 0
 
 
 def _resolve_inherit_refs(branch: str) -> list:
     """把用户提供的 branch 参数解析成候选 git 引用列表。
 
+    策略：
     - 若参数本身已是完整 ref（如 origin/auto-discover-confs），直接返回。
-    - 否则先尝试 origin/<branch>；若解析失败再回落到本地 <branch>。
-      在 CI 环境中会先执行 git fetch origin <branch> 来确保远程引用存在。
+    - 若本地存在该分支，直接使用本地引用，避免不必要的网络 fetch。
+    - 否则若仓库配置了 origin 远程，先执行 git fetch origin <branch>；
+      fetch 失败视为异常，直接抛出 InheritBranchError 终止流程（fail-fast），
+      防止 create-pull-request 在保护未生效时覆盖未合并发现。
+    - 无 origin 远程且本地无该分支时，返回 [branch]，由调用方按“不存在”降级。
     """
     if "/" in branch:
         return [branch]
 
-    refs = [f"origin/{branch}", branch]
+    if _has_local_ref(branch):
+        return [branch]
 
-    # 在 CI 中通常需要先从 origin fetch；本地测试/无 remote 时静默失败
-    try:
-        subprocess.run(
-            ["git", *_git_cwd_args(), "fetch", "origin", branch],
-            check=False,
-            capture_output=True,
-            timeout=60,
+    if not _has_origin_remote():
+        # 本地开发/测试环境没有 origin，直接尝试本地引用名称
+        return [branch]
+
+    result = _git_run(["fetch", "origin", branch], timeout=60)
+    if result.returncode != 0:
+        stderr = result.stderr.strip() if result.stderr else "(no stderr)"
+        raise InheritBranchError(
+            f"git fetch origin {branch} failed (rc={result.returncode}): {stderr}; "
+            "refusing to continue to avoid overwriting unmerged discoveries"
         )
-    except Exception:
-        pass
 
-    return refs
+    return [f"origin/{branch}", branch]
 
 
 def inherit_from_branch(branch: str, dry_run: bool = False):
@@ -275,14 +322,23 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__":
-    args = _build_parser().parse_args()
+def main(argv=None):
+    """命令行入口；被 ``if __name__ == "__main__"`` 调用，也可在测试中直接调用。"""
+    args = _build_parser().parse_args(argv)
 
-    run(
-        start_year=args.start_year,
-        end_year=args.end_year,
-        dry_run=args.dry_run,
-        only=args.only,
-        soft_timeout=args.soft_timeout,
-        inherit_branch=getattr(args, "inherit_branch"),
-    )
+    try:
+        run(
+            start_year=args.start_year,
+            end_year=args.end_year,
+            dry_run=args.dry_run,
+            only=args.only,
+            soft_timeout=args.soft_timeout,
+            inherit_branch=getattr(args, "inherit_branch"),
+        )
+    except InheritBranchError as e:
+        print(f"[!] {e}")
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
