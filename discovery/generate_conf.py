@@ -157,9 +157,12 @@ def _resolve_inherit_refs(branch: str) -> list:
     策略：
     - 若参数本身已是完整 ref（如 origin/auto-discover-confs），直接返回。
     - 若本地存在该分支，直接使用本地引用，避免不必要的网络 fetch。
-    - 否则若仓库配置了 origin 远程，先执行 git fetch origin <branch>；
-      fetch 失败视为异常，直接抛出 InheritBranchError 终止流程（fail-fast），
-      防止 create-pull-request 在保护未生效时覆盖未合并发现。
+    - 否则若仓库配置了 origin 远程，先执行 git fetch origin <branch>。
+      - fetch 因 "couldn't find remote ref" 失败：远程尚无该分支（首次运行）
+        或已删除，属于合法场景，返回 [f"origin/{branch}", branch] 优雅降级。
+      - fetch 因网络/远端/权限等其它原因失败：抛出 InheritBranchError 终止
+        流程（fail-fast），防止 create-pull-request 在保护未生效时覆盖
+        未合并发现。
     - 无 origin 远程且本地无该分支时，返回 [branch]，由调用方按“不存在”降级。
     """
     if "/" in branch:
@@ -175,6 +178,10 @@ def _resolve_inherit_refs(branch: str) -> list:
     result = _git_run(["fetch", "origin", branch], timeout=60)
     if result.returncode != 0:
         stderr = result.stderr.strip() if result.stderr else "(no stderr)"
+        # "couldn't find remote ref" 表示远程尚未创建该分支（首次运行）
+        # 或该分支已被合并删除，属于合法场景，优雅降级。
+        if "couldn't find remote ref" in stderr:
+            return [f"origin/{branch}", branch]
         raise InheritBranchError(
             f"git fetch origin {branch} failed (rc={result.returncode}): {stderr}; "
             "refusing to continue to avoid overwriting unmerged discoveries"

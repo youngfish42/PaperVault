@@ -309,6 +309,43 @@ def test_resolve_inherit_refs_fetches_from_origin_in_ci(tmp_path: Path, monkeypa
     assert any(item["name"] == "ICDE2026" for item in merged)
 
 
+def test_resolve_inherit_refs_degrades_when_remote_ref_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """origin 存在但远程无该分支时，应优雅降级而不是抛异常。"""
+    remote = tmp_path / "remote.git"
+    repo = tmp_path / "repo"
+    remote.mkdir()
+    repo.mkdir()
+
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True, capture_output=True)
+
+    conf_dir = repo / "conf"
+    monkeypatch.setattr(generate_conf, "CONF_DIR", conf_dir)
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    _write_conf(conf_dir, "dblp_conf.json", [
+        {"name": "ICDE2018", "url": "https://dblp.org/db/conf/icde/icde2018.html"},
+    ])
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-u", str(remote), "main"], cwd=repo, check=True, capture_output=True)
+
+    _add_origin_remote(repo, remote)
+
+    # 远程只有 main，没有 auto-discover-confs；不应抛异常
+    refs = generate_conf._resolve_inherit_refs("auto-discover-confs")
+    assert refs == ["origin/auto-discover-confs", "auto-discover-confs"]
+
+    # 继承流程也应安全跳过，不破坏现有文件
+    generate_conf.inherit_from_branch("auto-discover-confs")
+    assert _read_conf(conf_dir, "dblp_conf.json") == [
+        {"name": "ICDE2018", "url": "https://dblp.org/db/conf/icde/icde2018.html"},
+    ]
+
+
 def test_resolve_inherit_refs_fails_fast_on_fetch_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """origin 存在但 fetch 失败时，应抛出 InheritBranchError 而不是静默降级。"""
     repo = _init_git_repo(tmp_path)
