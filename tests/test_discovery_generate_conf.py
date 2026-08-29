@@ -346,6 +346,62 @@ def test_resolve_inherit_refs_degrades_when_remote_ref_missing(tmp_path: Path, m
     ]
 
 
+def test_git_run_forces_c_locale(monkeypatch: pytest.MonkeyPatch):
+    """_git_run 必须为 git 子进程显式设置 LC_ALL=C，避免 stderr 被本地化。"""
+    captured = {}
+    original_run = subprocess.run
+
+    def fake_run(*args, **kwargs):
+        captured["env"] = kwargs.get("env")
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    generate_conf._git_run(["status"])
+
+    assert captured.get("env", {}).get("LC_ALL") == "C"
+
+
+def test_resolve_inherit_refs_degrades_under_non_english_locale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """父进程 locale 非英文时，远程无该分支仍应优雅降级（git 子进程 stderr 被固定为英文）。"""
+    # 强制父进程使用非英文 locale（若系统不支持，git 仍会回退英文；关键是
+    # 我们显式设置 LC_ALL=C 的子进程不应受父进程 locale 影响）
+    monkeypatch.setenv("LC_ALL", "zh_CN.UTF-8")
+    monkeypatch.setenv("LANG", "zh_CN.UTF-8")
+
+    remote = tmp_path / "remote.git"
+    repo = tmp_path / "repo"
+    remote.mkdir()
+    repo.mkdir()
+
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-b", "main"], cwd=repo, check=True, capture_output=True)
+
+    conf_dir = repo / "conf"
+    monkeypatch.setattr(generate_conf, "CONF_DIR", conf_dir)
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    _write_conf(conf_dir, "dblp_conf.json", [
+        {"name": "ICDE2018", "url": "https://dblp.org/db/conf/icde/icde2018.html"},
+    ])
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-u", str(remote), "main"], cwd=repo, check=True, capture_output=True)
+
+    _add_origin_remote(repo, remote)
+
+    refs = generate_conf._resolve_inherit_refs("auto-discover-confs")
+    assert refs == ["origin/auto-discover-confs", "auto-discover-confs"]
+
+    generate_conf.inherit_from_branch("auto-discover-confs")
+    assert _read_conf(conf_dir, "dblp_conf.json") == [
+        {"name": "ICDE2018", "url": "https://dblp.org/db/conf/icde/icde2018.html"},
+    ]
+
+
 def test_resolve_inherit_refs_fails_fast_on_fetch_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """origin 存在但 fetch 失败时，应抛出 InheritBranchError 而不是静默降级。"""
     repo = _init_git_repo(tmp_path)
