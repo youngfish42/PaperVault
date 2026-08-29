@@ -21576,6 +21576,10 @@
     "DBLP::https://dblp.org/db/conf/crypto/crypto2026-10.html": {
       "name": "CRYPTO2026",
       "ts": "2026-08-28T08:56:25"
+    },
+    "DBLP::https://dblp.org/db/conf/icde/icde2026.html": {
+      "name": "ICDE2026",
+      "ts": "2026-08-29T14:18:48"
     }
   }
 }
