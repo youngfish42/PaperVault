@@ -6272,6 +6272,10 @@
         "url": "https://dblp.org/db/conf/miccai/miccai2024-12.html"
     },
     {
+        "name": "MICCAI2026",
+        "url": "https://dblp.org/db/conf/miccai/hecktor2026.html"
+    },
+    {
         "name": "ICDM2023",
         "url": "https://dblp.org/db/conf/icdm/icdm2023.html"
     },
@@ -9818,6 +9822,10 @@
     {
         "name": "ISCA2025",
         "url": "https://dblp.org/db/conf/isca/isca2025.html"
+    },
+    {
+        "name": "ISCA2026",
+        "url": "https://dblp.org/db/conf/isca/isca2026.html"
     },
     {
         "name": "EUROSYS2006",
@@ -14862,6 +14870,10 @@
     {
         "name": "CRYPTO2026",
         "url": "https://dblp.org/db/conf/crypto/crypto2026-10.html"
+    },
+    {
+        "name": "CRYPTO2026",
+        "url": "https://dblp.org/db/conf/crypto/crypto2026-4.html"
     },
     {
         "name": "PLDI2000",
