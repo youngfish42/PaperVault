@@ -15,6 +15,7 @@ import { useI18n } from '@/utils/i18n'
  */
 
 const GITHUB_URL = 'https://github.com/youngfish42/PaperVault'
+const brandIconUrl = `${import.meta.env.BASE_URL}papervault-icon.png`
 
 const props = defineProps<{
   activeKey: 'home' | 'advanced' | 'settings' | 'docs'
@@ -65,7 +66,21 @@ const goDocs = (): void => {
 <template>
   <nav class="pv-nav">
     <div class="pv-container pv-nav-inner">
-      <button type="button" class="brand" @click="goHome">PaperVault</button>
+      <button
+        type="button"
+        class="brand"
+        aria-label="PaperVault"
+        @click="goHome"
+      >
+        <img
+          class="brand-icon"
+          :src="brandIconUrl"
+          alt=""
+          width="32"
+          height="32"
+        />
+        <span>PaperVault</span>
+      </button>
       <button
         class="pv-nav-tab"
         :class="{ 'pv-nav-tab--active': props.activeKey === 'advanced' }"
@@ -186,6 +201,9 @@ const goDocs = (): void => {
   padding-right: 32px;
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.045em;
@@ -199,9 +217,10 @@ const goDocs = (): void => {
   background: transparent;
   font-family: inherit;
 }
-.brand b {
-  color: inherit;
-  font-weight: inherit;
+.brand-icon {
+  display: block;
+  flex: none;
+  object-fit: contain;
 }
 .pv-nav-github {
   margin: 0 18px 0 4px;
@@ -338,6 +357,7 @@ const goDocs = (): void => {
 }
 .pv-nav-tab {
   position: relative;
+  white-space: nowrap;
   padding: 19px 16px 18px;
   font-size: 14px;
   font-weight: 500;
@@ -391,8 +411,13 @@ const goDocs = (): void => {
   }
   .brand {
     font-size: 17px;
+    gap: 6px;
     padding-right: 10px;
     margin-right: 2px;
+  }
+  .brand-icon {
+    width: 28px;
+    height: 28px;
   }
   .pv-nav-tab {
     padding: 18px 9px 17px;
@@ -409,6 +434,15 @@ const goDocs = (): void => {
   .pv-nav-actions :deep(.el-button .el-icon) {
     font-size: 16px;
     margin: 0;
+  }
+}
+@media (max-width: 420px) {
+  .brand {
+    padding-right: 4px;
+    margin-right: 0;
+  }
+  .brand span {
+    display: none;
   }
 }
 </style>

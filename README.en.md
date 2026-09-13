@@ -1,5 +1,5 @@
 <p align="center">
-<h1 align="center"> <a href="https://papervault.top"><img src="./pics/icon/ai.png" width="30" /> PaperVault</a></h1>
+<h1 align="center"> <a href="https://papervault.top"><img src="./pics/papervault-icon.png" alt="PaperVault" width="40" /> PaperVault</a></h1>
 </p>
 <p align="center">
   <strong>English</strong> | <a href="README.md">简体中文</a>
