@@ -80,7 +80,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GITHUB_TOKEN,HF_TOKEN
+          envs: GITHUB_TOKEN,HF_TOKEN,GITHUB_OAUTH_CLIENT_ID,GITHUB_OAUTH_CLIENT_SECRET
           script: |
             cd /srv/papervault
             {
