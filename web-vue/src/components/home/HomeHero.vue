@@ -40,20 +40,48 @@ const queryModel = computed({
       </h1>
       <p class="pv-hero-slogan">{{ t('app.slogan') }}</p>
 
-      <div class="pv-search-modes" role="group" :aria-label="t('search.mode.label')">
-        <button type="button" :aria-pressed="!aiDialogOpen" :disabled="aiLoading"
-          @click="aiDialogOpen = false">{{ t('search.mode.standard') }}</button>
-        <button type="button" :aria-pressed="aiDialogOpen" :disabled="aiLoading"
-          @click="aiDialogOpen = true">{{ t('search.aiSearch.button') }}</button>
-        <button type="button" :aria-pressed="false" :disabled="aiLoading"
-          @click="router.push('/advanced')">{{ t('search.tab.advanced') }}</button>
+      <div
+        class="pv-search-modes"
+        role="group"
+        :aria-label="t('search.mode.label')"
+      >
+        <button
+          type="button"
+          :aria-pressed="!aiDialogOpen"
+          :disabled="aiLoading"
+          @click="aiDialogOpen = false"
+        >
+          {{ t('search.mode.standard') }}
+        </button>
+        <button
+          type="button"
+          :aria-pressed="aiDialogOpen"
+          :disabled="aiLoading"
+          @click="aiDialogOpen = true"
+        >
+          {{ t('search.aiSearch.button') }}
+        </button>
+        <button
+          type="button"
+          :aria-pressed="false"
+          :disabled="aiLoading"
+          @click="router.push('/advanced')"
+        >
+          {{ t('search.tab.advanced') }}
+        </button>
       </div>
       <div class="pv-hero-searchbox">
         <input
           v-model="queryModel"
           class="pv-hero-searchbox-input"
-          :placeholder="aiDialogOpen ? t('search.aiSearch.seedPh') : t('search.placeholder.short')"
-          :aria-label="aiDialogOpen ? t('search.aiSearch.button') : t('search.button')"
+          :placeholder="
+            aiDialogOpen
+              ? t('search.aiSearch.seedPh')
+              : t('search.placeholder.short')
+          "
+          :aria-label="
+            aiDialogOpen ? t('search.aiSearch.button') : t('search.button')
+          "
           :disabled="aiLoading"
           @keydown.enter="!$event.isComposing && submitSearch()"
         />
@@ -61,7 +89,9 @@ const queryModel = computed({
           type="button"
           class="pv-hero-searchbox-btn"
           :title="aiDialogOpen ? t('search.aiSearch.run') : t('search.button')"
-          :aria-label="aiDialogOpen ? t('search.aiSearch.run') : t('search.button')"
+          :aria-label="
+            aiDialogOpen ? t('search.aiSearch.run') : t('search.button')
+          "
           :disabled="aiLoading"
           :aria-busy="aiLoading"
           @click="submitSearch"
@@ -115,7 +145,14 @@ const queryModel = computed({
         </transition>
       </div>
     </div>
-    <footer class="pv-hero-footer"><span>© 2026 PaperVault</span><span class="pv-hero-footer-spacer" /><a href="https://github.com/youngfish42/PaperVault" target="_blank" rel="noopener noreferrer">GitHub ↗</a></footer>
+    <footer class="pv-hero-footer">
+      <span>© 2026 PaperVault</span><span class="pv-hero-footer-spacer" /><a
+        href="https://github.com/youngfish42/PaperVault"
+        target="_blank"
+        rel="noopener noreferrer"
+        >GitHub ↗</a
+      >
+    </footer>
   </section>
 </template>
 
@@ -227,7 +264,12 @@ const queryModel = computed({
   transform: scale(1.04);
 }
 /* The mode picker and input share exactly the same outer edges. */
-.pv-ai-slot { width: 100%; max-width: var(--pv-search-width); min-height: 118px; margin: 0 auto; }
+.pv-ai-slot {
+  width: 100%;
+  max-width: var(--pv-search-width);
+  min-height: 118px;
+  margin: 0 auto;
+}
 .pv-search-modes {
   display: flex;
   justify-content: center;
@@ -248,7 +290,7 @@ const queryModel = computed({
   font: inherit;
   font-size: 14px;
   cursor: pointer;
-  transition: background .16s ease, color .16s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 .pv-search-modes button[aria-pressed='true'] {
   background: var(--el-fill-color);
@@ -261,13 +303,18 @@ const queryModel = computed({
   outline-offset: 1px;
 }
 .pv-search-modes button:disabled,
-.pv-hero-searchbox-btn:disabled { cursor: wait; opacity: 0.65; }
+.pv-hero-searchbox-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 .pv-hero-hint {
   margin: 12px 0 22px;
   font-size: 13px;
   color: var(--el-text-color-regular, #606266);
 }
-.pv-hero:not(.is-ai) .pv-hero-hint { margin-top: -54px; }
+.pv-hero:not(.is-ai) .pv-hero-hint {
+  margin-top: -54px;
+}
 .pv-hero-hint-link {
   color: var(--el-color-primary, #6f5ed3);
   font-weight: 600;
@@ -322,7 +369,9 @@ const queryModel = computed({
   opacity: 0;
 }
 @media (max-width: 900px) {
-  .pv-hero-inner { transform: translateY(-52px); }
+  .pv-hero-inner {
+    transform: translateY(-52px);
+  }
   .pv-hero-title {
     font-size: 42px;
   }
@@ -338,5 +387,35 @@ const queryModel = computed({
     height: 38px;
   }
 }
-.pv-hero-footer{display:flex;align-items:center;gap:18px;width:100%;padding:16px max(24px,calc((100vw - var(--pv-page-width)) / 2));box-sizing:border-box;border-top:1px solid var(--el-border-color-lighter,#ebeef5);color:var(--el-text-color-secondary,#909399);font-size:11px;letter-spacing:.02em}.pv-hero-footer-spacer{flex:1}.pv-hero-footer a{color:inherit;text-decoration:none}.pv-hero-footer a:hover{color:var(--el-color-primary,#409eff)}@media(max-width:600px){.pv-hero-footer{gap:10px;font-size:10px}.pv-hero-footer span:last-child{display:none}}
+.pv-hero-footer {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 16px max(24px, calc((100vw - var(--pv-page-width)) / 2));
+  box-sizing: border-box;
+  border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
+  color: var(--el-text-color-secondary, #909399);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.pv-hero-footer-spacer {
+  flex: 1;
+}
+.pv-hero-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+.pv-hero-footer a:hover {
+  color: var(--el-color-primary, #409eff);
+}
+@media (max-width: 600px) {
+  .pv-hero-footer {
+    gap: 10px;
+    font-size: 10px;
+  }
+  .pv-hero-footer span:last-child {
+    display: none;
+  }
+}
 </style>

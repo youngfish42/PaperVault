@@ -69,11 +69,14 @@ const visibleProxy = computed({
   set: (v: boolean) => emit('update:visible', v)
 })
 
-watch(() => props.seedValue, () => {
-  keywords.value = []
-  errorMsg.value = ''
-  hasRun.value = false
-})
+watch(
+  () => props.seedValue,
+  () => {
+    keywords.value = []
+    errorMsg.value = ''
+    hasRun.value = false
+  }
+)
 
 watch(
   () => props.visible,
@@ -219,8 +222,11 @@ defineExpose({ run, loading })
   margin: 12px auto 0;
   text-align: left;
 }
-.pv-ai-search-rerank { height: auto; white-space: normal; }
- .pv-ai-search-panel {
+.pv-ai-search-rerank {
+  height: auto;
+  white-space: normal;
+}
+.pv-ai-search-panel {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid var(--el-border-color-lighter, #ebeef5);

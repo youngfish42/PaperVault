@@ -93,7 +93,26 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.lang': 'English',
     'toolbar.settings': '设置',
     'toolbar.docs': '开发者文档',
-    'docs.title': '搜索 SDK 文档', 'docs.intro': '用 REST API 和查询 DSL 将 PaperVault 的高级搜索接入你的脚本、Notebook 或应用。', 'docs.quickstart': '快速开始', 'docs.quickstartText': '论文搜索无需登录或 API 密钥。使用 GET 请求并传入 q、page 和 page_size 参数即可。', 'docs.dsl': '查询 DSL', 'docs.dslText': '支持 TS、TI、AB、AU、SO、PY 字段，以及 AND、OR、NOT、NEAR/x 和引号短语。', 'docs.example': 'cURL 示例', 'docs.copy': '复制', 'docs.copied': '已复制', 'docs.copyFailed': '复制失败，请手动选择文本', 'docs.responses': '响应与分页', 'docs.responsesText': '成功响应包含 items 和 meta。page 从 1 开始，page_size 受服务端上限约束；错误统一返回 error、message 和 request_id。', 'docs.ai': 'AI 接口（可选）', 'docs.aiText': '关键词推荐使用 POST /api/v1/suggest，结果重排使用 POST /api/v1/ai/rerank；密钥通过请求体传入或使用服务端配置。', 'docs.source': '完整参数与示例：',
+    'docs.title': '搜索 SDK 文档',
+    'docs.intro':
+      '用 REST API 和查询 DSL 将 PaperVault 的高级搜索接入你的脚本、Notebook 或应用。',
+    'docs.quickstart': '快速开始',
+    'docs.quickstartText':
+      '论文搜索无需登录或 API 密钥。使用 GET 请求并传入 q、page 和 page_size 参数即可。',
+    'docs.dsl': '查询 DSL',
+    'docs.dslText':
+      '支持 TS、TI、AB、AU、SO、PY 字段，以及 AND、OR、NOT、NEAR/x 和引号短语。',
+    'docs.example': 'cURL 示例',
+    'docs.copy': '复制',
+    'docs.copied': '已复制',
+    'docs.copyFailed': '复制失败，请手动选择文本',
+    'docs.responses': '响应与分页',
+    'docs.responsesText':
+      '成功响应包含 items 和 meta。page 从 1 开始，page_size 受服务端上限约束；错误统一返回 error、message 和 request_id。',
+    'docs.ai': 'AI 接口（可选）',
+    'docs.aiText':
+      '关键词推荐使用 POST /api/v1/suggest，结果重排使用 POST /api/v1/ai/rerank；密钥通过请求体传入或使用服务端配置。',
+    'docs.source': '完整参数与示例：',
     'settings.pageTitle': '设置',
     'settings.intro':
       '本页配置「AI 关键词推荐」与「AI 结果重排」所需的 LLM 提供方、API 密钥和默认参数。除 API 密钥保存在会话中（关闭浏览器即清除）外，其余设置保存在浏览器本地；留空时将使用服务端默认环境变量。',
@@ -281,7 +300,26 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.lang': '中文',
     'toolbar.settings': 'Settings',
     'toolbar.docs': 'Developer docs',
-    'docs.title': 'Search SDK documentation', 'docs.intro': 'Connect PaperVault advanced search to scripts, notebooks, and apps with the REST API and query DSL.', 'docs.quickstart': 'Quick start', 'docs.quickstartText': 'Paper search requires no login or API key. Send GET with q, page, and page_size parameters.', 'docs.dsl': 'Query DSL', 'docs.dslText': 'Use TS, TI, AB, AU, SO, and PY fields with AND, OR, NOT, NEAR/x, and quoted phrases.', 'docs.example': 'cURL example', 'docs.copy': 'Copy', 'docs.copied': 'Copied', 'docs.copyFailed': 'Copy failed; select the text manually', 'docs.responses': 'Responses and pagination', 'docs.responsesText': 'Success responses contain items and meta. page starts at 1 and page_size is capped by the server; errors use error, message, and request_id.', 'docs.ai': 'Optional AI endpoints', 'docs.aiText': 'Use POST /api/v1/suggest for keyword suggestions and POST /api/v1/ai/rerank for relevance reranking.', 'docs.source': 'Full parameters and examples: ',
+    'docs.title': 'Search SDK documentation',
+    'docs.intro':
+      'Connect PaperVault advanced search to scripts, notebooks, and apps with the REST API and query DSL.',
+    'docs.quickstart': 'Quick start',
+    'docs.quickstartText':
+      'Paper search requires no login or API key. Send GET with q, page, and page_size parameters.',
+    'docs.dsl': 'Query DSL',
+    'docs.dslText':
+      'Use TS, TI, AB, AU, SO, and PY fields with AND, OR, NOT, NEAR/x, and quoted phrases.',
+    'docs.example': 'cURL example',
+    'docs.copy': 'Copy',
+    'docs.copied': 'Copied',
+    'docs.copyFailed': 'Copy failed; select the text manually',
+    'docs.responses': 'Responses and pagination',
+    'docs.responsesText':
+      'Success responses contain items and meta. page starts at 1 and page_size is capped by the server; errors use error, message, and request_id.',
+    'docs.ai': 'Optional AI endpoints',
+    'docs.aiText':
+      'Use POST /api/v1/suggest for keyword suggestions and POST /api/v1/ai/rerank for relevance reranking.',
+    'docs.source': 'Full parameters and examples: ',
     'settings.pageTitle': 'Settings',
     'settings.intro':
       'Configure the LLM provider, API key, and defaults used by AI keyword suggestions and AI result reranking. The API key is kept in this session only (wiped when the browser closes); everything else is stored locally in your browser. Leave fields empty to fall back to the server-side defaults.',
