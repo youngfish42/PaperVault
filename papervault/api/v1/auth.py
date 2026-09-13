@@ -4,6 +4,7 @@ from functools import wraps
 from urllib.parse import urlencode
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 import secrets
+import requests
 
 bp = Blueprint("auth_v1", __name__)
 
@@ -49,5 +50,17 @@ def oauth_callback(provider):
     # OAuth is a general user login. It must never grant administrator
     # privileges; admin access is reserved for the separately configured
     # administrator credentials.
-    session["papervault_user"] = {"provider": provider, "name": provider.title() + " user"}
+    user = {"provider": provider, "name": provider.title() + " user"}
+    if provider == "github":
+        s = _settings()
+        try:
+            token_response = requests.post("https://github.com/login/oauth/access_token", data={"client_id": s.github_client_id, "client_secret": s.github_client_secret, "code": request.args["code"], "redirect_uri": s.github_redirect_uri}, headers={"Accept": "application/json"}, timeout=15)
+            token_response.raise_for_status()
+        except requests.RequestException:
+            return jsonify({"error": {"code": "OAUTH_FAILED", "message": "GitHub token exchange failed"}}), 502
+        access_token = token_response.json().get("access_token")
+        if not access_token: return jsonify({"error": {"code": "OAUTH_FAILED", "message": "GitHub token exchange failed"}}), 400
+        profile = requests.get("https://api.github.com/user", headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"}, timeout=15).json()
+        user = {"provider": provider, "id": str(profile.get("id", "")), "name": profile.get("login") or profile.get("name") or "GitHub user", "email": profile.get("email") or ""}
+    session["papervault_user"] = user
     return redirect("/#/?login=success")
