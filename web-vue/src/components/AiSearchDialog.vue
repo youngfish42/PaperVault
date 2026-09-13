@@ -41,6 +41,7 @@ const MERGE_CAP = 3
 const props = defineProps<{
   visible: boolean
   defaultRerank?: boolean
+  seedValue?: string
 }>()
 
 const emit = defineEmits<{
@@ -48,7 +49,7 @@ const emit = defineEmits<{
   (e: 'pick', payload: { query: string; rerank: boolean; seed: string }): void
 }>()
 
-const seed = ref('')
+const seed = computed(() => props.seedValue ?? '')
 const keywords = ref<string[]>([])
 const loading = ref(false)
 const rerankEnabled = ref(props.defaultRerank ?? true)
@@ -66,6 +67,12 @@ const hasRun = ref(false)
 const visibleProxy = computed({
   get: () => props.visible,
   set: (v: boolean) => emit('update:visible', v)
+})
+
+watch(() => props.seedValue, () => {
+  keywords.value = []
+  errorMsg.value = ''
+  hasRun.value = false
 })
 
 watch(
@@ -108,6 +115,7 @@ const extractError = (err: unknown): string => {
 }
 
 const run = async (): Promise<void> => {
+  if (loading.value) return
   const q = seed.value.trim()
   if (!q) {
     ElMessage.warning(t('search.aiSearch.toastNoSeed'))
@@ -165,34 +173,17 @@ const handleReplace = (kw: string): void => {
   emit('pick', { query: kw, rerank: rerankEnabled.value, seed: kw })
   visibleProxy.value = false
 }
+defineExpose({ run, loading })
 </script>
 
 <template>
-  <el-dialog
-    v-model="visibleProxy"
-    :title="t('search.aiSearch.dialogTitle')"
-    width="520px"
-    destroy-on-close
-    :close-on-click-modal="false"
-  >
-    <div class="pv-ai-search-row">
-      <el-input
-        v-model="seed"
-        :placeholder="t('search.aiSearch.seedPh')"
-        clearable
-        @keyup.enter="run"
-      />
-      <el-button type="primary" :loading="loading" @click="run">
-        {{ t('search.aiSearch.run') }}
-      </el-button>
-    </div>
-
+  <div v-if="visibleProxy" class="pv-ai-inline">
     <el-checkbox v-model="rerankEnabled" class="pv-ai-search-rerank">
       {{ t('search.aiSearch.rerank') }}
     </el-checkbox>
 
     <AiSuggestPanel
-      v-if="loading || hasRun"
+      v-if="loading || (hasRun && !errorMsg)"
       :keywords="keywords"
       :loading="loading"
       :title="''"
@@ -217,24 +208,23 @@ const handleReplace = (kw: string): void => {
         {{ t('search.aiSearch.goSettings') }}
       </el-button>
     </div>
-  </el-dialog>
+  </div>
 </template>
 
 <style scoped>
-.pv-ai-search-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
+.pv-ai-inline {
+  width: 100%;
+  max-width: var(--pv-search-width, 800px);
+  box-sizing: border-box;
+  margin: 12px auto 0;
+  text-align: left;
 }
-.pv-ai-search-row :deep(.el-input) {
-  flex: 1 1 auto;
-}
-.pv-ai-search-rerank {
-  margin-bottom: 12px;
-}
-.pv-ai-search-panel {
-  margin-top: 4px;
+.pv-ai-search-rerank { height: auto; white-space: normal; }
+ .pv-ai-search-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 8px;
 }
 .pv-ai-search-error {
   margin-top: 12px;

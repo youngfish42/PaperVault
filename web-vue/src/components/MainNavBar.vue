@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 import { useI18n } from '@/utils/i18n'
 
 /**
@@ -15,7 +16,7 @@ import { useI18n } from '@/utils/i18n'
 const GITHUB_URL = 'https://github.com/youngfish42/PaperVault'
 
 const props = defineProps<{
-  activeKey: 'home' | 'advanced' | 'settings'
+  activeKey: 'home' | 'advanced' | 'settings' | 'docs'
   isDark: boolean
 }>()
 
@@ -25,6 +26,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const { t, toggle: toggleLang } = useI18n()
+const loginVisible = ref(false)
 
 const goHome = (): void => {
   if (props.activeKey === 'home') return
@@ -38,20 +40,16 @@ const goSettings = (): void => {
   if (props.activeKey === 'settings') return
   router.push({ path: '/settings' })
 }
+const goDocs = (): void => {
+  if (props.activeKey === 'docs') return
+  router.push({ path: '/docs' })
+}
 </script>
 
 <template>
   <nav class="pv-nav">
     <div class="pv-container pv-nav-inner">
       <button type="button" class="brand" @click="goHome">PaperVault</button>
-      <button
-        class="pv-nav-tab"
-        :class="{ 'pv-nav-tab--active': props.activeKey === 'home' }"
-        type="button"
-        @click="goHome"
-      >
-        {{ t('search.tab.smart') }}
-      </button>
       <button
         class="pv-nav-tab"
         :class="{ 'pv-nav-tab--active': props.activeKey === 'advanced' }"
@@ -68,7 +66,10 @@ const goSettings = (): void => {
       >
         {{ t('toolbar.settings') }}
       </button>
+      <button class="pv-nav-tab" :class="{ 'pv-nav-tab--active': props.activeKey === 'docs' }" type="button" @click="goDocs">{{ t('toolbar.docs') }}</button>
+      <a class="pv-nav-github" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer">GitHub</a>
       <div class="pv-nav-actions">
+        <el-button link type="primary" @click="loginVisible = true">登录</el-button>
         <el-link
           type="primary"
           :icon="props.isDark ? 'Sunny' : 'Moon'"
@@ -79,92 +80,17 @@ const goSettings = (): void => {
         <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
           {{ t('toolbar.lang') }}
         </el-link>
-        <el-link
-          type="primary"
-          icon="Link"
-          :href="GITHUB_URL"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {{ t('toolbar.github') }}
-        </el-link>
       </div>
     </div>
   </nav>
+  <el-dialog v-model="loginVisible" title="登录 PaperVault" width="360px">
+    <div class="login-options">
+      <el-button type="primary" tag="a" href="/api/v1/auth/oauth/zhihu">使用知乎登录</el-button>
+      <el-button tag="a" href="/api/v1/auth/oauth/github">使用 GitHub 登录</el-button>
+    </div>
+  </el-dialog>
 </template>
 
 <style scoped>
-.pv-nav {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--el-bg-color, #fff);
-  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
-}
-.pv-nav-inner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 6px;
-  padding-bottom: 0;
-}
-.brand {
-  font-size: 20px;
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--el-text-color-primary, #333);
-  white-space: nowrap;
-  cursor: pointer;
-  padding: 8px 18px 14px 0;
-  margin-right: 8px;
-  border: none;
-  border-right: 1px solid var(--el-border-color-lighter, #ebeef5);
-  background: transparent;
-  font-family: inherit;
-}
-.pv-nav-tab {
-  position: relative;
-  padding: 14px 18px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.2px;
-  color: var(--el-text-color-secondary, #909399);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: color 0.18s ease;
-}
-.pv-nav-tab:hover {
-  color: var(--el-text-color-primary, #303133);
-}
-.pv-nav-tab--active {
-  color: var(--el-text-color-primary, #303133);
-  font-weight: 600;
-}
-.pv-nav-tab--active::after {
-  content: '';
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: -1px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--el-color-primary, #6f5ed3);
-}
-.pv-nav-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding-bottom: 6px;
-}
-@media (max-width: 768px) {
-  .brand {
-    border-right: none;
-    padding-right: 8px;
-  }
-  .pv-nav-tab {
-    padding: 14px 10px 16px;
-  }
-}
+.pv-nav{position:sticky;top:0;z-index:100;background:var(--el-bg-color,#fff);border-bottom:1px solid var(--el-border-color-lighter,#ebeef5)}.pv-nav-inner{display:flex;align-items:center;min-height:56px;gap:4px;max-width:none;padding-left:32px;padding-right:32px}.brand{font-size:19px;font-weight:700;letter-spacing:-.045em;text-decoration:none;color:var(--el-text-color-primary,#333);white-space:nowrap;cursor:pointer;padding:0 24px 0 0;margin-right:10px;border:none;background:transparent;font-family:inherit}.brand b{color:inherit;font-weight:inherit}.pv-nav-github{margin:0 18px 0 4px;padding-left:16px;border-left:1px solid var(--pv-line);color:var(--el-text-color-secondary,#909399);font-size:12px;letter-spacing:.02em;white-space:nowrap;text-decoration:none}.pv-nav-github:hover{color:var(--el-color-primary,#409eff)}.pv-nav-tab{position:relative;padding:19px 16px 18px;font-size:14px;font-weight:500;color:var(--el-text-color-secondary,#909399);background:transparent;border:none;cursor:pointer;transition:color .18s ease}.pv-nav-tab:hover,.pv-nav-tab--active{color:var(--el-text-color-primary,#303133)}.pv-nav-tab--active{font-weight:600}.pv-nav-tab--active::after{content:'';position:absolute;left:14px;right:14px;bottom:-1px;height:2px;border-radius:2px;background:var(--el-color-primary,#6f5ed3)}.pv-nav-actions{margin-left:auto;display:flex;gap:12px;align-items:center}.pv-nav-actions :deep(.el-link),.pv-nav-actions :deep(.el-button){font-size:13px;white-space:nowrap}@media(max-width:900px){.pv-nav-github{display:none}.pv-nav-actions :deep(.el-link:nth-last-child(-n+2)){display:none}}@media(max-width:600px){.pv-nav-inner{min-height:52px;padding-left:16px;padding-right:16px}.brand{font-size:17px;padding-right:10px;margin-right:2px}.pv-nav-tab{padding:18px 9px 17px;font-size:13px}.pv-nav-actions{gap:6px}.pv-nav-actions :deep(.el-link),.pv-nav-actions :deep(.el-button){font-size:0}.pv-nav-actions :deep(.el-link .el-icon),.pv-nav-actions :deep(.el-button .el-icon){font-size:16px;margin:0}}
 </style>

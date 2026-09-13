@@ -11,9 +11,27 @@ html, body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #333;
+  color: var(--el-text-color-primary, #1d2638);
+  background: var(--el-bg-color-page, #f5f7fb);
+}
+:root {
+  --el-text-color-primary: #172033;
+  --el-text-color-regular: #344054;
+  --el-text-color-secondary: #667085;
 }
 html.dark {
-  /* 自定义深色背景颜色 */
-  --el-bg-color: #282828;
+  --el-color-primary: #409eff;
+  --el-color-primary-light-9: #1d2f44;
+  --el-color-primary-dark-2: #337ecc;
+  --el-bg-color-page: #171b21;
+  --el-bg-color: #242a32;
+  --el-fill-color: #2d3540;
+  --el-fill-color-light: #28303a;
+  --el-fill-color-lighter: #222a33;
+  --el-text-color-primary: #edf2fb;
+  --el-text-color-regular: #c1cad8;
+  --el-text-color-secondary: #8d99aa;
+  --el-border-color: #3a424e;
+  --el-border-color-light: #343d49;
+  --el-border-color-lighter: #2c3440;
 }

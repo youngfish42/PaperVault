@@ -38,8 +38,8 @@ const { t } = useI18n()
 
 <style scoped>
 .pv-settings-body {
-  max-width: 720px;
-  padding-top: 28px;
+  max-width: var(--pv-page-width);
+  padding-top: 32px;
   padding-bottom: 40px;
 }
 .pv-settings-title {
@@ -57,7 +57,7 @@ const { t } = useI18n()
 .pv-settings-card {
   margin-bottom: 16px;
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 10px;
+  border-radius: var(--pv-card-radius);
   background: var(--el-bg-color, #fff);
 }
 </style>

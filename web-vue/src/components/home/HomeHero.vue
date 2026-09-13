@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AiSearchDialog from '@/components/AiSearchDialog.vue'
 import { useI18n } from '@/utils/i18n'
 
@@ -11,9 +12,19 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const router = useRouter()
 
 const cheatsheetOpen = ref(false)
 const aiDialogOpen = ref(false)
+const aiSearch = ref<InstanceType<typeof AiSearchDialog> | null>(null)
+const aiLoading = computed(() => aiSearch.value?.loading ?? false)
+const submitSearch = (): void => {
+  if (aiDialogOpen.value) {
+    void aiSearch.value?.run()
+  } else {
+    emit('search')
+  }
+}
 
 const queryModel = computed({
   get: () => props.query,
@@ -22,41 +33,52 @@ const queryModel = computed({
 </script>
 
 <template>
-  <section class="pv-hero">
+  <section class="pv-hero" :class="{ 'is-ai': aiDialogOpen }">
     <div class="pv-container pv-hero-inner">
       <h1 class="pv-hero-title">
-        <a href="/">{{ t('app.title') }}</a>
+        <a href="/"><span>Paper</span><b>Vault</b></a>
       </h1>
       <p class="pv-hero-slogan">{{ t('app.slogan') }}</p>
 
+      <div class="pv-search-modes" role="group" :aria-label="t('search.mode.label')">
+        <button type="button" :aria-pressed="!aiDialogOpen" :disabled="aiLoading"
+          @click="aiDialogOpen = false">{{ t('search.mode.standard') }}</button>
+        <button type="button" :aria-pressed="aiDialogOpen" :disabled="aiLoading"
+          @click="aiDialogOpen = true">{{ t('search.aiSearch.button') }}</button>
+        <button type="button" :aria-pressed="false" :disabled="aiLoading"
+          @click="router.push('/advanced')">{{ t('search.tab.advanced') }}</button>
+      </div>
       <div class="pv-hero-searchbox">
         <input
           v-model="queryModel"
           class="pv-hero-searchbox-input"
-          :placeholder="t('search.placeholder.short')"
-          @keyup.enter="$emit('search')"
+          :placeholder="aiDialogOpen ? t('search.aiSearch.seedPh') : t('search.placeholder.short')"
+          :aria-label="aiDialogOpen ? t('search.aiSearch.button') : t('search.button')"
+          :disabled="aiLoading"
+          @keydown.enter="!$event.isComposing && submitSearch()"
         />
         <button
           type="button"
           class="pv-hero-searchbox-btn"
-          :title="t('search.button')"
-          @click="$emit('search')"
+          :title="aiDialogOpen ? t('search.aiSearch.run') : t('search.button')"
+          :aria-label="aiDialogOpen ? t('search.aiSearch.run') : t('search.button')"
+          :disabled="aiLoading"
+          :aria-busy="aiLoading"
+          @click="submitSearch"
         >
+          <span v-if="aiLoading">…</span>
           <el-icon><Search /></el-icon>
         </button>
       </div>
 
-      <div class="pv-hero-ai-row">
-        <el-button class="pv-hero-ai-btn" plain @click="aiDialogOpen = true">
-          <el-icon><MagicStick /></el-icon>
-          <span>{{ t('search.aiSearch.button') }}</span>
-        </el-button>
-        <span class="pv-hero-ai-hint">{{ t('search.aiSearch.hint') }}</span>
+      <div class="pv-ai-slot">
+        <AiSearchDialog
+          ref="aiSearch"
+          v-model:visible="aiDialogOpen"
+          :seed-value="queryModel"
+          @pick="$emit('ai-pick', $event)"
+        />
       </div>
-      <AiSearchDialog
-        v-model:visible="aiDialogOpen"
-        @pick="$emit('ai-pick', $event)"
-      />
 
       <p class="pv-hero-hint">
         {{ t('search.heroHint')
@@ -93,13 +115,15 @@ const queryModel = computed({
         </transition>
       </div>
     </div>
+    <footer class="pv-hero-footer"><span>© 2026 PaperVault</span><span class="pv-hero-footer-spacer" /><a href="https://github.com/youngfish42/PaperVault" target="_blank" rel="noopener noreferrer">GitHub ↗</a></footer>
   </section>
 </template>
 
 <style scoped>
 .pv-hero {
+  --pv-search-width: 800px;
   width: 100%;
-  min-height: 100%;
+  min-height: calc(100vh - 58px);
   display: flex;
   flex-direction: column;
   background: linear-gradient(
@@ -110,42 +134,54 @@ const queryModel = computed({
   box-sizing: border-box;
 }
 .pv-hero-inner {
-  max-width: 860px;
-  padding-top: 64px;
-  padding-bottom: 80px;
+  width: 100%;
+  max-width: var(--pv-page-width);
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  padding-top: 28px;
+  padding-bottom: 28px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Keep the focal search group slightly above the viewport midpoint. */
+  transform: translateY(-88px);
 }
 .pv-hero-title {
   margin: 0 0 6px;
-  font-size: 56px;
-  letter-spacing: 1px;
+  font-size: 46px;
+  letter-spacing: -0.055em;
+  font-weight: 750;
   user-select: none;
 }
 .pv-hero-title a {
   text-decoration: none;
   color: var(--el-text-color-primary, #303133);
+  letter-spacing: inherit;
 }
 .pv-hero-title a:hover {
   text-decoration: underline;
 }
 .pv-hero-slogan {
   margin: 0 0 32px;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--el-text-color-regular, #606266);
   user-select: none;
 }
 .pv-hero-searchbox {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   margin: 0 auto;
-  max-width: 720px;
-  height: 56px;
+  width: 100%;
+  max-width: var(--pv-search-width);
+  height: 68px;
   padding: 0 6px 0 24px;
-  background: var(--el-bg-color, #fff);
+  background: var(--pv-page-bg);
   border: 1.5px solid var(--el-color-primary-light-5, #b3d8ff);
-  border-radius: 9999px;
-  box-shadow: 0 2px 12px rgba(111, 94, 211, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 6px 22px rgba(38, 50, 80, 0.08);
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .pv-hero-searchbox:focus-within {
@@ -161,6 +197,7 @@ const queryModel = computed({
   background: transparent;
   font-size: 16px;
   color: var(--el-text-color-primary, #303133);
+  letter-spacing: inherit;
   font-style: italic;
 }
 .pv-hero-searchbox-input::placeholder {
@@ -172,9 +209,9 @@ const queryModel = computed({
 }
 .pv-hero-searchbox-btn {
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
   border: none;
   background: var(--el-color-primary, #6f5ed3);
   color: #fff;
@@ -182,34 +219,55 @@ const queryModel = computed({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   transition: background 0.18s ease, transform 0.18s ease;
 }
 .pv-hero-searchbox-btn:hover {
   background: var(--el-color-primary-dark-2, #5847c0);
   transform: scale(1.04);
 }
-.pv-hero-ai-row {
+/* The mode picker and input share exactly the same outer edges. */
+.pv-ai-slot { width: 100%; max-width: var(--pv-search-width); min-height: 118px; margin: 0 auto; }
+.pv-search-modes {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin: 10px auto 0;
-  max-width: 720px;
+  gap: 6px;
+  width: 100%;
+  max-width: var(--pv-search-width);
+  min-height: 40px;
+  margin: 0 auto 14px;
 }
-.pv-hero-ai-btn :deep(.el-icon) {
-  margin-right: 6px;
-  vertical-align: middle;
+.pv-search-modes button {
+  flex: 0 0 116px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--el-text-color-regular);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease;
 }
-.pv-hero-ai-hint {
-  font-size: 12px;
-  color: var(--el-text-color-secondary, #909399);
+.pv-search-modes button[aria-pressed='true'] {
+  background: var(--el-fill-color);
+  border-color: var(--el-border-color);
+  color: var(--el-text-color-primary);
+  font-weight: 600;
 }
+.pv-search-modes button:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 1px;
+}
+.pv-search-modes button:disabled,
+.pv-hero-searchbox-btn:disabled { cursor: wait; opacity: 0.65; }
 .pv-hero-hint {
-  margin: 14px 0 32px;
+  margin: 12px 0 22px;
   font-size: 13px;
   color: var(--el-text-color-regular, #606266);
 }
+.pv-hero:not(.is-ai) .pv-hero-hint { margin-top: -54px; }
 .pv-hero-hint-link {
   color: var(--el-color-primary, #6f5ed3);
   font-weight: 600;
@@ -220,7 +278,7 @@ const queryModel = computed({
   color: var(--el-color-primary-dark-2, #5847c0);
 }
 .pv-hero-syntax {
-  max-width: 720px;
+  max-width: var(--pv-search-width);
   margin: 0 auto;
 }
 .pv-hero-syntax-toggle {
@@ -264,6 +322,7 @@ const queryModel = computed({
   opacity: 0;
 }
 @media (max-width: 900px) {
+  .pv-hero-inner { transform: translateY(-52px); }
   .pv-hero-title {
     font-size: 42px;
   }
@@ -279,4 +338,5 @@ const queryModel = computed({
     height: 38px;
   }
 }
+.pv-hero-footer{display:flex;align-items:center;gap:18px;width:100%;padding:16px max(24px,calc((100vw - var(--pv-page-width)) / 2));box-sizing:border-box;border-top:1px solid var(--el-border-color-lighter,#ebeef5);color:var(--el-text-color-secondary,#909399);font-size:11px;letter-spacing:.02em}.pv-hero-footer-spacer{flex:1}.pv-hero-footer a{color:inherit;text-decoration:none}.pv-hero-footer a:hover{color:var(--el-color-primary,#409eff)}@media(max-width:600px){.pv-hero-footer{gap:10px;font-size:10px}.pv-hero-footer span:last-child{display:none}}
 </style>

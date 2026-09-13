@@ -205,8 +205,8 @@ defineExpose({ searchResult })
   display: flex;
   align-items: center;
   gap: 16px;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 .brand {
   font-size: 20px;
@@ -218,7 +218,7 @@ defineExpose({ searchResult })
 .pv-topbar-input {
   flex: 1 1 auto;
   min-width: 320px;
-  max-width: 720px;
+  max-width: var(--pv-max-width);
 }
 .pv-topbar-input--refine :deep(.el-input-group__prepend) {
   background: var(--el-color-warning-light-9, #fdf6ec);

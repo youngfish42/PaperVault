@@ -1,6 +1,10 @@
 @import './base.css';
 
 :root {
+  --pv-page-width: 1040px;
+  --pv-page-bg: var(--el-bg-color-page, #f5f7fa);
+  --pv-card-radius: 8px;
+  --pv-card-border: var(--el-border-color-lighter, #ebeef5);
   --pv-max-width: 1600px;
   --pv-gutter: 16px;
   /* Vertical offset applied to sticky elements that must sit below the
@@ -284,3 +288,23 @@
   font-family: 'Fira Code', Consolas, monospace;
   font-size: 12px;
 }
+
+/* Shared page geometry and color tokens */
+:root {
+  --pv-max-width: 1040px;
+  --pv-page-bg: #f5f7fb;
+  --pv-surface: #ffffff;
+  --pv-line: #dfe4ed;
+  --pv-accent: #5367d9;
+  --pv-ink: #172033;
+}
+html.dark {
+  --pv-page-bg: #171b21;
+  --pv-surface: #242a32;
+  --pv-line: #3a424e;
+  --pv-accent: #5b9cff;
+  --pv-ink: #edf2fb;
+}
+html, body { background: var(--pv-page-bg); color: var(--pv-ink); }
+.pv-container { max-width: var(--pv-max-width); }
+.el-card, .pv-adv-card, .pv-settings-card { background: var(--pv-surface); border-color: var(--pv-line); }

@@ -20,6 +20,8 @@ const lang = ref<Lang>(detect())
 
 const messages: Record<Lang, Record<string, string>> = {
   zh: {
+    'search.mode.label': '搜索方式',
+    'search.mode.standard': '普通搜索',
     'app.title': 'PaperVault',
     'app.slogan': '顶尖计算机论文精选，深度可搜。',
     'search.placeholder':
@@ -28,8 +30,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.button': '搜索',
     'search.tab.smart': '智能搜索',
     'search.tab.advanced': '高级搜索',
-    'search.heroHint': '需要按字段限定或可视化组合多条件？前往 ',
-    'search.heroHintLink': '高级搜索',
+    'search.heroHint': '直接输入关键词开始搜索；需要组合字段和条件时，',
+    'search.heroHintLink': '使用高级搜索',
     'search.heroHintTail': '。',
     'search.cheatsheetToggle.show': '查看检索语法',
     'search.cheatsheetToggle.hide': '收起语法说明',
@@ -90,6 +92,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.github': 'GitHub',
     'toolbar.lang': 'English',
     'toolbar.settings': '设置',
+    'toolbar.docs': '开发者文档',
+    'docs.title': '搜索 SDK 文档', 'docs.intro': '用 REST API 和查询 DSL 将 PaperVault 的高级搜索接入你的脚本、Notebook 或应用。', 'docs.quickstart': '快速开始', 'docs.quickstartText': '论文搜索无需登录或 API 密钥。使用 GET 请求并传入 q、page 和 page_size 参数即可。', 'docs.dsl': '查询 DSL', 'docs.dslText': '支持 TS、TI、AB、AU、SO、PY 字段，以及 AND、OR、NOT、NEAR/x 和引号短语。', 'docs.example': 'cURL 示例', 'docs.copy': '复制', 'docs.copied': '已复制', 'docs.copyFailed': '复制失败，请手动选择文本', 'docs.responses': '响应与分页', 'docs.responsesText': '成功响应包含 items 和 meta。page 从 1 开始，page_size 受服务端上限约束；错误统一返回 error、message 和 request_id。', 'docs.ai': 'AI 接口（可选）', 'docs.aiText': '关键词推荐使用 POST /api/v1/suggest，结果重排使用 POST /api/v1/ai/rerank；密钥通过请求体传入或使用服务端配置。', 'docs.source': '完整参数与示例：',
     'settings.pageTitle': '设置',
     'settings.intro':
       '本页配置「AI 关键词推荐」与「AI 结果重排」所需的 LLM 提供方、API 密钥和默认参数。除 API 密钥保存在会话中（关闭浏览器即清除）外，其余设置保存在浏览器本地；留空时将使用服务端默认环境变量。',
@@ -169,7 +173,7 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.aiSearch.toastNoSeed': '请先输入搜索主题',
     'search.aiSearch.toastNoKey': '请先在「设置」配置 API key',
     'search.aiSearch.goSettings': '前往设置',
-    'search.aiSearch.hint': 'AI 自动扩展关键词。普通搜索流程不受影响。',
+    'search.aiSearch.hint': '用 AI 扩展关键词（可选）',
     'search.aiSearch.mergeCapHint': '仅合并前 {cap} 个，避免搜索范围过宽',
     'tree.all': '全部',
     'tree.truncatedMark': '· 仅展示 {n}',
@@ -202,6 +206,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'adv.cheatsheet.confs': '当前已收录会议（可用于 SO= 字段）'
   },
   en: {
+    'search.mode.label': 'Search mode',
+    'search.mode.standard': 'Keyword search',
     'app.title': 'PaperVault',
     'app.slogan': 'Curated top-tier CS papers. Deeply searchable.',
     'search.placeholder':
@@ -210,10 +216,9 @@ const messages: Record<Lang, Record<string, string>> = {
     'search.button': 'Search',
     'search.tab.smart': 'Smart Search',
     'search.tab.advanced': 'Advanced Search',
-    'search.heroHint':
-      'To search specific indexes or fields, or build a query, go to ',
-    'search.heroHintLink': 'Advanced Search',
-    'search.heroHintTail': '.',
+    'search.heroHint': 'Search with keywords, or ',
+    'search.heroHintLink': 'build a field-based query',
+    'search.heroHintTail': ' in Advanced Search.',
     'search.cheatsheetToggle.show': 'Show query syntax',
     'search.cheatsheetToggle.hide': 'Hide syntax help',
     'search.warn.empty': 'Please input your keywords for search.',
@@ -275,6 +280,8 @@ const messages: Record<Lang, Record<string, string>> = {
     'toolbar.github': 'GitHub',
     'toolbar.lang': '中文',
     'toolbar.settings': 'Settings',
+    'toolbar.docs': 'Developer docs',
+    'docs.title': 'Search SDK documentation', 'docs.intro': 'Connect PaperVault advanced search to scripts, notebooks, and apps with the REST API and query DSL.', 'docs.quickstart': 'Quick start', 'docs.quickstartText': 'Paper search requires no login or API key. Send GET with q, page, and page_size parameters.', 'docs.dsl': 'Query DSL', 'docs.dslText': 'Use TS, TI, AB, AU, SO, and PY fields with AND, OR, NOT, NEAR/x, and quoted phrases.', 'docs.example': 'cURL example', 'docs.copy': 'Copy', 'docs.copied': 'Copied', 'docs.copyFailed': 'Copy failed; select the text manually', 'docs.responses': 'Responses and pagination', 'docs.responsesText': 'Success responses contain items and meta. page starts at 1 and page_size is capped by the server; errors use error, message, and request_id.', 'docs.ai': 'Optional AI endpoints', 'docs.aiText': 'Use POST /api/v1/suggest for keyword suggestions and POST /api/v1/ai/rerank for relevance reranking.', 'docs.source': 'Full parameters and examples: ',
     'settings.pageTitle': 'Settings',
     'settings.intro':
       'Configure the LLM provider, API key, and defaults used by AI keyword suggestions and AI result reranking. The API key is kept in this session only (wiped when the browser closes); everything else is stored locally in your browser. Leave fields empty to fall back to the server-side defaults.',

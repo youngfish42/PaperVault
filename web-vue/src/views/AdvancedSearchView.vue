@@ -256,7 +256,7 @@ onMounted(async () => {
 .pv-adv-page {
   width: 100%;
   min-height: 100%;
-  background: var(--el-bg-color-page, #f5f7fa);
+  background: var(--pv-page-bg);
   box-sizing: border-box;
 }
 
@@ -325,24 +325,22 @@ onMounted(async () => {
 
 /* ---------- 主体双列布局 ---------- */
 .pv-adv-body {
-  padding-top: 24px;
-  padding-bottom: 32px;
+  max-width: var(--pv-page-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 32px;
+  padding-bottom: 40px;
 }
 .pv-adv-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
-}
-@media (max-width: 1024px) {
-  .pv-adv-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .pv-adv-card {
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 10px;
+  border-radius: var(--pv-card-radius);
   background: var(--el-bg-color, #fff);
 }
 .pv-adv-card-header {
