@@ -67,6 +67,11 @@ const copy = async (value: string): Promise<void> => {
             <code>POST /api/v1/suggest<br />POST /api/v1/ai/rerank</code>
           </div>
         </article>
+        <article class="pv-docs-card pv-docs-card--wide">
+          <h2>MCP 接入 / MCP integration</h2>
+          <p>可将 PaperVault 作为 MCP 工具接入 ChatGPT、Claude Desktop 或其他智能体客户端，直接调用 <code>search_papers</code> 检索论文。运行仓库中的 <code>mcp_server.py</code> 并在客户端配置为 stdio server。</p>
+          <div class="pv-code"><code>python /path/to/PaperVault/mcp_server.py</code></div>
+        </article>
       </div>
       <p class="pv-docs-foot">
         {{ t('docs.source') }}
