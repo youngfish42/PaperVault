@@ -50,3 +50,5 @@ PaperVault also includes a dependency-free stdio MCP server. Configure an MCP cl
 ```
 
 The `search_papers` tool accepts `query`, `conf`, `author`, `since`, `until`, `page`, and `size`.
+
+智能体可直接加载仓库中的 [`skills/papervault-search/SKILL.md`](../skills/papervault-search/SKILL.md) 获取调用规范。
