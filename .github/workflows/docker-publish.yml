@@ -74,6 +74,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GITHUB_OAUTH_CLIENT_ID: ${{ secrets.PAPERVAULT_GITHUB_OAUTH_CLIENT_ID }}
+          GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.PAPERVAULT_GITHUB_OAUTH_CLIENT_SECRET }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -83,6 +85,8 @@ jobs:
             cd /srv/papervault
             {
               echo "HF_TOKEN=$HF_TOKEN"
+              echo "GITHUB_OAUTH_CLIENT_ID=$GITHUB_OAUTH_CLIENT_ID"
+              echo "GITHUB_OAUTH_CLIENT_SECRET=$GITHUB_OAUTH_CLIENT_SECRET"
               echo "PAPERVAULT_HF_REPO_ID=youngfish42/PaperVault"
               echo "GOOGLE_ANALYTICS_ID=${{ vars.VITE_GOOGLE_ANALYTICS_ID }}"
               echo "BAIDU_ANALYTICS_ID=${{ vars.VITE_BAIDU_ANALYTICS_ID }}"
