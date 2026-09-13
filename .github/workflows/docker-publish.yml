@@ -11,6 +11,8 @@ on:
       - ".dockerignore"
       - "gunicorn.conf.py"
       - "requirements.txt"
+      - "mcp_server.py"
+      - "docs/search-sdk.md"
       - ".github/workflows/docker-publish.yml"
     tags:
       - "v*"

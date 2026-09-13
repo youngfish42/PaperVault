@@ -40,3 +40,13 @@ data = r.json()
 ## 兼容性
 
 API 路径统一使用 `/api/v1` 前缀。客户端应忽略未知响应字段，并在收到 429 或 5xx 时采用指数退避。语义搜索上线后将沿用相同的分页和错误封装。
+
+## MCP
+
+PaperVault also includes a dependency-free stdio MCP server. Configure an MCP client to run:
+
+```json
+{"command":"python","args":["/path/to/PaperVault/mcp_server.py"]}
+```
+
+The `search_papers` tool accepts `query`, `conf`, `author`, `since`, `until`, `page`, and `size`.
