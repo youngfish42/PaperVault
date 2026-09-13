@@ -128,16 +128,42 @@ const goDocs = (): void => {
       </div>
     </div>
   </nav>
-  <el-dialog v-model="loginVisible" width="420px" class="login-dialog">
+  <el-dialog
+    v-model="loginVisible"
+    width="440px"
+    class="login-dialog"
+    :show-close="false"
+  >
     <div class="login-panel">
+      <button
+        class="login-close"
+        type="button"
+        aria-label="关闭"
+        @click="loginVisible = false"
+      >
+        ×
+      </button>
       <div class="login-eyebrow">PaperVault</div>
       <h2>欢迎回来</h2>
-      <p class="login-description">登录后同步你的搜索偏好，并在不同设备间继续使用。</p>
+      <p class="login-description">
+        登录后同步你的搜索偏好<br />在不同设备间继续使用
+      </p>
       <div class="login-divider"><span>选择登录方式</span></div>
       <div class="login-options">
-        <el-button type="primary" tag="a" href="/api/v1/auth/oauth/zhihu">使用知乎登录</el-button>
-        <el-button tag="a" href="/api/v1/auth/oauth/github">使用 GitHub 登录</el-button>
+        <a
+          class="oauth-button oauth-button--zhihu"
+          href="/api/v1/auth/oauth/zhihu"
+          ><span class="oauth-icon">知</span><span>使用知乎账号登录</span
+          ><span class="oauth-arrow">→</span></a
+        >
+        <a
+          class="oauth-button oauth-button--github"
+          href="/api/v1/auth/oauth/github"
+          ><span class="oauth-icon oauth-icon--github">⌘</span
+          ><span>使用 GitHub 登录</span><span class="oauth-arrow">→</span></a
+        >
       </div>
+      <p class="login-footnote">安全授权 · 不会保存你的第三方密码</p>
     </div>
   </el-dialog>
 </template>
@@ -187,16 +213,125 @@ const goDocs = (): void => {
   white-space: nowrap;
   text-decoration: none;
 }
-.login-panel { text-align:center; padding: 4px 8px 12px; }
-.login-eyebrow { color: var(--el-color-primary); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-.login-panel h2 { margin: 8px 0 6px; font-size: 24px; color: var(--el-text-color-primary); }
-.login-description { margin: 0 auto 18px; max-width: 300px; color: var(--el-text-color-secondary); line-height: 1.6; font-size: 13px; }
-.login-divider { display:flex; align-items:center; gap:10px; color:var(--el-text-color-placeholder); font-size:12px; margin: 18px 0; }
-.login-divider::before,.login-divider::after { content:''; height:1px; background:var(--el-border-color-lighter); flex:1; }
-.login-options { display:flex; flex-direction:column; gap:12px; }
-.login-options :deep(.el-button) { width:100%; height:42px; margin:0; font-size:14px; border-radius:8px; }
-.login-dialog :deep(.el-dialog__header) { padding-bottom:0; }
-.login-dialog :deep(.el-dialog__headerbtn) { top:16px; }
+.login-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+.login-dialog :deep(.el-dialog) {
+  overflow: hidden;
+  border-radius: 18px;
+}
+.login-panel {
+  position: relative;
+  text-align: center;
+  padding: 34px 34px 28px;
+  background: linear-gradient(180deg, #fff 0%, #fafaff 100%);
+}
+.login-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  border: 0;
+  background: transparent;
+  color: #a3a6b0;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.login-eyebrow {
+  color: var(--el-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.login-panel h2 {
+  margin: 8px 0 6px;
+  font-size: 24px;
+  color: var(--el-text-color-primary);
+}
+.login-description {
+  margin: 0 auto 24px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.8;
+  font-size: 13px;
+}
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+  margin: 18px 0;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  height: 1px;
+  background: var(--el-border-color-lighter);
+  flex: 1;
+}
+.login-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.oauth-button {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid #e5e7ef;
+  border-radius: 11px;
+  color: #30313b;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.oauth-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 18px rgba(55, 48, 100, 0.12);
+  border-color: #c9c2f5;
+}
+.oauth-button--zhihu {
+  background: #fff;
+}
+.oauth-button--github {
+  background: #292b35;
+  color: #fff;
+  border-color: #292b35;
+}
+.oauth-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 12px;
+  border-radius: 8px;
+  background: #087cff;
+  color: #fff;
+  font-size: 15px;
+}
+.oauth-icon--github {
+  background: #fff;
+  color: #292b35;
+  font-size: 17px;
+}
+.oauth-arrow {
+  margin-left: auto;
+  color: #a1a4b0;
+  font-size: 20px;
+  font-weight: 400;
+}
+.oauth-button--github .oauth-arrow {
+  color: #c8c9d0;
+}
+.login-footnote {
+  margin: 20px 0 0;
+  color: #a4a6b0;
+  font-size: 11px;
+}
 .pv-nav-github:hover {
   color: var(--el-color-primary, #409eff);
 }
