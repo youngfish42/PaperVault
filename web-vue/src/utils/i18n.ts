@@ -113,6 +113,12 @@ const messages: Record<Lang, Record<string, string>> = {
     'docs.aiText':
       '关键词推荐使用 POST /api/v1/suggest，结果重排使用 POST /api/v1/ai/rerank；密钥通过请求体传入或使用服务端配置。',
     'docs.source': '完整参数与示例：',
+    'docs.skillTitle': '下载 PaperVault 搜索 Skill',
+    'docs.skillText':
+      '请先下载安装 PaperVault Search Skill，并完成初始化配置。下载 ZIP 后解压到本地，按包内说明接入支持 MCP 的智能体客户端。',
+    'docs.skillDownload': '下载 Skill ZIP',
+    'docs.skillUrl':
+      '下载地址：https://papervault.top/downloads/papervault-search-skill.zip',
     'settings.pageTitle': '设置',
     'settings.intro':
       '本页配置「AI 关键词推荐」与「AI 结果重排」所需的 LLM 提供方、API 密钥和默认参数。除 API 密钥保存在会话中（关闭浏览器即清除）外，其余设置保存在浏览器本地；留空时将使用服务端默认环境变量。',
@@ -320,6 +326,12 @@ const messages: Record<Lang, Record<string, string>> = {
     'docs.aiText':
       'Use POST /api/v1/suggest for keyword suggestions and POST /api/v1/ai/rerank for relevance reranking.',
     'docs.source': 'Full parameters and examples: ',
+    'docs.skillTitle': 'Download the PaperVault Search Skill',
+    'docs.skillText':
+      'Download and install the PaperVault Search Skill, then complete the initial setup. Unzip the package locally and follow the included guide to connect an MCP-compatible agent client.',
+    'docs.skillDownload': 'Download Skill ZIP',
+    'docs.skillUrl':
+      'Download URL: https://papervault.top/downloads/papervault-search-skill.zip',
     'settings.pageTitle': 'Settings',
     'settings.intro':
       'Configure the LLM provider, API key, and defaults used by AI keyword suggestions and AI result reranking. The API key is kept in this session only (wiped when the browser closes); everything else is stored locally in your browser. Leave fields empty to fall back to the server-side defaults.',

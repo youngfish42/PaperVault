@@ -1,5 +1,9 @@
 # PaperVault 搜索 SDK 文档
 
+## 下载 Skill
+
+如果你使用支持 MCP 的智能体客户端，可直接下载 [PaperVault Search Skill ZIP](../web-vue/public/downloads/papervault-search-skill.zip)，解压后按包内 `SKILL.md` 配置即可。
+
 本文介绍 PaperVault 的搜索 API，适合脚本、Notebook 和第三方应用集成。服务以论文**元数据**为主，基础搜索无需登录或 API key。
 
 ## 快速开始

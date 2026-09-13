@@ -6,6 +6,8 @@ import { useI18n } from '@/utils/i18n'
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const { t } = useI18n()
+const skillInstallText =
+  '请下载安装  papervault-search skill 并完成初始化配置\nhttps://papervault.top/downloads/papervault-search-skill.zip'
 const curlExample = `curl -G 'https://papervault.top/api/v1/papers' \\\n  --data-urlencode 'q=TS=(federated AND privacy) SO=ICLR PY=2024-2026' \\\n  --data-urlencode 'page=1' --data-urlencode 'page_size=20'`
 const copy = async (value: string): Promise<void> => {
   try {
@@ -30,6 +32,14 @@ const copy = async (value: string): Promise<void> => {
         <p>{{ t('docs.intro') }}</p>
       </header>
       <div class="pv-docs-grid">
+        <article class="pv-docs-card pv-docs-card--wide pv-docs-skill-card">
+          <div class="pv-docs-card-head">
+            <h2>{{ t('docs.skillTitle') }}</h2>
+          </div>
+          <div class="pv-docs-skill-code" @click="copy(skillInstallText)">
+            <pre><code>{{ skillInstallText }}</code></pre>
+          </div>
+        </article>
         <article class="pv-docs-card">
           <h2>{{ t('docs.quickstart') }}</h2>
           <p>{{ t('docs.quickstartText') }}</p>
@@ -69,8 +79,15 @@ const copy = async (value: string): Promise<void> => {
         </article>
         <article class="pv-docs-card pv-docs-card--wide">
           <h2>MCP 接入 / MCP integration</h2>
-          <p>可将 PaperVault 作为 MCP 工具接入 ChatGPT、Claude Desktop 或其他智能体客户端，直接调用 <code>search_papers</code> 检索论文。运行仓库中的 <code>mcp_server.py</code> 并在客户端配置为 stdio server。</p>
-          <div class="pv-code"><code>python /path/to/PaperVault/mcp_server.py</code></div>
+          <p>
+            可将 PaperVault 作为 MCP 工具接入 ChatGPT、Claude Desktop
+            或其他智能体客户端，直接调用
+            <code>search_papers</code> 检索论文。运行仓库中的
+            <code>mcp_server.py</code> 并在客户端配置为 stdio server。
+          </p>
+          <div class="pv-code">
+            <code>python /path/to/PaperVault/mcp_server.py</code>
+          </div>
         </article>
       </div>
       <p class="pv-docs-foot">
@@ -127,6 +144,41 @@ const copy = async (value: string): Promise<void> => {
 .pv-docs-card--wide {
   grid-column: 1/-1;
 }
+.pv-docs-skill-card {
+  display: block;
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+}
+.pv-docs-skill-link {
+  display: inline-block;
+  margin-top: 0;
+  color: var(--el-color-primary);
+  font-size: 13px;
+  word-break: break-all;
+}
+.pv-docs-skill-card .pv-docs-card-head h2 {
+  margin-bottom: 0;
+}
+.pv-docs-skill-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+  cursor: copy;
+}
+.pv-docs-skill-code pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.pv-docs-skill-code code {
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  line-height: 1.6;
+}
 .pv-docs-card h2 {
   font-size: 18px;
   margin: 0 0 10px;
@@ -178,6 +230,18 @@ const copy = async (value: string): Promise<void> => {
   }
   .pv-docs-card--wide {
     grid-column: auto;
+  }
+  .pv-docs-skill-card {
+    overflow: hidden;
+  }
+  .pv-docs-skill-card .pv-docs-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pv-docs-skill-code {
+    align-items: flex-start;
+    flex-direction: column;
   }
   .pv-docs-hero h1 {
     font-size: 28px;
