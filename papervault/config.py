@@ -116,6 +116,21 @@ class Settings:
         default_factory=lambda: _env_int("PAPERVAULT_DEFAULT_PAGE_SIZE", 50)
     )
 
+    # Authentication and OAuth configuration. Secrets are read only from the
+    # process environment and are never returned by the API.
+    secret_key: str = field(default_factory=lambda: _env_str("PAPERVAULT_SECRET_KEY", "change-me-in-production"))
+    admin_username: str = field(default_factory=lambda: _env_str("PAPERVAULT_ADMIN_USERNAME", "admin"))
+    admin_password: str = field(default_factory=lambda: _env_str("PAPERVAULT_ADMIN_PASSWORD", ""))
+    admin_users: str = field(default_factory=lambda: _env_str("PAPERVAULT_ADMIN_USERS", ""))
+    github_client_id: str = field(default_factory=lambda: _env_str("GITHUB_OAUTH_CLIENT_ID", ""))
+    github_client_secret: str = field(default_factory=lambda: _env_str("GITHUB_OAUTH_CLIENT_SECRET", ""))
+    github_redirect_uri: str = field(default_factory=lambda: _env_str("GITHUB_OAUTH_REDIRECT_URI", ""))
+    zhihu_client_id: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_CLIENT_ID", ""))
+    zhihu_client_secret: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_CLIENT_SECRET", ""))
+    zhihu_redirect_uri: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_REDIRECT_URI", ""))
+    llm_api_url: str = field(default_factory=lambda: _env_str("PAPERVAULT_LLM_API_URL", ""))
+    llm_api_key: str = field(default_factory=lambda: _env_str("PAPERVAULT_LLM_API_KEY", ""))
+
 
 def get_settings() -> Settings:
     """Build a fresh ``Settings`` instance from the current environment."""

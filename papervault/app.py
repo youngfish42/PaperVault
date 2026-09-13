@@ -29,6 +29,7 @@ def create_app(settings: Settings | None = None, *, eager_load: bool = True) -> 
     )
     app.config["JSON_SORT_KEYS"] = False
     app.config["TEMPLATES_AUTO_RELOAD"] = False
+    app.secret_key = settings.secret_key
 
     repository = PaperRepository(
         cache_path=settings.cache_path,
