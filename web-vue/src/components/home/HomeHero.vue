@@ -116,6 +116,7 @@ const queryModel = computed({
           t('search.heroHintLink')
         }}</router-link
         >{{ t('search.heroHintTail') }}
+        <span class="pv-hero-mcp"> · <router-link to="/docs" class="pv-hero-hint-link">MCP 接入</router-link></span>
       </p>
 
       <div class="pv-hero-syntax">
