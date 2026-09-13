@@ -298,9 +298,9 @@ const goDocs = (): void => {
   background: #fff;
 }
 .oauth-button--github {
-  background: #292b35;
-  color: #fff;
-  border-color: #292b35;
+  background: #f6f8fa;
+  color: #24292f;
+  border-color: #d0d7de;
 }
 .oauth-icon {
   display: grid;
@@ -314,8 +314,8 @@ const goDocs = (): void => {
   font-size: 15px;
 }
 .oauth-icon--github {
-  background: #fff;
-  color: #292b35;
+  background: #24292f;
+  color: #fff;
   font-size: 17px;
 }
 .oauth-arrow {
@@ -325,7 +325,7 @@ const goDocs = (): void => {
   font-weight: 400;
 }
 .oauth-button--github .oauth-arrow {
-  color: #c8c9d0;
+  color: #57606a;
 }
 .login-footnote {
   margin: 20px 0 0;
