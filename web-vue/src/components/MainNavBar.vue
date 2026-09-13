@@ -128,14 +128,16 @@ const goDocs = (): void => {
       </div>
     </div>
   </nav>
-  <el-dialog v-model="loginVisible" title="登录 PaperVault" width="360px">
-    <div class="login-options">
-      <el-button type="primary" tag="a" href="/api/v1/auth/oauth/zhihu"
-        >使用知乎登录</el-button
-      >
-      <el-button tag="a" href="/api/v1/auth/oauth/github"
-        >使用 GitHub 登录</el-button
-      >
+  <el-dialog v-model="loginVisible" width="420px" class="login-dialog">
+    <div class="login-panel">
+      <div class="login-eyebrow">PaperVault</div>
+      <h2>欢迎回来</h2>
+      <p class="login-description">登录后同步你的搜索偏好，并在不同设备间继续使用。</p>
+      <div class="login-divider"><span>选择登录方式</span></div>
+      <div class="login-options">
+        <el-button type="primary" tag="a" href="/api/v1/auth/oauth/zhihu">使用知乎登录</el-button>
+        <el-button tag="a" href="/api/v1/auth/oauth/github">使用 GitHub 登录</el-button>
+      </div>
     </div>
   </el-dialog>
 </template>
@@ -185,6 +187,16 @@ const goDocs = (): void => {
   white-space: nowrap;
   text-decoration: none;
 }
+.login-panel { text-align:center; padding: 4px 8px 12px; }
+.login-eyebrow { color: var(--el-color-primary); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.login-panel h2 { margin: 8px 0 6px; font-size: 24px; color: var(--el-text-color-primary); }
+.login-description { margin: 0 auto 18px; max-width: 300px; color: var(--el-text-color-secondary); line-height: 1.6; font-size: 13px; }
+.login-divider { display:flex; align-items:center; gap:10px; color:var(--el-text-color-placeholder); font-size:12px; margin: 18px 0; }
+.login-divider::before,.login-divider::after { content:''; height:1px; background:var(--el-border-color-lighter); flex:1; }
+.login-options { display:flex; flex-direction:column; gap:12px; }
+.login-options :deep(.el-button) { width:100%; height:42px; margin:0; font-size:14px; border-radius:8px; }
+.login-dialog :deep(.el-dialog__header) { padding-bottom:0; }
+.login-dialog :deep(.el-dialog__headerbtn) { top:16px; }
 .pv-nav-github:hover {
   color: var(--el-color-primary, #409eff);
 }
