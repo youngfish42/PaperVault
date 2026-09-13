@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
+import { onMounted } from 'vue'
 import { useI18n } from '@/utils/i18n'
 
 /**
@@ -27,6 +28,12 @@ const emit = defineEmits<{
 const router = useRouter()
 const { t, toggle: toggleLang } = useI18n()
 const loginVisible = ref(false)
+const currentUser = ref<any>(null)
+const loadAuth = async (): Promise<void> => {
+  try { const response = await fetch('/api/v1/auth/me'); const data = await response.json(); currentUser.value = data.authenticated ? data : null } catch { currentUser.value = null }
+}
+const logout = async (): Promise<void> => { await fetch('/api/v1/auth/logout', { method: 'POST' }); currentUser.value = null }
+onMounted(loadAuth)
 
 const goHome = (): void => {
   if (props.activeKey === 'home') return
@@ -69,7 +76,13 @@ const goDocs = (): void => {
       <button class="pv-nav-tab" :class="{ 'pv-nav-tab--active': props.activeKey === 'docs' }" type="button" @click="goDocs">{{ t('toolbar.docs') }}</button>
       <a class="pv-nav-github" :href="GITHUB_URL" target="_blank" rel="noopener noreferrer">GitHub</a>
       <div class="pv-nav-actions">
-        <el-button link type="primary" @click="loginVisible = true">登录</el-button>
+        <template v-if="currentUser">
+          <el-dropdown>
+            <el-button link type="primary">{{ currentUser.username || currentUser.user?.name || '已登录' }}</el-button>
+            <template #dropdown><el-dropdown-menu><el-dropdown-item @click="logout">退出登录</el-dropdown-item></el-dropdown-menu></template>
+          </el-dropdown>
+        </template>
+        <el-button v-else link type="primary" @click="loginVisible = true">登录</el-button>
         <el-link
           type="primary"
           :icon="props.isDark ? 'Sunny' : 'Moon'"
