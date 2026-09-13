@@ -159,7 +159,7 @@ const goDocs = (): void => {
         <a
           class="oauth-button oauth-button--github"
           href="/api/v1/auth/oauth/github"
-          ><span class="oauth-icon oauth-icon--github">⌘</span
+          ><span class="oauth-icon oauth-icon--github">GH</span
           ><span>使用 GitHub 登录</span><span class="oauth-arrow">→</span></a
         >
       </div>
@@ -314,9 +314,10 @@ const goDocs = (): void => {
   font-size: 15px;
 }
 .oauth-icon--github {
-  background: #24292f;
+  background: #0969da;
   color: #fff;
-  font-size: 17px;
+  font-size: 11px;
+  letter-spacing: -0.04em;
 }
 .oauth-arrow {
   margin-left: auto;
