@@ -62,3 +62,12 @@ def test_as_dict_is_jsonable_for_dropdown_rendering():
 
     for preset in get_all_presets():
         json.dumps(preset.as_dict())
+
+
+def test_presets_carry_english_display_variants():
+    # The Settings page renders ``label`` / ``note`` in Chinese and falls
+    # back to ``label_en`` / ``note_en`` when the UI language is English,
+    # so every preset must ship non-empty English variants.
+    for preset in get_all_presets():
+        assert preset.label_en, f"{preset.key} missing label_en"
+        assert preset.note_en, f"{preset.key} missing note_en"

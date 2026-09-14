@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import request from '@/utils/axios'
+import { useI18n } from '@/utils/i18n'
+
+const { t } = useI18n()
+
 const username = ref('')
 const password = ref('')
 const loggedIn = ref(false)
@@ -20,7 +24,7 @@ async function login() {
     })
     await load()
   } catch {
-    error.value = '登录失败'
+    error.value = t('admin.loginFail')
   }
 }
 async function logout() {
@@ -34,34 +38,56 @@ onMounted(() => load().catch(() => {}))
   <main class="admin-page">
     <h1>PaperVault Admin</h1>
     <section v-if="!loggedIn" class="card">
-      <el-input v-model="username" placeholder="管理员账号" /><el-input
+      <el-input
+        v-model="username"
+        :placeholder="t('admin.usernamePh')"
+      /><el-input
         v-model="password"
         type="password"
         show-password
-        placeholder="管理员密码"
+        :placeholder="t('admin.passwordPh')"
         @keyup.enter="login"
-      /><el-button type="primary" @click="login">管理员登录</el-button>
+      /><el-button type="primary" @click="login">{{
+        t('admin.login')
+      }}</el-button>
       <p v-if="error" class="error">{{ error }}</p>
     </section>
     <section v-else class="card">
       <header>
-        <h2>配置概览</h2>
-        <el-button @click="logout">退出</el-button>
+        <h2>{{ t('admin.overview') }}</h2>
+        <el-button @click="logout">{{ t('admin.logout') }}</el-button>
       </header>
-      <p>管理员：{{ config?.adminUsername }}</p>
-      <p>LLM Provider：{{ config?.llm?.provider || '未配置' }}</p>
       <p>
-        LLM API URL：{{ config?.llm?.baseUrlConfigured ? '已配置' : '未配置' }}
+        {{ t('admin.adminLabel') }}{{ t('admin.sep')
+        }}{{ config?.adminUsername }}
       </p>
       <p>
-        LLM API Key：{{
-          config?.llm?.apiKeyConfigured ? '已配置（隐藏）' : '未配置'
+        {{ t('admin.labelProvider') }}{{ t('admin.sep')
+        }}{{ config?.llm?.provider || t('admin.notConfigured') }}
+      </p>
+      <p>
+        {{ t('admin.labelApiUrl') }}{{ t('admin.sep')
+        }}{{
+          config?.llm?.baseUrlConfigured
+            ? t('admin.configured')
+            : t('admin.notConfigured')
         }}
       </p>
       <p>
-        GitHub：{{ config?.oauth?.github ? '已启用' : '未启用' }} / 知乎：{{
-          config?.oauth?.zhihu ? '已启用' : '未启用'
+        {{ t('admin.labelApiKey') }}{{ t('admin.sep')
+        }}{{
+          config?.llm?.apiKeyConfigured
+            ? t('admin.configuredHidden')
+            : t('admin.notConfigured')
         }}
+      </p>
+      <p>
+        {{ t('admin.labelGithub') }}{{ t('admin.sep')
+        }}{{
+          config?.oauth?.github ? t('admin.enabled') : t('admin.disabled')
+        }}
+        / {{ t('admin.labelZhihu') }}{{ t('admin.sep')
+        }}{{ config?.oauth?.zhihu ? t('admin.enabled') : t('admin.disabled') }}
       </p>
     </section>
   </main>

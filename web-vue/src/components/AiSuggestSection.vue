@@ -36,7 +36,12 @@ import {
 import { listAiProviders, suggestKeywordsWithSettings } from '@/api/ai'
 import type { SuggestApiResponse } from '@/api/ai'
 
-const { t } = useI18n()
+const { t, isZh } = useI18n()
+
+const presetLabel = (p: AiProviderPreset): string =>
+  isZh.value || !p.labelEn ? p.label : p.labelEn
+const presetNote = (p: AiProviderPreset): string =>
+  isZh.value || !p.noteEn ? p.note : p.noteEn
 
 const form = reactive<AiUserSettings>({
   provider: '',
@@ -189,14 +194,16 @@ const handleTest = async (): Promise<void> => {
           <el-option
             v-for="p in providers"
             :key="p.key"
-            :label="`${p.label} (${p.protocol})`"
+            :label="`${presetLabel(p)} (${p.protocol})`"
             :value="p.key"
           />
         </el-select>
         <div class="pv-ai-hint">
           {{ t('settings.aiSuggest.hint.provider') }}
         </div>
-        <div v-if="preset?.note" class="pv-ai-hint">{{ preset.note }}</div>
+        <div v-if="preset?.note" class="pv-ai-hint">
+          {{ presetNote(preset) }}
+        </div>
       </el-form-item>
 
       <el-row :gutter="12">

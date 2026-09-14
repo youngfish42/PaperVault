@@ -38,10 +38,12 @@ export interface ProviderListResponse {
 interface RawProviderPreset {
   key?: string
   label?: string
+  label_en?: string
   protocol?: string
   base_url?: string
   model?: string
   note?: string
+  note_en?: string
   env_key_var?: string
   env_base_var?: string
   env_model_var?: string
@@ -65,10 +67,12 @@ const normalizeProtocol = (value: unknown): ProtocolKind =>
 const normalizeProviderPreset = (raw: RawProviderPreset): AiProviderPreset => ({
   key: typeof raw.key === 'string' ? raw.key : '',
   label: typeof raw.label === 'string' ? raw.label : '',
+  labelEn: typeof raw.label_en === 'string' ? raw.label_en : undefined,
   protocol: normalizeProtocol(raw.protocol),
   baseUrl: typeof raw.base_url === 'string' ? raw.base_url : '',
   model: typeof raw.model === 'string' ? raw.model : '',
   note: typeof raw.note === 'string' ? raw.note : '',
+  noteEn: typeof raw.note_en === 'string' ? raw.note_en : undefined,
   envKeyVar: typeof raw.env_key_var === 'string' ? raw.env_key_var : '',
   envBaseVar: typeof raw.env_base_var === 'string' ? raw.env_base_var : '',
   envModelVar: typeof raw.env_model_var === 'string' ? raw.env_model_var : '',

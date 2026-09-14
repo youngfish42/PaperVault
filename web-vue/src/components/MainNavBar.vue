@@ -116,20 +116,22 @@ const goDocs = (): void => {
         <template v-if="currentUser">
           <el-dropdown>
             <el-button link type="primary">{{
-              currentUser.username || currentUser.user?.name || '已登录'
+              currentUser.username ||
+              currentUser.user?.name ||
+              t('auth.loggedIn')
             }}</el-button>
             <template #dropdown
               ><el-dropdown-menu
-                ><el-dropdown-item @click="logout"
-                  >退出登录</el-dropdown-item
-                ></el-dropdown-menu
+                ><el-dropdown-item @click="logout">{{
+                  t('auth.logout')
+                }}</el-dropdown-item></el-dropdown-menu
               ></template
             >
           </el-dropdown>
         </template>
-        <el-button v-else link type="primary" @click="loginVisible = true"
-          >登录</el-button
-        >
+        <el-button v-else link type="primary" @click="loginVisible = true">{{
+          t('auth.login')
+        }}</el-button>
         <el-link
           type="primary"
           :icon="props.isDark ? 'Sunny' : 'Moon'"
@@ -153,32 +155,36 @@ const goDocs = (): void => {
       <button
         class="login-close"
         type="button"
-        aria-label="关闭"
+        :aria-label="t('auth.close')"
         @click="loginVisible = false"
       >
         ×
       </button>
       <div class="login-eyebrow">PaperVault</div>
-      <h2>欢迎回来</h2>
+      <h2>{{ t('auth.welcome') }}</h2>
       <p class="login-description">
-        登录后同步你的搜索偏好<br />在不同设备间继续使用
+        {{ t('auth.descriptionLine1') }}<br />{{ t('auth.descriptionLine2') }}
       </p>
-      <div class="login-divider"><span>选择登录方式</span></div>
+      <div class="login-divider">
+        <span>{{ t('auth.chooseMethod') }}</span>
+      </div>
       <div class="login-options">
         <a
           class="oauth-button oauth-button--zhihu"
           href="/api/v1/auth/oauth/zhihu"
-          ><span class="oauth-icon">知</span><span>使用知乎账号登录</span
+          ><span class="oauth-icon">知</span
+          ><span>{{ t('auth.loginZhihu') }}</span
           ><span class="oauth-arrow">→</span></a
         >
         <a
           class="oauth-button oauth-button--github"
           href="/api/v1/auth/oauth/github"
           ><span class="oauth-icon oauth-icon--github">GH</span
-          ><span>使用 GitHub 登录</span><span class="oauth-arrow">→</span></a
+          ><span>{{ t('auth.loginGithub') }}</span
+          ><span class="oauth-arrow">→</span></a
         >
       </div>
-      <p class="login-footnote">安全授权 · 不会保存你的第三方密码</p>
+      <p class="login-footnote">{{ t('auth.footnote') }}</p>
     </div>
   </el-dialog>
 </template>
