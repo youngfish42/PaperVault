@@ -39,6 +39,11 @@ class ProviderPreset:
     env_base_var: str
     env_model_var: str
     requires_max_tokens: bool = False
+    # English display variants for the UI catalog. ``label`` / ``note``
+    # stay in Chinese for wire backwards-compatibility; the frontend
+    # picks ``label_en`` / ``note_en`` when the UI language is English.
+    label_en: str = ""
+    note_en: str = ""
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -55,6 +60,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_key_var="OPENAI_API_KEY",
         env_base_var="OPENAI_API_BASE",
         env_model_var="PAPERVAULT_OPENAI_MODEL",
+        label_en="OpenAI",
+        note_en="OpenAI's official Chat Completions API. A lighter model such as gpt-5-mini also works.",
     ),
     "deepseek": ProviderPreset(
         key="deepseek",
@@ -66,6 +73,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_key_var="DEEPSEEK_API_KEY",
         env_base_var="PAPERVAULT_DEEPSEEK_BASE_URL",
         env_model_var="PAPERVAULT_DEEPSEEK_MODEL",
+        label_en="DeepSeek",
+        note_en="DeepSeek's official OpenAI-compatible API.",
     ),
     "anthropic": ProviderPreset(
         key="anthropic",
@@ -78,6 +87,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_base_var="ANTHROPIC_API_BASE",
         env_model_var="PAPERVAULT_ANTHROPIC_MODEL",
         requires_max_tokens=True,
+        label_en="Anthropic Claude",
+        note_en="Anthropic Messages API. Adjust the model id to whatever your Anthropic console offers.",
     ),
     "qwen": ProviderPreset(
         key="qwen",
@@ -89,6 +100,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_key_var="QWEN_API_KEY",
         env_base_var="QWEN_API_BASE",
         env_model_var="PAPERVAULT_QWEN_MODEL",
+        label_en="Qwen / DashScope",
+        note_en="Alibaba Cloud Model Studio (DashScope), OpenAI-compatible mode; use the dashscope-intl endpoint outside mainland China.",
     ),
     "glm": ProviderPreset(
         key="glm",
@@ -100,6 +113,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_key_var="GLM_API_KEY",
         env_base_var="GLM_API_BASE",
         env_model_var="PAPERVAULT_GLM_MODEL",
+        label_en="Zhipu GLM",
+        note_en="Zhipu BigModel OpenAI-compatible API.",
     ),
     "stepfun": ProviderPreset(
         key="stepfun",
@@ -112,6 +127,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_base_var="STEPFUN_BASE_URL",
         env_model_var="PAPERVAULT_STEPFUN_MODEL",
         requires_max_tokens=True,
+        label_en="StepFun",
+        note_en="StepFun's step_plan endpoint is Anthropic Messages API compatible (not OpenAI).",
     ),
     "custom": ProviderPreset(
         key="custom",
@@ -123,6 +140,8 @@ _PRESETS: Dict[str, ProviderPreset] = {
         env_key_var="",
         env_base_var="",
         env_model_var="",
+        label_en="Custom / OpenAI-compatible",
+        note_en="Enter any service address and model name compatible with /chat/completions or /messages.",
     ),
 }
 

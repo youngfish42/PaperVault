@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
+import { computed } from 'vue'
 import MainNavBar from '@/components/MainNavBar.vue'
 import { useI18n } from '@/utils/i18n'
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const { t } = useI18n()
-const skillInstallText =
-  '请下载安装  papervault-search skill 并完成初始化配置\nhttps://papervault.top/downloads/papervault-search-skill.zip'
+const skillInstallText = computed(() => t('docs.skillInstall'))
 const curlExample = `curl -G 'https://papervault.top/api/v1/papers' \\\n  --data-urlencode 'q=TS=(federated AND privacy) SO=ICLR PY=2024-2026' \\\n  --data-urlencode 'page=1' --data-urlencode 'page_size=20'`
 const copy = async (value: string): Promise<void> => {
   try {
@@ -78,13 +78,8 @@ const copy = async (value: string): Promise<void> => {
           </div>
         </article>
         <article class="pv-docs-card pv-docs-card--wide">
-          <h2>MCP 接入 / MCP integration</h2>
-          <p>
-            可将 PaperVault 作为 MCP 工具接入 ChatGPT、Claude Desktop
-            或其他智能体客户端，直接调用
-            <code>search_papers</code> 检索论文。运行仓库中的
-            <code>mcp_server.py</code> 并在客户端配置为 stdio server。
-          </p>
+          <h2>{{ t('docs.mcpTitle') }}</h2>
+          <p>{{ t('docs.mcpText') }}</p>
           <div class="pv-code">
             <code>python /path/to/PaperVault/mcp_server.py</code>
           </div>
