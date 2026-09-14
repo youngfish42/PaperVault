@@ -1,6 +1,9 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
 import { ERROR_CODE_TYPE } from '@/types/error-code-type'
+import { useI18n } from '@/utils/i18n'
 import { ElMessage } from 'element-plus'
+
+const { t } = useI18n()
 
 export interface AppAxiosRequestConfig extends AxiosRequestConfig {
   /**
@@ -44,7 +47,7 @@ service.interceptors.response.use(
     if (body && typeof body === 'object' && 'error' in body) {
       const error = (body as any).error
       const message =
-        error?.message || error?.code || ERROR_CODE_TYPE('default')
+        error?.message || error?.code || ERROR_CODE_TYPE('default', t)
       if (!isSilent(res.config)) ElMessage.error(message)
       return Promise.reject(body)
     }
@@ -84,12 +87,12 @@ service.interceptors.response.use(
     } else if (status) {
       message = `[${status}] ${message || 'Request failed'}`
     } else if (message === 'Network Error') {
-      message = '后端接口连接异常'
+      message = t('error.network')
     } else if (message?.includes('timeout')) {
-      message = '系统接口请求超时'
+      message = t('error.timeout')
     } else if (message?.includes('Request failed with status code')) {
       const code = message.substr(message.length - 3)
-      message = ERROR_CODE_TYPE(code)
+      message = ERROR_CODE_TYPE(code, t)
     }
     if (!isSilent(err?.config)) {
       ElMessage.error({ message, duration: 5 * 1000 })

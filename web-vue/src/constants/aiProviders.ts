@@ -27,6 +27,9 @@ export interface AiProviderPreset {
   baseUrl: string
   model: string
   note: string
+  /** English display variants; empty string falls back to `label` / `note`. */
+  labelEn?: string
+  noteEn?: string
   envKeyVar: string
   envBaseVar: string
   envModelVar: string
@@ -41,6 +44,8 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
     note: 'OpenAI 官方 Chat Completions 接口。也可改成 gpt-5-mini 等更轻模型。',
+    labelEn:
+      "OpenAI's official Chat Completions API. A lighter model such as gpt-5-mini also works.",
     envKeyVar: 'OPENAI_API_KEY',
     envBaseVar: 'OPENAI_API_BASE',
     envModelVar: 'PAPERVAULT_OPENAI_MODEL',
@@ -53,6 +58,8 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: 'https://api.deepseek.com',
     model: 'deepseek-chat',
     note: 'DeepSeek 官方 OpenAI-compatible 接口。',
+    labelEn: 'DeepSeek',
+    noteEn: "DeepSeek's official OpenAI-compatible API.",
     envKeyVar: 'DEEPSEEK_API_KEY',
     envBaseVar: 'PAPERVAULT_DEEPSEEK_BASE_URL',
     envModelVar: 'PAPERVAULT_DEEPSEEK_MODEL',
@@ -65,6 +72,9 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: 'https://api.anthropic.com',
     model: 'claude-haiku-4-5',
     note: 'Anthropic Messages API。模型名按 Anthropic 控制台可用列表调整。',
+    labelEn: 'Anthropic Claude',
+    noteEn:
+      'Anthropic Messages API. Adjust the model id to whatever your Anthropic console offers.',
     envKeyVar: 'ANTHROPIC_API_KEY',
     envBaseVar: 'ANTHROPIC_API_BASE',
     envModelVar: 'PAPERVAULT_ANTHROPIC_MODEL',
@@ -77,6 +87,9 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: 'qwen-plus',
     note: '阿里云百炼 OpenAI 兼容模式；国际站可改为 dashscope-intl 地址。',
+    labelEn: 'Qwen / DashScope',
+    noteEn:
+      'Alibaba Cloud Model Studio (DashScope), OpenAI-compatible mode; use the dashscope-intl endpoint outside mainland China.',
     envKeyVar: 'QWEN_API_KEY',
     envBaseVar: 'QWEN_API_BASE',
     envModelVar: 'PAPERVAULT_QWEN_MODEL',
@@ -89,6 +102,8 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     model: 'glm-4-flash',
     note: '智谱 BigModel OpenAI-compatible 接口。',
+    labelEn: 'Zhipu GLM',
+    noteEn: 'Zhipu BigModel OpenAI-compatible API.',
     envKeyVar: 'GLM_API_KEY',
     envBaseVar: 'GLM_API_BASE',
     envModelVar: 'PAPERVAULT_GLM_MODEL',
@@ -101,6 +116,9 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: 'https://api.stepfun.com/step_plan/v1',
     model: 'step-3.7-flash',
     note: 'StepFun 的 step_plan 端点是 Anthropic Messages API 兼容（不是 OpenAI）。',
+    labelEn: 'StepFun',
+    noteEn:
+      "StepFun's step_plan endpoint is Anthropic Messages API compatible (not OpenAI).",
     envKeyVar: 'STEPFUN_API_KEY',
     envBaseVar: 'STEPFUN_BASE_URL',
     envModelVar: 'PAPERVAULT_STEPFUN_MODEL',
@@ -113,6 +131,9 @@ export const AI_PROVIDER_PRESETS: Record<string, AiProviderPreset> = {
     baseUrl: '',
     model: '',
     note: '填写任何兼容 /chat/completions 或 /messages 的服务地址和模型名。',
+    labelEn: 'Custom / OpenAI-compatible',
+    noteEn:
+      'Enter any service address and model name compatible with /chat/completions or /messages.',
     envKeyVar: '',
     envBaseVar: '',
     envModelVar: '',
