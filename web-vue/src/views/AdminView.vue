@@ -62,11 +62,11 @@ onMounted(() => load().catch(() => {}))
         }}{{ config?.adminUsername }}
       </p>
       <p>
-        LLM Provider{{ t('admin.sep')
+        {{ t('admin.labelProvider') }}{{ t('admin.sep')
         }}{{ config?.llm?.provider || t('admin.notConfigured') }}
       </p>
       <p>
-        LLM API URL{{ t('admin.sep')
+        {{ t('admin.labelApiUrl') }}{{ t('admin.sep')
         }}{{
           config?.llm?.baseUrlConfigured
             ? t('admin.configured')
@@ -74,7 +74,7 @@ onMounted(() => load().catch(() => {}))
         }}
       </p>
       <p>
-        LLM API Key{{ t('admin.sep')
+        {{ t('admin.labelApiKey') }}{{ t('admin.sep')
         }}{{
           config?.llm?.apiKeyConfigured
             ? t('admin.configuredHidden')
@@ -82,11 +82,11 @@ onMounted(() => load().catch(() => {}))
         }}
       </p>
       <p>
-        GitHub{{ t('admin.sep')
+        {{ t('admin.labelGithub') }}{{ t('admin.sep')
         }}{{
           config?.oauth?.github ? t('admin.enabled') : t('admin.disabled')
         }}
-        / Zhihu{{ t('admin.sep')
+        / {{ t('admin.labelZhihu') }}{{ t('admin.sep')
         }}{{ config?.oauth?.zhihu ? t('admin.enabled') : t('admin.disabled') }}
       </p>
     </section>
