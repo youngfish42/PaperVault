@@ -129,6 +129,7 @@ PaperVault/
 │   ├── fetch_cvf_abstracts.py        # CVF Open Access-only abstract backfill (scrapes `*_paper.html` detail pages)
 │   ├── cvf_abstract.py               # Side-effect-free CVF scraping helpers, shared by `collector` and `fetch_cvf_abstracts.py`
 │   ├── fetch_code_links.py           # Extract GitHub code links from abstracts
+│   ├── fetch_pwc_backfill.py         # Offline one-shot backfill of empty abstracts/code links from the archived PwC HF snapshots (exact-key matching only; never overwrites non-empty fields)
 │   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
 │   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
 │   ├── sync_hf_readme.py             # Render `docs/HF_README.md` and push it as the Hugging Face dataset repo root README
@@ -369,6 +370,7 @@ Other frontend scripts:
 | `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
 | `python scripts/fetch_cvf_abstracts.py` | CVF Open Access-targeted abstract backfill (scrapes `openaccess.thecvf.com/.../*_paper.html`). Independent of DOI-based sources |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
+| `python scripts/fetch_pwc_backfill.py` | Offline backfill of empty abstracts/code links from `pwc-archive/papers-with-abstracts` + `pwc-archive/links-between-paper-and-code` (2025-07 snapshots). Conservative exact-key matching (arXiv ID → OpenReview ID → normalized URL → unique normalized title with year guard). Supports `--dry-run`, `--report`, `--conf`, `--no-upload` |
 | `python scripts/cleanup_cache_dedupe.py` | One-shot cache dedupe by `(conf, paper_url)` — reuses `collector._merge_paper_record` so semantics stay in lockstep with the collector |
 | `python scripts/migrate_progress_to_jsonl.py` | Migrate legacy `abstract_backfill_progress.json` to the JSONL.gz format (`--dry-run` to preview) |
 | `python scripts/sync_hf_readme.py` | Render `docs/HF_README.md` + push it as the Hugging Face dataset repo root README |
@@ -450,6 +452,8 @@ chain takes over. Currently registered hosts:
 - [CEUR-WS](https://ceur-ws.org/) (`ceur-ws.org`)
 
 Code links are enriched from [MLNLP-World/Top-AI-Conferences-Paper-with-Code](https://github.com/MLNLP-World/Top-AI-Conferences-Paper-with-Code) and via regex extraction from abstracts (`scripts/fetch_code_links.py`).
+
+A further offline enrichment source is the archived Papers with Code snapshot on Hugging Face ([pwc-archive/papers-with-abstracts](https://huggingface.co/datasets/pwc-archive/papers-with-abstracts) and [pwc-archive/links-between-paper-and-code](https://huggingface.co/datasets/pwc-archive/links-between-paper-and-code), both frozen at the 2025-07 final public snapshot). `scripts/fetch_pwc_backfill.py` joins them onto the cache with conservative exact-key matching (arXiv ID / OpenReview ID / normalized URL / globally-unique normalized title guarded by venue year) and only fills fields that are still empty.
 
 ## CI/CD Workflows
 
