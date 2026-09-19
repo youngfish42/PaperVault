@@ -5,7 +5,11 @@ env:
   AUTO_COLLECT_BRANCH: "auto-collect-papers"
   # cache/cache.jsonl.gz is intentionally excluded: it is now stored on
   # Hugging Face (PAPERVAULT_HF_REPO_ID) and pulled via data_artifacts.ensure_cache_local.
-  AUTO_COLLECT_FILES: "cache/collect_progress.json cache/collect_failures.json README.md"
+  # cache/readme_meta.json drives the README "recent update" brief and MUST stay
+  # committed alongside README.md — otherwise a later readme-only run of
+  # maintain.py re-renders the brief from a frozen snapshot and regresses the
+  # date / new-paper count (see 2026-09-19 incident).
+  AUTO_COLLECT_FILES: "cache/collect_progress.json cache/collect_failures.json cache/readme_meta.json README.md README.en.md docs/stats.html pics/stats/stats_overview.svg pics/stats/papers_by_category.svg pics/stats/papers_by_year.svg pics/stats/wordcloud.svg"
 
 on:
   schedule:
@@ -260,11 +264,21 @@ jobs:
           # Defensive whitelist: never let cache/cache.jsonl.gz sneak into the PR.
           # The authoritative copy lives on Hugging Face (PAPERVAULT_HF_REPO_ID)
           # and is uploaded by data_artifacts.sync_cache_artifacts; only the
-          # collection progress + rendered README should be committed back to git.
+          # collection progress + rendered README/stats artefacts should be
+          # committed back to git. cache/readme_meta.json must stay in this
+          # list: it is the source of the README "recent update" brief, and
+          # dropping it lets readme-only runs regress the date/new-paper count.
           add-paths: |
             cache/collect_progress.json
             cache/collect_failures.json
+            cache/readme_meta.json
             README.md
+            README.en.md
+            docs/stats.html
+            pics/stats/stats_overview.svg
+            pics/stats/papers_by_category.svg
+            pics/stats/papers_by_year.svg
+            pics/stats/wordcloud.svg
 
       - name: Sync Hugging Face dataset README
         # Render docs/HF_README.md with the just-updated cache stats and push
