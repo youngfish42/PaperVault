@@ -820,21 +820,39 @@ def _write_meta(meta):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
 
+def _paper_identity_keys(cache_data: dict) -> set:
+    """Return the set of (conf, identity) keys used to detect genuinely new papers.
+
+    Mirrors the collector's dedupe key (conf, paper_url); records without a URL
+    fall back to their title, and records with neither are skipped.
+    """
+    keys = set()
+    for conf_key, papers in cache_data.items():
+        for p in papers:
+            ident = p.get("paper_url") or p.get("paper_name")
+            if ident:
+                keys.add((conf_key, ident))
+    return keys
+
+
 def _recent_update_meta(before: dict, after: dict) -> dict:
     """Build the readme_meta snapshot for the README recent-update brief.
 
-    Both collection modes must record the *delta* against the pre-run cache.
-    Writing whole-corpus totals here (as a force rebuild would produce from
-    `compute_stats`) persists a bogus "new papers" count, because
-    cache/readme_meta.json is committed to git and replayed by every later
-    readme-only `python maintain.py` run.
+    `new_papers` counts records whose (conf, paper_url) identity did not exist
+    in the pre-run cache — never a net size delta and never whole-corpus totals.
+    A full rebuild can legitimately shrink the corpus (transient scrape failures,
+    upstream pages dropping entries), so a net delta could go negative and be
+    rendered into the README, while whole-corpus totals would claim the entire
+    library is new. Either bogus value would persist: cache/readme_meta.json is
+    committed to git and replayed by every later readme-only `python maintain.py`
+    run.
     """
-    before_count = sum(len(papers) for papers in before.values())
-    after_count = sum(len(papers) for papers in after.values())
+    before_keys = _paper_identity_keys(before)
+    new_papers = sum(1 for key in _paper_identity_keys(after) if key not in before_keys)
     new_confs = set(after.keys()) - set(before.keys())
     return {
         "last_update": datetime.now().strftime("%Y-%m-%d"),
-        "new_papers": after_count - before_count,
+        "new_papers": new_papers,
         "new_conferences": len(new_confs),
     }
 
@@ -1006,7 +1024,6 @@ def incremental_update(soft_timeout=None):
     if soft_timeout:
         print(f"[*] Soft timeout: {soft_timeout}s ({soft_timeout/3600:.1f}h)")
     before = load_cache(cache_path)
-    before_count = sum(len(papers) for papers in before.values())
     before_confs = set(before.keys())
 
     res = collect(cache_file=cache_path, force=False, soft_timeout=soft_timeout)
@@ -1016,10 +1033,9 @@ def incremental_update(soft_timeout=None):
         commit_message="Update PaperVault data artifacts after incremental collect",
     )
 
-    after_count = sum(len(papers) for papers in res.values())
+    meta = _recent_update_meta(before, res)
     new_confs = set(res.keys()) - before_confs
-    new_papers = after_count - before_count
-    print(f"[+] Collected {new_papers} new papers across {len(new_confs)} new conference(s).")
+    print(f"[+] Collected {meta['new_papers']} new papers across {len(new_confs)} new conference(s).")
     if new_confs:
         print(f"    New conferences: {', '.join(sorted(new_confs))}")
 
@@ -1033,7 +1049,6 @@ def incremental_update(soft_timeout=None):
         except Exception:
             pass
 
-    meta = _recent_update_meta(before, res)
     _write_meta(meta)
 
     update_readme()
