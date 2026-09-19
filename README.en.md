@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-06-13
-- 🆕 **New Papers This Update**: 30,986
+- 📅 **Last Updated**: 2026-08-29
+- 🆕 **New Papers This Update**: 361
 - 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 647,320 papers / 120 publication series / 204,060 with abstracts / 30,251 with code
+- 📊 **Database Scale**: 650,459 papers / 120 publication series / 566,142 with abstracts / 110,994 with code
 
 <!-- recent-update-end -->
 
@@ -158,8 +158,8 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **EUROSYS** 2006-2026 (21 editions)
 - **FAST** 2002-2026 (24 editions)
 - **HPCA** 2000-2026 (27 editions)
-- **HPDC** 2000-2025 (26 editions)
-- **ISCA** 2000-2025 (26 editions)
+- **HPDC** 2000-2026 (27 editions)
+- **ISCA** 2000-2026 (27 editions)
 - **MICRO** 2000-2025 (26 editions)
 - **PPOPP** 2001-2026 (24 editions)
 - **SC** 2000-2025 (26 editions)
@@ -174,11 +174,11 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 <details>
 <summary><b>Computer Networks</b> (7 series)</summary>
 
-- **INFOCOM** 2000-2025 (26 editions)
+- **INFOCOM** 2000-2026 (27 editions)
 - **JSAC** 2000-2026 (27 editions)
 - **MOBICOM** 2000-2025 (25 editions)
 - **NSDI** 2004-2026 (23 editions)
-- **SIGCOMM** 2000-2025 (26 editions)
+- **SIGCOMM** 2000-2026 (27 editions)
 - **TMC** 2002-2026 (25 editions)
 - **TON** 2000-2026 (27 editions)
 
@@ -187,11 +187,11 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 <summary><b>Network & Information Security</b> (9 series)</summary>
 
 - **CCS** 2000-2025 (26 editions)
-- **CRYPTO** 2000-2025 (26 editions)
+- **CRYPTO** 2000-2026 (27 editions)
 - **EUROCRYPT** 2000-2026 (27 editions)
 - **JOC** 2000-2026 (27 editions)
 - **NDSS** 2000-2026 (27 editions)
-- **SP** 2000-2025 (26 editions)
+- **SP** 2000-2026 (27 editions)
 - **TDSC** 2004-2026 (23 editions)
 - **TIFS** 2006-2026 (21 editions)
 - **USS** 2000-2025 (26 editions)
@@ -203,7 +203,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **ASE** 2000-2025 (26 editions)
 - **FM** 2001-2026 (17 editions)
 - **FSE** 2000-2023 (24 editions)
-- **ICSE** 2000-2025 (26 editions)
+- **ICSE** 2000-2026 (27 editions)
 - **ISSTA** 2000-2024 (22 editions)
 - **OOPSLA** 2000-2016 (17 editions)
 - **OSDI** 2000-2025 (16 editions)
@@ -221,11 +221,11 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 
 - **CIKM** 2000-2025 (26 editions)
 - **ECIR** 2002-2026 (25 editions)
-- **ICDE** 2000-2025 (26 editions)
+- **ICDE** 2000-2026 (27 editions)
 - **ICDM** 2001-2025 (25 editions)
 - **KDD** 2000-2026 (27 editions)
 - **RECSYS** 2007-2025 (19 editions)
-- **SIGIR** 2000-2025 (26 editions)
+- **SIGIR** 2000-2026 (27 editions)
 - **SIGMOD** 2000-2022 (23 editions)
 - **TKDE** 2000-2025 (26 editions)
 - **TODS** 2000-2026 (27 editions)
@@ -240,11 +240,11 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 <summary><b>Theoretical Computer Science</b> (10 series)</summary>
 
 - **ALT** 2000-2025 (26 editions)
-- **CAV** 2000-2025 (26 editions)
-- **COLT** 2000-2025 (24 editions)
+- **CAV** 2000-2026 (27 editions)
+- **COLT** 2000-2026 (25 editions)
 - **FOCS** 2000-2025 (26 editions)
 - **IANDC** 2000-2026 (27 editions)
-- **LICS** 2000-2025 (26 editions)
+- **LICS** 2000-2026 (27 editions)
 - **SICOMP** 2000-2026 (26 editions)
 - **SODA** 2000-2026 (27 editions)
 - **STOC** 2000-2026 (27 editions)
@@ -255,11 +255,11 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 <summary><b>Computer Graphics & Multimedia</b> (11 series)</summary>
 
 - **BMVC** 2000-2024 (25 editions)
-- **ICME** 2000-2025 (25 editions)
+- **ICME** 2000-2026 (26 editions)
 - **IEEEVIS** 2000-2024 (13 editions)
-- **MICCAI** 2000-2025 (26 editions)
+- **MICCAI** 2000-2026 (27 editions)
 - **MM** 2000-2025 (26 editions)
-- **SIGGRAPH** 2000-2025 (13 editions)
+- **SIGGRAPH** 2000-2026 (14 editions)
 - **TIP** 2000-2026 (27 editions)
 - **TMM** 2000-2026 (27 editions)
 - **TOG** 2000-2026 (25 editions)
@@ -286,7 +286,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **IJCV** 2000-2026 (27 editions)
 - **JMLR** 2000-2026 (26 editions)
 - **MLJ** 2000-2026 (27 editions)
-- **MLSYS** 2019-2025 (7 editions)
+- **MLSYS** 2019-2026 (8 editions)
 - **NAACL** 2000-2025 (18 editions)
 - **NIPS** 2000-2025 (26 editions)
 - **TNNLS** 2000-2025 (26 editions)
@@ -319,7 +319,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **BIOINFORMATICS** 2000-2026 (26 editions)
 - **ISWC** 2000-2022 (23 editions)
 - **JACM** 2000-2026 (26 editions)
-- **PROCIEEE** 2000-2025 (26 editions)
+- **PROCIEEE** 2000-2026 (27 editions)
 - **RTSS** 2000-2025 (26 editions)
 - **SCIS** 2001-2026 (26 editions)
 
