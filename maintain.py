@@ -820,6 +820,25 @@ def _write_meta(meta):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
 
+def _recent_update_meta(before: dict, after: dict) -> dict:
+    """Build the readme_meta snapshot for the README recent-update brief.
+
+    Both collection modes must record the *delta* against the pre-run cache.
+    Writing whole-corpus totals here (as a force rebuild would produce from
+    `compute_stats`) persists a bogus "new papers" count, because
+    cache/readme_meta.json is committed to git and replayed by every later
+    readme-only `python maintain.py` run.
+    """
+    before_count = sum(len(papers) for papers in before.values())
+    after_count = sum(len(papers) for papers in after.values())
+    new_confs = set(after.keys()) - set(before.keys())
+    return {
+        "last_update": datetime.now().strftime("%Y-%m-%d"),
+        "new_papers": after_count - before_count,
+        "new_conferences": len(new_confs),
+    }
+
+
 def build_recent_update_brief(meta: dict, stats: dict):
     """Build the recent update brief markdown."""
     last_date = meta.get("last_update", datetime.now().strftime("%Y-%m-%d"))
@@ -959,19 +978,16 @@ def force_update():
     # the upload step a valid parent so the optimistic lock can detect concurrent
     # writers landing between our download and upload windows.
     ensure_cache_local(cache_path, refresh=True)
+    # Snapshot the pre-rebuild cache so the recent-update brief records the real
+    # delta instead of whole-corpus totals.
+    before = load_cache(cache_path) if os.path.exists(cache_path) else {}
     res = collect(cache_file=None, force=True)
     save_cache(cache_path, res)
     sync_cache_artifacts(
         cache_path=cache_path,
         commit_message="Update PaperVault data artifacts after force rebuild",
     )
-    stats = compute_stats(res)
-    meta = {
-        "last_update": datetime.now().strftime("%Y-%m-%d"),
-        "new_papers": stats["total_papers"],
-        "new_conferences": stats["total_instances"],
-    }
-    _write_meta(meta)
+    _write_meta(_recent_update_meta(before, res))
     update_readme()
 
 
@@ -1017,11 +1033,7 @@ def incremental_update(soft_timeout=None):
         except Exception:
             pass
 
-    meta = {
-        "last_update": datetime.now().strftime("%Y-%m-%d"),
-        "new_papers": new_papers,
-        "new_conferences": len(new_confs),
-    }
+    meta = _recent_update_meta(before, res)
     _write_meta(meta)
 
     update_readme()
