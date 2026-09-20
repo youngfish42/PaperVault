@@ -144,6 +144,10 @@ CONFERENCES: Dict[str, Dict[str, Any]] = {
     "uist":   {"root": "https://dblp.org/db/conf/uist/index.html",   "start_year": 1980, "name": "UIST"},
     # --- 交叉/综合/新兴 ---
     "rtss":   {"root": "https://dblp.org/db/conf/rtss/index.html",   "start_year": 1980, "name": "RTSS"},
+    # --- 地理空间信息（GIS / 遥感）---
+    # SIGSPATIAL 在 DBLP 的会议流 key 为 conf/gis（前身为 ACM GIS 研讨会系列）
+    "sigspatial": {"root": "https://dblp.org/db/conf/gis/index.html", "start_year": 1980, "name": "SIGSPATIAL"},
+    "igarss": {"root": "https://dblp.org/db/conf/igarss/index.html", "start_year": 1980, "name": "IGARSS"},
 }
 
 # ---------------------------------------------------------------------------
@@ -201,6 +205,15 @@ JOURNALS: Dict[str, Dict[str, Any]] = {
     "tnn":   {"root": "https://dblp.org/db/journals/tnn/index.html",   "start_year": 1980, "name": "TNNLS"},
     "taslp": {"root": "https://dblp.org/db/journals/taslp/index.html", "start_year": 1980, "name": "TASLP"},
     "ml":    {"root": "https://dblp.org/db/journals/ml/index.html",    "start_year": 1980, "name": "MLJ"},
+    # --- 地理空间信息（GIS / 遥感）---
+    # 注意 DBLP key 与常见缩写不一致：IJGIS=gis，CEUS=urban，JSTARS=staeors
+    "gis":   {"root": "https://dblp.org/db/journals/gis/index.html",   "start_year": 1980, "name": "IJGIS"},
+    "tgis":  {"root": "https://dblp.org/db/journals/tgis/index.html",  "start_year": 1980, "name": "TGIS"},
+    "aeog":  {"root": "https://dblp.org/db/journals/aeog/index.html",  "start_year": 1980, "name": "IJAEO"},
+    "urban": {"root": "https://dblp.org/db/journals/urban/index.html", "start_year": 1980, "name": "CEUS"},
+    "geoinformatica": {"root": "https://dblp.org/db/journals/geoinformatica/index.html", "start_year": 1980, "name": "GeoInformatica"},
+    "josis": {"root": "https://dblp.org/db/journals/josis/index.html", "start_year": 1980, "name": "JOSIS"},
+    "staeors": {"root": "https://dblp.org/db/journals/staeors/index.html", "start_year": 1980, "name": "JSTARS"},
 }
 
 # ---------------------------------------------------------------------------
