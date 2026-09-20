@@ -177,21 +177,6 @@ const FIELD_DEFS: FieldDef[] = [
     zh: '交叉/综合/新兴',
     en: 'Interdisciplinary / Comprehensive / Emerging',
     venues: ['JACM', 'PROCIEEE', 'SCIS', 'BIOINFORMATICS', 'RTSS', 'ISWC']
-  },
-  {
-    zh: '地理空间信息',
-    en: 'Geospatial Information & Remote Sensing',
-    venues: [
-      'IJGIS',
-      'TGIS',
-      'IJAEO',
-      'CEUS',
-      'GEOINFORMATICA',
-      'JOSIS',
-      'JSTARS',
-      'SIGSPATIAL',
-      'IGARSS'
-    ]
   }
 ]
 
