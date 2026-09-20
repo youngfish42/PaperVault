@@ -20366,5 +20366,2057 @@
     {
         "name": "ISWC2018",
         "url": "https://dblp.org/db/conf/semweb/iswc2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2000",
+        "url": "https://dblp.org/db/conf/gis/gis2000.html"
+    },
+    {
+        "name": "SIGSPATIAL2001",
+        "url": "https://dblp.org/db/conf/gis/gis2001.html"
+    },
+    {
+        "name": "SIGSPATIAL2002",
+        "url": "https://dblp.org/db/conf/gis/gis2002.html"
+    },
+    {
+        "name": "SIGSPATIAL2003",
+        "url": "https://dblp.org/db/conf/gis/gis2003.html"
+    },
+    {
+        "name": "SIGSPATIAL2004",
+        "url": "https://dblp.org/db/conf/gis/gis2004.html"
+    },
+    {
+        "name": "SIGSPATIAL2005",
+        "url": "https://dblp.org/db/conf/gis/gis2005.html"
+    },
+    {
+        "name": "SIGSPATIAL2006",
+        "url": "https://dblp.org/db/conf/gis/gis2006.html"
+    },
+    {
+        "name": "SIGSPATIAL2007",
+        "url": "https://dblp.org/db/conf/gis/gis2007.html"
+    },
+    {
+        "name": "SIGSPATIAL2008",
+        "url": "https://dblp.org/db/conf/gis/gis2008.html"
+    },
+    {
+        "name": "SIGSPATIAL2008",
+        "url": "https://dblp.org/db/conf/gis/springl2008.html"
+    },
+    {
+        "name": "SIGSPATIAL2009",
+        "url": "https://dblp.org/db/conf/gis/gis2009.html"
+    },
+    {
+        "name": "SIGSPATIAL2009",
+        "url": "https://dblp.org/db/conf/gis/lbsn2009.html"
+    },
+    {
+        "name": "SIGSPATIAL2009",
+        "url": "https://dblp.org/db/conf/gis/springl2009.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/gis2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/lbsn2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/springl2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/iwgs2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/isa2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/hpdgis2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2010",
+        "url": "https://dblp.org/db/conf/gis/dmg2010.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/gis2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/lbsn2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/springl2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/iwgs2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/isa2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/sso2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/hpdgis2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2011",
+        "url": "https://dblp.org/db/conf/gis/quest2011.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/gis2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/geogrowd2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/mobigis2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/isa2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/healthgis2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/lbsn2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2012",
+        "url": "https://dblp.org/db/conf/gis/iwgs2012.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/gis2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/mobigis2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/comp2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/geocrowd2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/lbsn2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/healthgis2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/isa2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/iwgs2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gis/mapinteract2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2013",
+        "url": "https://dblp.org/db/conf/gir/gir2013.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/gis2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/mobigis2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/healthgis2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/geocrowd2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/isa2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/iwgs2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/mapinteract2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/lbsn2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2014",
+        "url": "https://dblp.org/db/conf/gis/phd2014.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/gis2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/lbsn2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/isa2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/melt2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/mobigis2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/iwgs2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/urbangis2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2015",
+        "url": "https://dblp.org/db/conf/gis/phd2015.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/gis2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/lbsn2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/isa2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/iwgs2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/urbangis2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/phd2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2016",
+        "url": "https://dblp.org/db/conf/gis/mobigis2016.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/gis2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/urbangis2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/autonomousGIS2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/iwgs2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/lens2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2017",
+        "url": "https://dblp.org/db/conf/gis/predictgis2017.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/gis2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/aric2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/gir2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/isa2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/lens2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2018",
+        "url": "https://dblp.org/db/conf/gis/predictgis2018.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/gis2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/aric2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/geoed2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/predictgis2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/move2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/lens2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2019",
+        "url": "https://dblp.org/db/conf/gis/spatialapi2019.html"
+    },
+    {
+        "name": "SIGSPATIAL2020",
+        "url": "https://dblp.org/db/conf/gis/gis2020.html"
+    },
+    {
+        "name": "SIGSPATIAL2020",
+        "url": "https://dblp.org/db/conf/gis/covid2020.html"
+    },
+    {
+        "name": "SIGSPATIAL2020",
+        "url": "https://dblp.org/db/conf/gis/aric2020.html"
+    },
+    {
+        "name": "SIGSPATIAL2020",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2020.html"
+    },
+    {
+        "name": "SIGSPATIAL2021",
+        "url": "https://dblp.org/db/conf/gis/gis2021.html"
+    },
+    {
+        "name": "SIGSPATIAL2021",
+        "url": "https://dblp.org/db/conf/gis/hanimob2021.html"
+    },
+    {
+        "name": "SIGSPATIAL2021",
+        "url": "https://dblp.org/db/conf/gis/aric2021.html"
+    },
+    {
+        "name": "SIGSPATIAL2021",
+        "url": "https://dblp.org/db/conf/gis/spatialapi2021.html"
+    },
+    {
+        "name": "SIGSPATIAL2021",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2021.html"
+    },
+    {
+        "name": "SIGSPATIAL2022",
+        "url": "https://dblp.org/db/conf/gis/gis2022.html"
+    },
+    {
+        "name": "SIGSPATIAL2022",
+        "url": "https://dblp.org/db/conf/gis/hanimob2022.html"
+    },
+    {
+        "name": "SIGSPATIAL2022",
+        "url": "https://dblp.org/db/conf/gis/aric2022.html"
+    },
+    {
+        "name": "SIGSPATIAL2022",
+        "url": "https://dblp.org/db/conf/gis/spatialapi2022.html"
+    },
+    {
+        "name": "SIGSPATIAL2022",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2022.html"
+    },
+    {
+        "name": "SIGSPATIAL2023",
+        "url": "https://dblp.org/db/conf/gis/gis2023.html"
+    },
+    {
+        "name": "SIGSPATIAL2023",
+        "url": "https://dblp.org/db/conf/gis/geohumanities2023.html"
+    },
+    {
+        "name": "SIGSPATIAL2024",
+        "url": "https://dblp.org/db/conf/gis/gis2024.html"
+    },
+    {
+        "name": "SIGSPATIAL2025",
+        "url": "https://dblp.org/db/conf/gis/gis2025.html"
+    },
+    {
+        "name": "IGARSS2002",
+        "url": "https://dblp.org/db/conf/igarss/igarss2002.html"
+    },
+    {
+        "name": "IGARSS2003",
+        "url": "https://dblp.org/db/conf/igarss/igarss2003.html"
+    },
+    {
+        "name": "IGARSS2004",
+        "url": "https://dblp.org/db/conf/igarss/igarss2004.html"
+    },
+    {
+        "name": "IGARSS2005",
+        "url": "https://dblp.org/db/conf/igarss/igarss2005.html"
+    },
+    {
+        "name": "IGARSS2006",
+        "url": "https://dblp.org/db/conf/igarss/igarss2006.html"
+    },
+    {
+        "name": "IGARSS2007",
+        "url": "https://dblp.org/db/conf/igarss/igarss2007.html"
+    },
+    {
+        "name": "IGARSS2008",
+        "url": "https://dblp.org/db/conf/igarss/igarss2008.html"
+    },
+    {
+        "name": "IGARSS2009",
+        "url": "https://dblp.org/db/conf/igarss/igarss2009.html"
+    },
+    {
+        "name": "IGARSS2010",
+        "url": "https://dblp.org/db/conf/igarss/igarss2010.html"
+    },
+    {
+        "name": "IGARSS2011",
+        "url": "https://dblp.org/db/conf/igarss/igarss2011.html"
+    },
+    {
+        "name": "IGARSS2012",
+        "url": "https://dblp.org/db/conf/igarss/igarss2012.html"
+    },
+    {
+        "name": "IGARSS2013",
+        "url": "https://dblp.org/db/conf/igarss/igarss2013.html"
+    },
+    {
+        "name": "IGARSS2014",
+        "url": "https://dblp.org/db/conf/igarss/igarss2014.html"
+    },
+    {
+        "name": "IGARSS2015",
+        "url": "https://dblp.org/db/conf/igarss/igarss2015.html"
+    },
+    {
+        "name": "IGARSS2016",
+        "url": "https://dblp.org/db/conf/igarss/igarss2016.html"
+    },
+    {
+        "name": "IGARSS2017",
+        "url": "https://dblp.org/db/conf/igarss/igarss2017.html"
+    },
+    {
+        "name": "IGARSS2018",
+        "url": "https://dblp.org/db/conf/igarss/igarss2018.html"
+    },
+    {
+        "name": "IGARSS2019",
+        "url": "https://dblp.org/db/conf/igarss/igarss2019.html"
+    },
+    {
+        "name": "IGARSS2020",
+        "url": "https://dblp.org/db/conf/igarss/igarss2020.html"
+    },
+    {
+        "name": "IGARSS2021",
+        "url": "https://dblp.org/db/conf/igarss/igarss2021.html"
+    },
+    {
+        "name": "IGARSS2022",
+        "url": "https://dblp.org/db/conf/igarss/igarss2022.html"
+    },
+    {
+        "name": "IGARSS2023",
+        "url": "https://dblp.org/db/conf/igarss/igarss2023.html"
+    },
+    {
+        "name": "IGARSS2024",
+        "url": "https://dblp.org/db/conf/igarss/igarss2024.html"
+    },
+    {
+        "name": "IJGIS1987",
+        "url": "https://dblp.org/db/journals/gis/gis1.html"
+    },
+    {
+        "name": "IJGIS1988",
+        "url": "https://dblp.org/db/journals/gis/gis2.html"
+    },
+    {
+        "name": "IJGIS1989",
+        "url": "https://dblp.org/db/journals/gis/gis3.html"
+    },
+    {
+        "name": "IJGIS1990",
+        "url": "https://dblp.org/db/journals/gis/gis4.html"
+    },
+    {
+        "name": "IJGIS1991",
+        "url": "https://dblp.org/db/journals/gis/gis5.html"
+    },
+    {
+        "name": "IJGIS1992",
+        "url": "https://dblp.org/db/journals/gis/gis6.html"
+    },
+    {
+        "name": "IJGIS1993",
+        "url": "https://dblp.org/db/journals/gis/gis7.html"
+    },
+    {
+        "name": "IJGIS1994",
+        "url": "https://dblp.org/db/journals/gis/gis8.html"
+    },
+    {
+        "name": "IJGIS1995",
+        "url": "https://dblp.org/db/journals/gis/gis9.html"
+    },
+    {
+        "name": "IJGIS1996",
+        "url": "https://dblp.org/db/journals/gis/gis10.html"
+    },
+    {
+        "name": "IJGIS1997",
+        "url": "https://dblp.org/db/journals/gis/gis11.html"
+    },
+    {
+        "name": "IJGIS1998",
+        "url": "https://dblp.org/db/journals/gis/gis12.html"
+    },
+    {
+        "name": "IJGIS1999",
+        "url": "https://dblp.org/db/journals/gis/gis13.html"
+    },
+    {
+        "name": "IJGIS2000",
+        "url": "https://dblp.org/db/journals/gis/gis14.html"
+    },
+    {
+        "name": "IJGIS2001",
+        "url": "https://dblp.org/db/journals/gis/gis15.html"
+    },
+    {
+        "name": "IJGIS2002",
+        "url": "https://dblp.org/db/journals/gis/gis16.html"
+    },
+    {
+        "name": "IJGIS2003",
+        "url": "https://dblp.org/db/journals/gis/gis17.html"
+    },
+    {
+        "name": "IJGIS2004",
+        "url": "https://dblp.org/db/journals/gis/gis18.html"
+    },
+    {
+        "name": "IJGIS2005",
+        "url": "https://dblp.org/db/journals/gis/gis19.html"
+    },
+    {
+        "name": "IJGIS2006",
+        "url": "https://dblp.org/db/journals/gis/gis20.html"
+    },
+    {
+        "name": "IJGIS2007",
+        "url": "https://dblp.org/db/journals/gis/gis21.html"
+    },
+    {
+        "name": "IJGIS2008",
+        "url": "https://dblp.org/db/journals/gis/gis22.html"
+    },
+    {
+        "name": "IJGIS2009",
+        "url": "https://dblp.org/db/journals/gis/gis23.html"
+    },
+    {
+        "name": "IJGIS2010",
+        "url": "https://dblp.org/db/journals/gis/gis24.html"
+    },
+    {
+        "name": "IJGIS2011",
+        "url": "https://dblp.org/db/journals/gis/gis25.html"
+    },
+    {
+        "name": "IJGIS2012",
+        "url": "https://dblp.org/db/journals/gis/gis26.html"
+    },
+    {
+        "name": "IJGIS2013",
+        "url": "https://dblp.org/db/journals/gis/gis27.html"
+    },
+    {
+        "name": "IJGIS2014",
+        "url": "https://dblp.org/db/journals/gis/gis28.html"
+    },
+    {
+        "name": "IJGIS2015",
+        "url": "https://dblp.org/db/journals/gis/gis29.html"
+    },
+    {
+        "name": "IJGIS2016",
+        "url": "https://dblp.org/db/journals/gis/gis30.html"
+    },
+    {
+        "name": "IJGIS2017",
+        "url": "https://dblp.org/db/journals/gis/gis31.html"
+    },
+    {
+        "name": "IJGIS2018",
+        "url": "https://dblp.org/db/journals/gis/gis32.html"
+    },
+    {
+        "name": "IJGIS2019",
+        "url": "https://dblp.org/db/journals/gis/gis33.html"
+    },
+    {
+        "name": "IJGIS2020",
+        "url": "https://dblp.org/db/journals/gis/gis34.html"
+    },
+    {
+        "name": "IJGIS2021",
+        "url": "https://dblp.org/db/journals/gis/gis35.html"
+    },
+    {
+        "name": "IJGIS2022",
+        "url": "https://dblp.org/db/journals/gis/gis36.html"
+    },
+    {
+        "name": "IJGIS2023",
+        "url": "https://dblp.org/db/journals/gis/gis37.html"
+    },
+    {
+        "name": "IJGIS2024",
+        "url": "https://dblp.org/db/journals/gis/gis38.html"
+    },
+    {
+        "name": "IJGIS2025",
+        "url": "https://dblp.org/db/journals/gis/gis39.html"
+    },
+    {
+        "name": "IJGIS2026",
+        "url": "https://dblp.org/db/journals/gis/gis40.html"
+    },
+    {
+        "name": "TGIS1996",
+        "url": "https://dblp.org/db/journals/tgis/tgis1.html"
+    },
+    {
+        "name": "TGIS1997",
+        "url": "https://dblp.org/db/journals/tgis/tgis2.html"
+    },
+    {
+        "name": "TGIS1999",
+        "url": "https://dblp.org/db/journals/tgis/tgis3.html"
+    },
+    {
+        "name": "TGIS2000",
+        "url": "https://dblp.org/db/journals/tgis/tgis4.html"
+    },
+    {
+        "name": "TGIS2001",
+        "url": "https://dblp.org/db/journals/tgis/tgis5.html"
+    },
+    {
+        "name": "TGIS2002",
+        "url": "https://dblp.org/db/journals/tgis/tgis6.html"
+    },
+    {
+        "name": "TGIS2003",
+        "url": "https://dblp.org/db/journals/tgis/tgis7.html"
+    },
+    {
+        "name": "TGIS2004",
+        "url": "https://dblp.org/db/journals/tgis/tgis8.html"
+    },
+    {
+        "name": "TGIS2005",
+        "url": "https://dblp.org/db/journals/tgis/tgis9.html"
+    },
+    {
+        "name": "TGIS2006",
+        "url": "https://dblp.org/db/journals/tgis/tgis10.html"
+    },
+    {
+        "name": "TGIS2007",
+        "url": "https://dblp.org/db/journals/tgis/tgis11.html"
+    },
+    {
+        "name": "TGIS2008",
+        "url": "https://dblp.org/db/journals/tgis/tgis12.html"
+    },
+    {
+        "name": "TGIS2009",
+        "url": "https://dblp.org/db/journals/tgis/tgis13.html"
+    },
+    {
+        "name": "TGIS2010",
+        "url": "https://dblp.org/db/journals/tgis/tgis14.html"
+    },
+    {
+        "name": "TGIS2011",
+        "url": "https://dblp.org/db/journals/tgis/tgis15.html"
+    },
+    {
+        "name": "TGIS2012",
+        "url": "https://dblp.org/db/journals/tgis/tgis16.html"
+    },
+    {
+        "name": "TGIS2013",
+        "url": "https://dblp.org/db/journals/tgis/tgis17.html"
+    },
+    {
+        "name": "TGIS2014",
+        "url": "https://dblp.org/db/journals/tgis/tgis18.html"
+    },
+    {
+        "name": "TGIS2015",
+        "url": "https://dblp.org/db/journals/tgis/tgis19.html"
+    },
+    {
+        "name": "TGIS2016",
+        "url": "https://dblp.org/db/journals/tgis/tgis20.html"
+    },
+    {
+        "name": "TGIS2017",
+        "url": "https://dblp.org/db/journals/tgis/tgis21.html"
+    },
+    {
+        "name": "TGIS2018",
+        "url": "https://dblp.org/db/journals/tgis/tgis22.html"
+    },
+    {
+        "name": "TGIS2019",
+        "url": "https://dblp.org/db/journals/tgis/tgis23.html"
+    },
+    {
+        "name": "TGIS2020",
+        "url": "https://dblp.org/db/journals/tgis/tgis24.html"
+    },
+    {
+        "name": "TGIS2021",
+        "url": "https://dblp.org/db/journals/tgis/tgis25.html"
+    },
+    {
+        "name": "TGIS2022",
+        "url": "https://dblp.org/db/journals/tgis/tgis26.html"
+    },
+    {
+        "name": "TGIS2023",
+        "url": "https://dblp.org/db/journals/tgis/tgis27.html"
+    },
+    {
+        "name": "TGIS2024",
+        "url": "https://dblp.org/db/journals/tgis/tgis28.html"
+    },
+    {
+        "name": "TGIS2025",
+        "url": "https://dblp.org/db/journals/tgis/tgis29.html"
+    },
+    {
+        "name": "TGIS2026",
+        "url": "https://dblp.org/db/journals/tgis/tgis30.html"
+    },
+    {
+        "name": "IJAEO2007",
+        "url": "https://dblp.org/db/journals/aeog/aeog9.html"
+    },
+    {
+        "name": "IJAEO2008",
+        "url": "https://dblp.org/db/journals/aeog/aeog10.html"
+    },
+    {
+        "name": "IJAEO2009",
+        "url": "https://dblp.org/db/journals/aeog/aeog11.html"
+    },
+    {
+        "name": "IJAEO2010",
+        "url": "https://dblp.org/db/journals/aeog/aeog12.html"
+    },
+    {
+        "name": "IJAEO2011",
+        "url": "https://dblp.org/db/journals/aeog/aeog13.html"
+    },
+    {
+        "name": "IJAEO2012",
+        "url": "https://dblp.org/db/journals/aeog/aeog14.html"
+    },
+    {
+        "name": "IJAEO2012",
+        "url": "https://dblp.org/db/journals/aeog/aeog15.html"
+    },
+    {
+        "name": "IJAEO2012",
+        "url": "https://dblp.org/db/journals/aeog/aeog16.html"
+    },
+    {
+        "name": "IJAEO2012",
+        "url": "https://dblp.org/db/journals/aeog/aeog17.html"
+    },
+    {
+        "name": "IJAEO2012",
+        "url": "https://dblp.org/db/journals/aeog/aeog18.html"
+    },
+    {
+        "name": "IJAEO2012",
+        "url": "https://dblp.org/db/journals/aeog/aeog19.html"
+    },
+    {
+        "name": "IJAEO2013",
+        "url": "https://dblp.org/db/journals/aeog/aeog20.html"
+    },
+    {
+        "name": "IJAEO2013",
+        "url": "https://dblp.org/db/journals/aeog/aeog21.html"
+    },
+    {
+        "name": "IJAEO2013",
+        "url": "https://dblp.org/db/journals/aeog/aeog22.html"
+    },
+    {
+        "name": "IJAEO2013",
+        "url": "https://dblp.org/db/journals/aeog/aeog23.html"
+    },
+    {
+        "name": "IJAEO2013",
+        "url": "https://dblp.org/db/journals/aeog/aeog24.html"
+    },
+    {
+        "name": "IJAEO2013",
+        "url": "https://dblp.org/db/journals/aeog/aeog25.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog26.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog27.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog28.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog29.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog30.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog31.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog32.html"
+    },
+    {
+        "name": "IJAEO2014",
+        "url": "https://dblp.org/db/journals/aeog/aeog33.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog34.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog35.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog36.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog37.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog38.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog39.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog40.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog41.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog42.html"
+    },
+    {
+        "name": "IJAEO2015",
+        "url": "https://dblp.org/db/journals/aeog/aeog43.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog44.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog45.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog46.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog47.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog48.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog49.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog50.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog51.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog52.html"
+    },
+    {
+        "name": "IJAEO2016",
+        "url": "https://dblp.org/db/journals/aeog/aeog53.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog54.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog55.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog56.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog57.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog58.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog59.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog60.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog61.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog62.html"
+    },
+    {
+        "name": "IJAEO2017",
+        "url": "https://dblp.org/db/journals/aeog/aeog63.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog64.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog65.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog66.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog67.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog68.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog69.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog70.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog71.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog72.html"
+    },
+    {
+        "name": "IJAEO2018",
+        "url": "https://dblp.org/db/journals/aeog/aeog73.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog74.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog75.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog76.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog77.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog78.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog79.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog80.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog81.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog82.html"
+    },
+    {
+        "name": "IJAEO2019",
+        "url": "https://dblp.org/db/journals/aeog/aeog83.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog84.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog85.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog86.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog87.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog88.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog89.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog90.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog91.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog92.html"
+    },
+    {
+        "name": "IJAEO2020",
+        "url": "https://dblp.org/db/journals/aeog/aeog93.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog94.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog95.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog96.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog97.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog98.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog99.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog100.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog101.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog102.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog103.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog104.html"
+    },
+    {
+        "name": "IJAEO2021",
+        "url": "https://dblp.org/db/journals/aeog/aeog105.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog106.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog107.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog108.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog109.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog110.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog111.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog112.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog113.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog114.html"
+    },
+    {
+        "name": "IJAEO2022",
+        "url": "https://dblp.org/db/journals/aeog/aeog115.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog116.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog117.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog118.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog119.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog120.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog121.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog122.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog123.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog124.html"
+    },
+    {
+        "name": "IJAEO2023",
+        "url": "https://dblp.org/db/journals/aeog/aeog125.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog126.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog127.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog128.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog129.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog130.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog131.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog132.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog133.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog134.html"
+    },
+    {
+        "name": "IJAEO2024",
+        "url": "https://dblp.org/db/journals/aeog/aeog135.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog136.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog137.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog138.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog139.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog140.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog141.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog142.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog143.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog144.html"
+    },
+    {
+        "name": "IJAEO2025",
+        "url": "https://dblp.org/db/journals/aeog/aeog145.html"
+    },
+    {
+        "name": "IJAEO2026",
+        "url": "https://dblp.org/db/journals/aeog/aeog146.html"
+    },
+    {
+        "name": "CEUS2003",
+        "url": "https://dblp.org/db/journals/urban/urban27.html"
+    },
+    {
+        "name": "CEUS2004",
+        "url": "https://dblp.org/db/journals/urban/urban28.html"
+    },
+    {
+        "name": "CEUS2005",
+        "url": "https://dblp.org/db/journals/urban/urban29.html"
+    },
+    {
+        "name": "CEUS2006",
+        "url": "https://dblp.org/db/journals/urban/urban30.html"
+    },
+    {
+        "name": "CEUS2007",
+        "url": "https://dblp.org/db/journals/urban/urban31.html"
+    },
+    {
+        "name": "CEUS2008",
+        "url": "https://dblp.org/db/journals/urban/urban32.html"
+    },
+    {
+        "name": "CEUS2009",
+        "url": "https://dblp.org/db/journals/urban/urban33.html"
+    },
+    {
+        "name": "CEUS2010",
+        "url": "https://dblp.org/db/journals/urban/urban34.html"
+    },
+    {
+        "name": "CEUS2011",
+        "url": "https://dblp.org/db/journals/urban/urban35.html"
+    },
+    {
+        "name": "CEUS2012",
+        "url": "https://dblp.org/db/journals/urban/urban36.html"
+    },
+    {
+        "name": "CEUS2013",
+        "url": "https://dblp.org/db/journals/urban/urban37.html"
+    },
+    {
+        "name": "CEUS2013",
+        "url": "https://dblp.org/db/journals/urban/urban38.html"
+    },
+    {
+        "name": "CEUS2013",
+        "url": "https://dblp.org/db/journals/urban/urban39.html"
+    },
+    {
+        "name": "CEUS2013",
+        "url": "https://dblp.org/db/journals/urban/urban40.html"
+    },
+    {
+        "name": "CEUS2013",
+        "url": "https://dblp.org/db/journals/urban/urban41.html"
+    },
+    {
+        "name": "CEUS2013",
+        "url": "https://dblp.org/db/journals/urban/urban42.html"
+    },
+    {
+        "name": "CEUS2014",
+        "url": "https://dblp.org/db/journals/urban/urban43.html"
+    },
+    {
+        "name": "CEUS2014",
+        "url": "https://dblp.org/db/journals/urban/urban44.html"
+    },
+    {
+        "name": "CEUS2014",
+        "url": "https://dblp.org/db/journals/urban/urban45.html"
+    },
+    {
+        "name": "CEUS2014",
+        "url": "https://dblp.org/db/journals/urban/urban46.html"
+    },
+    {
+        "name": "CEUS2014",
+        "url": "https://dblp.org/db/journals/urban/urban47.html"
+    },
+    {
+        "name": "CEUS2014",
+        "url": "https://dblp.org/db/journals/urban/urban48.html"
+    },
+    {
+        "name": "CEUS2015",
+        "url": "https://dblp.org/db/journals/urban/urban49.html"
+    },
+    {
+        "name": "CEUS2015",
+        "url": "https://dblp.org/db/journals/urban/urban50.html"
+    },
+    {
+        "name": "CEUS2015",
+        "url": "https://dblp.org/db/journals/urban/urban51.html"
+    },
+    {
+        "name": "CEUS2015",
+        "url": "https://dblp.org/db/journals/urban/urban52.html"
+    },
+    {
+        "name": "CEUS2015",
+        "url": "https://dblp.org/db/journals/urban/urban53.html"
+    },
+    {
+        "name": "CEUS2015",
+        "url": "https://dblp.org/db/journals/urban/urban54.html"
+    },
+    {
+        "name": "CEUS2016",
+        "url": "https://dblp.org/db/journals/urban/urban55.html"
+    },
+    {
+        "name": "CEUS2016",
+        "url": "https://dblp.org/db/journals/urban/urban56.html"
+    },
+    {
+        "name": "CEUS2016",
+        "url": "https://dblp.org/db/journals/urban/urban57.html"
+    },
+    {
+        "name": "CEUS2016",
+        "url": "https://dblp.org/db/journals/urban/urban58.html"
+    },
+    {
+        "name": "CEUS2016",
+        "url": "https://dblp.org/db/journals/urban/urban59.html"
+    },
+    {
+        "name": "CEUS2016",
+        "url": "https://dblp.org/db/journals/urban/urban60.html"
+    },
+    {
+        "name": "CEUS2017",
+        "url": "https://dblp.org/db/journals/urban/urban61.html"
+    },
+    {
+        "name": "CEUS2017",
+        "url": "https://dblp.org/db/journals/urban/urban62.html"
+    },
+    {
+        "name": "CEUS2017",
+        "url": "https://dblp.org/db/journals/urban/urban63.html"
+    },
+    {
+        "name": "CEUS2017",
+        "url": "https://dblp.org/db/journals/urban/urban64.html"
+    },
+    {
+        "name": "CEUS2017",
+        "url": "https://dblp.org/db/journals/urban/urban65.html"
+    },
+    {
+        "name": "CEUS2017",
+        "url": "https://dblp.org/db/journals/urban/urban66.html"
+    },
+    {
+        "name": "CEUS2018",
+        "url": "https://dblp.org/db/journals/urban/urban67.html"
+    },
+    {
+        "name": "CEUS2018",
+        "url": "https://dblp.org/db/journals/urban/urban68.html"
+    },
+    {
+        "name": "CEUS2018",
+        "url": "https://dblp.org/db/journals/urban/urban69.html"
+    },
+    {
+        "name": "CEUS2018",
+        "url": "https://dblp.org/db/journals/urban/urban70.html"
+    },
+    {
+        "name": "CEUS2018",
+        "url": "https://dblp.org/db/journals/urban/urban71.html"
+    },
+    {
+        "name": "CEUS2018",
+        "url": "https://dblp.org/db/journals/urban/urban72.html"
+    },
+    {
+        "name": "CEUS2019",
+        "url": "https://dblp.org/db/journals/urban/urban73.html"
+    },
+    {
+        "name": "CEUS2019",
+        "url": "https://dblp.org/db/journals/urban/urban74.html"
+    },
+    {
+        "name": "CEUS2019",
+        "url": "https://dblp.org/db/journals/urban/urban75.html"
+    },
+    {
+        "name": "CEUS2019",
+        "url": "https://dblp.org/db/journals/urban/urban76.html"
+    },
+    {
+        "name": "CEUS2019",
+        "url": "https://dblp.org/db/journals/urban/urban77.html"
+    },
+    {
+        "name": "CEUS2019",
+        "url": "https://dblp.org/db/journals/urban/urban78.html"
+    },
+    {
+        "name": "CEUS2020",
+        "url": "https://dblp.org/db/journals/urban/urban79.html"
+    },
+    {
+        "name": "CEUS2020",
+        "url": "https://dblp.org/db/journals/urban/urban80.html"
+    },
+    {
+        "name": "CEUS2020",
+        "url": "https://dblp.org/db/journals/urban/urban81.html"
+    },
+    {
+        "name": "CEUS2020",
+        "url": "https://dblp.org/db/journals/urban/urban82.html"
+    },
+    {
+        "name": "CEUS2020",
+        "url": "https://dblp.org/db/journals/urban/urban83.html"
+    },
+    {
+        "name": "CEUS2020",
+        "url": "https://dblp.org/db/journals/urban/urban84.html"
+    },
+    {
+        "name": "CEUS2021",
+        "url": "https://dblp.org/db/journals/urban/urban85.html"
+    },
+    {
+        "name": "CEUS2021",
+        "url": "https://dblp.org/db/journals/urban/urban86.html"
+    },
+    {
+        "name": "CEUS2021",
+        "url": "https://dblp.org/db/journals/urban/urban87.html"
+    },
+    {
+        "name": "CEUS2021",
+        "url": "https://dblp.org/db/journals/urban/urban88.html"
+    },
+    {
+        "name": "CEUS2021",
+        "url": "https://dblp.org/db/journals/urban/urban89.html"
+    },
+    {
+        "name": "CEUS2021",
+        "url": "https://dblp.org/db/journals/urban/urban90.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban91.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban92.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban93.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban94.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban95.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban96.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban97.html"
+    },
+    {
+        "name": "CEUS2022",
+        "url": "https://dblp.org/db/journals/urban/urban98.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban99.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban100.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban101.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban102.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban103.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban104.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban105.html"
+    },
+    {
+        "name": "CEUS2023",
+        "url": "https://dblp.org/db/journals/urban/urban106.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban107.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban108.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban109.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban110.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban111.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban112.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban113.html"
+    },
+    {
+        "name": "CEUS2024",
+        "url": "https://dblp.org/db/journals/urban/urban114.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban115.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban116.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban117.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban118.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban119.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban120.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban121.html"
+    },
+    {
+        "name": "CEUS2025",
+        "url": "https://dblp.org/db/journals/urban/urban122.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban123.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban124.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban125.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban126.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban127.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban128.html"
+    },
+    {
+        "name": "CEUS2026",
+        "url": "https://dblp.org/db/journals/urban/urban129.html"
+    },
+    {
+        "name": "GeoInformatica1997",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica1.html"
+    },
+    {
+        "name": "GeoInformatica1998",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica2.html"
+    },
+    {
+        "name": "GeoInformatica1999",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica3.html"
+    },
+    {
+        "name": "GeoInformatica2000",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica4.html"
+    },
+    {
+        "name": "GeoInformatica2001",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica5.html"
+    },
+    {
+        "name": "GeoInformatica2002",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica6.html"
+    },
+    {
+        "name": "GeoInformatica2003",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica7.html"
+    },
+    {
+        "name": "GeoInformatica2004",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica8.html"
+    },
+    {
+        "name": "GeoInformatica2005",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica9.html"
+    },
+    {
+        "name": "GeoInformatica2006",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica10.html"
+    },
+    {
+        "name": "GeoInformatica2007",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica11.html"
+    },
+    {
+        "name": "GeoInformatica2008",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica12.html"
+    },
+    {
+        "name": "GeoInformatica2009",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica13.html"
+    },
+    {
+        "name": "GeoInformatica2010",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica14.html"
+    },
+    {
+        "name": "GeoInformatica2011",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica15.html"
+    },
+    {
+        "name": "GeoInformatica2012",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica16.html"
+    },
+    {
+        "name": "GeoInformatica2013",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica17.html"
+    },
+    {
+        "name": "GeoInformatica2014",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica18.html"
+    },
+    {
+        "name": "GeoInformatica2015",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica19.html"
+    },
+    {
+        "name": "GeoInformatica2016",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica20.html"
+    },
+    {
+        "name": "GeoInformatica2017",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica21.html"
+    },
+    {
+        "name": "GeoInformatica2018",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica22.html"
+    },
+    {
+        "name": "GeoInformatica2019",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica23.html"
+    },
+    {
+        "name": "GeoInformatica2020",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica24.html"
+    },
+    {
+        "name": "GeoInformatica2021",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica25.html"
+    },
+    {
+        "name": "GeoInformatica2022",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica26.html"
+    },
+    {
+        "name": "GeoInformatica2023",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica27.html"
+    },
+    {
+        "name": "GeoInformatica2024",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica28.html"
+    },
+    {
+        "name": "GeoInformatica2025",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica29.html"
+    },
+    {
+        "name": "GeoInformatica2026",
+        "url": "https://dblp.org/db/journals/geoinformatica/geoinformatica30.html"
+    },
+    {
+        "name": "JOSIS2010",
+        "url": "https://dblp.org/db/journals/josis/josis1.html"
+    },
+    {
+        "name": "JOSIS2011",
+        "url": "https://dblp.org/db/journals/josis/josis2.html"
+    },
+    {
+        "name": "JOSIS2011",
+        "url": "https://dblp.org/db/journals/josis/josis3.html"
+    },
+    {
+        "name": "JOSIS2012",
+        "url": "https://dblp.org/db/journals/josis/josis4.html"
+    },
+    {
+        "name": "JOSIS2012",
+        "url": "https://dblp.org/db/journals/josis/josis5.html"
+    },
+    {
+        "name": "JOSIS2013",
+        "url": "https://dblp.org/db/journals/josis/josis6.html"
+    },
+    {
+        "name": "JOSIS2013",
+        "url": "https://dblp.org/db/journals/josis/josis7.html"
+    },
+    {
+        "name": "JOSIS2014",
+        "url": "https://dblp.org/db/journals/josis/josis8.html"
+    },
+    {
+        "name": "JOSIS2014",
+        "url": "https://dblp.org/db/journals/josis/josis9.html"
+    },
+    {
+        "name": "JOSIS2015",
+        "url": "https://dblp.org/db/journals/josis/josis10.html"
+    },
+    {
+        "name": "JOSIS2015",
+        "url": "https://dblp.org/db/journals/josis/josis11.html"
+    },
+    {
+        "name": "JOSIS2016",
+        "url": "https://dblp.org/db/journals/josis/josis12.html"
+    },
+    {
+        "name": "JOSIS2016",
+        "url": "https://dblp.org/db/journals/josis/josis13.html"
+    },
+    {
+        "name": "JOSIS2017",
+        "url": "https://dblp.org/db/journals/josis/josis14.html"
+    },
+    {
+        "name": "JOSIS2017",
+        "url": "https://dblp.org/db/journals/josis/josis15.html"
+    },
+    {
+        "name": "JOSIS2018",
+        "url": "https://dblp.org/db/journals/josis/josis16.html"
+    },
+    {
+        "name": "JOSIS2018",
+        "url": "https://dblp.org/db/journals/josis/josis17.html"
+    },
+    {
+        "name": "JOSIS2019",
+        "url": "https://dblp.org/db/journals/josis/josis18.html"
+    },
+    {
+        "name": "JOSIS2019",
+        "url": "https://dblp.org/db/journals/josis/josis19.html"
+    },
+    {
+        "name": "JOSIS2020",
+        "url": "https://dblp.org/db/journals/josis/josis20.html"
+    },
+    {
+        "name": "JOSIS2020",
+        "url": "https://dblp.org/db/journals/josis/josis21.html"
+    },
+    {
+        "name": "JSTARS2008",
+        "url": "https://dblp.org/db/journals/staeors/staeors1.html"
+    },
+    {
+        "name": "JSTARS2009",
+        "url": "https://dblp.org/db/journals/staeors/staeors2.html"
+    },
+    {
+        "name": "JSTARS2010",
+        "url": "https://dblp.org/db/journals/staeors/staeors3.html"
+    },
+    {
+        "name": "JSTARS2011",
+        "url": "https://dblp.org/db/journals/staeors/staeors4.html"
+    },
+    {
+        "name": "JSTARS2012",
+        "url": "https://dblp.org/db/journals/staeors/staeors5.html"
+    },
+    {
+        "name": "JSTARS2013",
+        "url": "https://dblp.org/db/journals/staeors/staeors6.html"
+    },
+    {
+        "name": "JSTARS2014",
+        "url": "https://dblp.org/db/journals/staeors/staeors7.html"
+    },
+    {
+        "name": "JSTARS2015",
+        "url": "https://dblp.org/db/journals/staeors/staeors8.html"
+    },
+    {
+        "name": "JSTARS2016",
+        "url": "https://dblp.org/db/journals/staeors/staeors9.html"
+    },
+    {
+        "name": "JSTARS2017",
+        "url": "https://dblp.org/db/journals/staeors/staeors10.html"
+    },
+    {
+        "name": "JSTARS2018",
+        "url": "https://dblp.org/db/journals/staeors/staeors11.html"
+    },
+    {
+        "name": "JSTARS2019",
+        "url": "https://dblp.org/db/journals/staeors/staeors12.html"
+    },
+    {
+        "name": "JSTARS2020",
+        "url": "https://dblp.org/db/journals/staeors/staeors13.html"
+    },
+    {
+        "name": "JSTARS2021",
+        "url": "https://dblp.org/db/journals/staeors/staeors14.html"
+    },
+    {
+        "name": "JSTARS2022",
+        "url": "https://dblp.org/db/journals/staeors/staeors15.html"
+    },
+    {
+        "name": "JSTARS2023",
+        "url": "https://dblp.org/db/journals/staeors/staeors16.html"
+    },
+    {
+        "name": "JSTARS2024",
+        "url": "https://dblp.org/db/journals/staeors/staeors17.html"
+    },
+    {
+        "name": "JSTARS2025",
+        "url": "https://dblp.org/db/journals/staeors/staeors18.html"
+    },
+    {
+        "name": "JSTARS2026",
+        "url": "https://dblp.org/db/journals/staeors/staeors19.html"
     }
 ]

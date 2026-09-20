@@ -186,10 +186,13 @@ CONF_PRIORITY: Dict[str, int] = {
     "MM": 2, "ICASSP": 2, "INTERSPEECH": 2, "MICCAI": 2,
     "BMVC": 2, "AISTATS": 2, "COLT": 2,
     "VLDB": 2, "SIGMOD": 2, "ICDE": 2, "ICDM": 2,
+    "SIGSPATIAL": 2, "IGARSS": 2,
     # Tier 3 — 期刊 (Journal)
     "TPAMI": 3, "TNNLS": 3, "TIP": 3, "TKDE": 3, "TASLP": 3,
     "TOIS": 3, "IJCV": 3, "JMLR": 3, "TMM": 3, "TCYB": 3,
     "TCSVT": 3, "TIST": 3, "TKDD": 3, "TWEB": 3,
+    "IJGIS": 3, "TGIS": 3, "IJAEO": 3, "CEUS": 3,
+    "GEOINFORMATICA": 3, "JOSIS": 3, "JSTARS": 3,
     # Tier 4 — 其他 (默认)
 }
 
