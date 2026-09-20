@@ -38,6 +38,21 @@ _JOURNAL_LINK_RE = re.compile(
 _YEAR_RE = re.compile(r"(\d{4})")
 
 
+def _url_key(url: str) -> str:
+    """URL 去重用的归一化键。
+
+    DBLP 的镜像域名（dblp.org / dblp.uni-trier.de / dblp.dagstuhl.de …）
+    指向同一页面；conf 中历史上存在镜像域名的条目（如 IJCV2020-2022），
+    若按原始字符串比较会被误判为新条目。DBLP 系列主机统一按 path 比较。
+    """
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    if "dblp" in parts.netloc.lower():
+        return parts.path
+    return url
+
+
 def _load_cache() -> dict:
     if CACHE_FILE.exists():
         try:
@@ -283,6 +298,12 @@ class DBLPDiscovery(BaseDiscovery):
 
         from urllib.parse import urljoin
 
+        # 同一年度可能对应多个页面（"-N" 多卷、SIGSPATIAL/WWW 的卫星研讨会等），
+        # name 不是唯一键：仅以 URL 去重，否则 DBLP 后续为已记录年度新增的页面
+        # 会因同名被跳过。seen_urls 额外覆盖本次运行内的新发现，避免页面内重复
+        # 链接造成重复追加；去重按归一化键比较，兼容 conf 中的镜像域名条目。
+        seen_urls = {_url_key(u) for u in existing_urls}
+
         soup = BeautifulSoup(text, "html.parser")
         for a in soup.find_all("a", href=True):
             href = urljoin(meta["root"], a["href"])
@@ -296,17 +317,11 @@ class DBLPDiscovery(BaseDiscovery):
             if year < start_year or year > end_year:
                 continue
 
-            name = f"{meta['name']}{year}"
-            # 多卷会议（如 ECCV, MICCAI）只按 URL 去重，避免已有某一卷时漏掉其他卷
-            href_filename = href.split("/")[-1]
-            is_multi_volume = "-" in href_filename and href_filename.endswith(".html")
-            if is_multi_volume:
-                if href in existing_urls:
-                    continue
-            else:
-                if name in self.existing_names or href in existing_urls:
-                    continue
-            results.append({"name": name, "url": href})
+            key = _url_key(href)
+            if key in seen_urls:
+                continue
+            seen_urls.add(key)
+            results.append({"name": f"{meta['name']}{year}", "url": href})
 
         return results
 
@@ -327,6 +342,12 @@ class DBLPDiscovery(BaseDiscovery):
 
         from urllib.parse import urljoin
 
+        # 期刊普遍按卷拆分页面，同一年度可能有多卷（如 IJAEO/CEUS/JOSIS）。
+        # name 不是唯一键：仅以 URL 去重，否则 DBLP 后续为已记录年度新增的卷
+        # 会因同名被跳过。seen_urls 额外覆盖本次运行内的新发现；去重按归一化键
+        # 比较，兼容 conf 中的镜像域名条目。
+        seen_urls = {_url_key(u) for u in existing_urls}
+
         soup = BeautifulSoup(text, "html.parser")
         for a in soup.find_all("a", href=True):
             href = urljoin(meta["root"], a["href"])
@@ -338,15 +359,15 @@ class DBLPDiscovery(BaseDiscovery):
             m = _YEAR_RE.search(container_text)
             if not m:
                 continue
-                continue
             year = int(m.group(1))
             if year < start_year or year > end_year:
                 continue
 
-            name = f"{meta['name']}{year}"
-            if name in self.existing_names or href in existing_urls:
+            key = _url_key(href)
+            if key in seen_urls:
                 continue
-            results.append({"name": name, "url": href})
+            seen_urls.add(key)
+            results.append({"name": f"{meta['name']}{year}", "url": href})
 
         return results
 
