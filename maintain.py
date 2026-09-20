@@ -93,6 +93,10 @@ CATEGORY_MAP = {
         "JACM", "PROCIEEE", "SCIS", "BIOINFORMATICS",
         "RTSS", "ISWC",
     ],
+    "地理空间信息": [
+        "IJGIS", "TGIS", "IJAEO", "CEUS", "GEOINFORMATICA", "JOSIS", "JSTARS",
+        "SIGSPATIAL", "IGARSS",
+    ],
 }
 
 CATEGORY_MAP_EN = {
@@ -139,6 +143,10 @@ CATEGORY_MAP_EN = {
     "Interdisciplinary / Comprehensive / Emerging": [
         "JACM", "PROCIEEE", "SCIS", "BIOINFORMATICS",
         "RTSS", "ISWC",
+    ],
+    "Geospatial Information & Remote Sensing": [
+        "IJGIS", "TGIS", "IJAEO", "CEUS", "GEOINFORMATICA", "JOSIS", "JSTARS",
+        "SIGSPATIAL", "IGARSS",
     ],
 }
 
