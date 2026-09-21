@@ -128,6 +128,11 @@ class Settings:
     zhihu_client_id: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_CLIENT_ID", ""))
     zhihu_client_secret: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_CLIENT_SECRET", ""))
     zhihu_redirect_uri: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_REDIRECT_URI", ""))
+    # Zhihu OpenAPI (openapi.zhihu.com) endpoints; overridable for testing.
+    zhihu_authorize_url: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_AUTHORIZE_URL", "https://openapi.zhihu.com/authorize"))
+    zhihu_token_url: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_TOKEN_URL", "https://openapi.zhihu.com/access_token"))
+    zhihu_user_url: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_USER_URL", "https://openapi.zhihu.com/user"))
+    zhihu_timeout_seconds: float = field(default_factory=lambda: _env_float("ZHIHU_OAUTH_TIMEOUT_SECONDS", 15.0))
     llm_api_url: str = field(default_factory=lambda: _env_str("PAPERVAULT_LLM_API_URL", ""))
     llm_api_key: str = field(default_factory=lambda: _env_str("PAPERVAULT_LLM_API_KEY", ""))
 

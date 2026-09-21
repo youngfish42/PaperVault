@@ -1,14 +1,25 @@
 from __future__ import annotations
 
-from functools import wraps
 from urllib.parse import urlencode
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 import secrets
 import requests
 
+from ...errors import ApiError
+from ...services import zhihu_oauth
+
 bp = Blueprint("auth_v1", __name__)
 
 def _settings(): return current_app.extensions["settings"]
+
+def _oauth_unavailable():
+    return jsonify({"error": {"code": "OAUTH_UNAVAILABLE", "message": "provider is not configured"}}), 503
+
+def _invalid_state():
+    return jsonify({"error": {"code": "INVALID_OAUTH_STATE", "message": "OAuth verification failed"}}), 400
+
+def _zhihu_redirect_uri(s):
+    return s.zhihu_redirect_uri or f"{request.host_url.rstrip('/')}/api/v1/auth/oauth/zhihu/callback"
 
 @bp.get("/auth/config")
 def auth_config():
@@ -35,32 +46,64 @@ def me():
 
 @bp.get("/auth/oauth/<provider>")
 def oauth_start(provider):
-    s = _settings(); configs = {"github": (s.github_client_id, "https://github.com/login/oauth/authorize", s.github_redirect_uri), "zhihu": (s.zhihu_client_id, "https://www.zhihu.com/oauth/authorize", s.zhihu_redirect_uri)}
-    if provider not in configs or not configs[provider][0]: return jsonify({"error": {"code": "OAUTH_UNAVAILABLE", "message": "provider is not configured"}}), 503
-    client_id, endpoint, redirect_uri = configs[provider]; state = secrets.token_urlsafe(24); session["oauth_state"] = state
-    return redirect(endpoint + "?" + urlencode({"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "state": state, "scope": "read:user user:email" if provider == "github" else ""}))
+    s = _settings()
+    state = secrets.token_urlsafe(24)
+    if provider == "github":
+        if not (s.github_client_id and s.github_client_secret): return _oauth_unavailable()
+        session["oauth_state"] = state
+        query = {"client_id": s.github_client_id, "redirect_uri": s.github_redirect_uri, "response_type": "code", "state": state, "scope": "read:user user:email"}
+        return redirect("https://github.com/login/oauth/authorize?" + urlencode(query))
+    if provider == "zhihu":
+        if not (s.zhihu_client_id and s.zhihu_client_secret): return _oauth_unavailable()
+        session["oauth_state"] = state
+        return redirect(zhihu_oauth.build_authorization_url(s, state=state, redirect_uri=_zhihu_redirect_uri(s)))
+    return _oauth_unavailable()
 
 @bp.get("/auth/oauth/<provider>/callback")
 def oauth_callback(provider):
-    # Provider token exchange is intentionally delegated to the deployment's
-    # identity gateway; this endpoint preserves a safe callback contract.
-    if request.args.get("error"): return jsonify({"error": request.args["error"]}), 400
-    if not request.args.get("code") or request.args.get("state") != session.pop("oauth_state", None):
-        return jsonify({"error": {"code": "INVALID_OAUTH_STATE", "message": "OAuth verification failed"}}), 400
     # OAuth is a general user login. It must never grant administrator
     # privileges; admin access is reserved for the separately configured
     # administrator credentials.
-    user = {"provider": provider, "name": provider.title() + " user"}
+    if request.args.get("error"): return jsonify({"error": request.args["error"]}), 400
+    code = request.args.get("code")
+    expected_state = session.pop("oauth_state", None)
+    # Zhihu's authorize endpoint does not echo `state` back on the callback;
+    # when the query param is absent the server-side state stands in, but a
+    # returned value must always match what we issued.
+    if request.args.get("state") is not None:
+        if request.args["state"] != expected_state: return _invalid_state()
+    elif provider != "zhihu" or not expected_state:
+        return _invalid_state()
+    if not code: return _invalid_state()
+
     if provider == "github":
-        s = _settings()
-        try:
-            token_response = requests.post("https://github.com/login/oauth/access_token", data={"client_id": s.github_client_id, "client_secret": s.github_client_secret, "code": request.args["code"], "redirect_uri": s.github_redirect_uri}, headers={"Accept": "application/json"}, timeout=15)
-            token_response.raise_for_status()
-        except requests.RequestException:
-            return jsonify({"error": {"code": "OAUTH_FAILED", "message": "GitHub token exchange failed"}}), 502
-        access_token = token_response.json().get("access_token")
-        if not access_token: return jsonify({"error": {"code": "OAUTH_FAILED", "message": "GitHub token exchange failed"}}), 400
-        profile = requests.get("https://api.github.com/user", headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"}, timeout=15).json()
-        user = {"provider": provider, "id": str(profile.get("id", "")), "name": profile.get("login") or profile.get("name") or "GitHub user", "email": profile.get("email") or ""}
+        user = _github_callback_user(code)
+    elif provider == "zhihu":
+        user = _zhihu_callback_user(code)
+    else:
+        return _oauth_unavailable()
     session["papervault_user"] = user
     return redirect("/#/?login=success")
+
+def _github_callback_user(code: str) -> dict:
+    s = _settings()
+    try:
+        token_response = requests.post("https://github.com/login/oauth/access_token", data={"client_id": s.github_client_id, "client_secret": s.github_client_secret, "code": code, "redirect_uri": s.github_redirect_uri}, headers={"Accept": "application/json"}, timeout=15)
+        token_response.raise_for_status()
+    except requests.RequestException:
+        raise ApiError("GitHub token exchange failed", status_code=502, code="OAUTH_FAILED")
+    access_token = token_response.json().get("access_token")
+    if not access_token:
+        raise ApiError("GitHub token exchange failed", status_code=400, code="OAUTH_FAILED")
+    profile = requests.get("https://api.github.com/user", headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"}, timeout=15).json()
+    return {"provider": "github", "id": str(profile.get("id", "")), "name": profile.get("login") or profile.get("name") or "GitHub user", "email": profile.get("email") or ""}
+
+def _zhihu_callback_user(code: str) -> dict:
+    s = _settings()
+    try:
+        exchanged = zhihu_oauth.exchange_code(s, code, redirect_uri=_zhihu_redirect_uri(s))
+    except zhihu_oauth.ZhihuOAuthError as exc:
+        current_app.logger.warning("zhihu oauth exchange failed: %s", exc)
+        raise ApiError("Zhihu token exchange failed", status_code=502, code="OAUTH_FAILED")
+    p = exchanged.profile
+    return {"provider": "zhihu", "id": p.open_id, "name": p.name, "account": p.account, "headline": p.headline, "avatar_url": p.avatar_url}
