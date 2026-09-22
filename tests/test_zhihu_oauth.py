@@ -1,8 +1,9 @@
 """Regression tests for the Zhihu OpenAPI OAuth login flow.
 
-Zhihu deviates from stock OAuth2 in two ways that this suite pins down:
-the authorize step takes ``app_id`` (not ``client_id``) and the callback
-frequently omits the ``state`` query parameter. Both behaviours mirror the
+Zhihu deviates from stock OAuth2 in three ways that this suite pins down:
+the authorize step takes ``app_id`` (not ``client_id``), the callback
+frequently omits the ``state`` query parameter, and the grant is returned
+as ``authorization_code`` (not ``code``). All behaviours mirror the
 reference implementation in deepseek-harness-server.
 """
 
@@ -192,6 +193,37 @@ def test_zhihu_callback_with_matching_state_logs_in(zhihu_client, monkeypatch):
     resp = zhihu_client.get(f"/api/v1/auth/oauth/zhihu/callback?code=abc&state={state}")
     assert resp.status_code == 302
     assert resp.headers["Location"] == "/#/?login=success"
+
+
+def test_zhihu_callback_with_authorization_code_param_logs_in(zhihu_client, monkeypatch):
+    # Real Zhihu callbacks carry the grant as ``authorization_code`` (with the
+    # echoed state) — no ``code`` param at all. This is the exact production
+    # URL shape; it must not be rejected as an invalid state.
+    start = zhihu_client.get("/api/v1/auth/oauth/zhihu")
+    assert start.status_code == 302
+    state = start.headers["Location"].split("state=")[1].split("&")[0]
+    calls = _patch_requests(
+        monkeypatch,
+        post_response=_FakeResponse(payload={"code": 20000, "data": {"access_token": "tok123"}}),
+        get_response=_FakeResponse(payload={"id": "ov-x1", "name": "国宝"}),
+    )
+    resp = zhihu_client.get(f"/api/v1/auth/oauth/zhihu/callback?state={state}&authorization_code=f36be8ed0cd14279b88756c26bd94246")
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/#/?login=success"
+    assert calls["post"]["data"]["code"] == "f36be8ed0cd14279b88756c26bd94246"
+
+    me = zhihu_client.get("/api/v1/auth/me").get_json()
+    assert me["authenticated"] is True
+    assert me["user"]["provider"] == "zhihu"
+
+
+def test_zhihu_callback_without_code_returns_distinct_error(zhihu_client):
+    # A callback that carries neither ``code`` nor ``authorization_code`` must
+    # fail with its own code, not be conflated with a state mismatch.
+    zhihu_client.get("/api/v1/auth/oauth/zhihu")
+    resp = zhihu_client.get("/api/v1/auth/oauth/zhihu/callback")
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "MISSING_AUTHORIZATION_CODE"
 
 
 def test_zhihu_callback_rejects_mismatched_state(zhihu_client):

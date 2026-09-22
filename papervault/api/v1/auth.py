@@ -65,7 +65,9 @@ def oauth_callback(provider):
     # privileges; admin access is reserved for the separately configured
     # administrator credentials.
     if request.args.get("error"): return jsonify({"error": request.args["error"]}), 400
-    code = request.args.get("code")
+    # Zhihu's OpenAPI names the grant param ``authorization_code`` on the
+    # callback; standard providers (GitHub) use ``code``.
+    code = request.args.get("code") or request.args.get("authorization_code")
     expected_state = session.pop("oauth_state", None)
     # Zhihu's authorize endpoint does not echo `state` back on the callback;
     # when the query param is absent the server-side state stands in, but a
@@ -74,7 +76,8 @@ def oauth_callback(provider):
         if request.args["state"] != expected_state: return _invalid_state()
     elif provider != "zhihu" or not expected_state:
         return _invalid_state()
-    if not code: return _invalid_state()
+    if not code:
+        return jsonify({"error": {"code": "MISSING_AUTHORIZATION_CODE", "message": "OAuth verification failed"}}), 400
 
     if provider == "github":
         user = _github_callback_user(code)
