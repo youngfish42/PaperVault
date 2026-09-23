@@ -57,7 +57,7 @@ def is_challenge(resp: requests.Response) -> bool:
     一旦被当成正常页，上游会解析成 0 篇并写 empty 标记）。标记位于页面
     <head> 内，扫描前 64KB 即可，避免为超大页面多做一次全文解码。
     """
-    return "anubis_challenge" in resp.text[:65536]
+    return b"anubis_challenge" in resp.content[:65536]
 
 
 def _solve_pow(random_data: str, difficulty: int) -> tuple:
