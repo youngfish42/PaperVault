@@ -5828,6 +5828,10 @@
         "url": "https://dblp.org/db/conf/kdd/kdd2026-1.html"
     },
     {
+        "name": "KDD2026",
+        "url": "https://dblp.org/db/conf/kdd/kdd2026-2.html"
+    },
+    {
         "name": "CIKM2024",
         "url": "https://dblp.org/db/conf/cikm/cikm2024.html"
     },
@@ -6068,6 +6072,10 @@
         "url": "https://dblp.org/db/conf/icml/icml2025.html"
     },
     {
+        "name": "ICML2025",
+        "url": "https://dblp.org/db/conf/icml/terrabytes2025.html"
+    },
+    {
         "name": "AAAI2024",
         "url": "https://dblp.org/db/conf/aaai/aaai2024.html"
     },
@@ -6086,6 +6094,14 @@
     {
         "name": "IJCAI2025",
         "url": "https://dblp.org/db/conf/ijcai/ijcai2025.html"
+    },
+    {
+        "name": "IJCAI2025",
+        "url": "https://dblp.org/db/conf/ijcai/democrai2025.html"
+    },
+    {
+        "name": "IJCAI2026",
+        "url": "https://dblp.org/db/conf/ijcai/ijcai2026.html"
     },
     {
         "name": "CVPR2023",
@@ -6182,6 +6198,10 @@
     {
         "name": "RECSYS2025",
         "url": "https://dblp.org/db/conf/recsys/recsys2025.html"
+    },
+    {
+        "name": "RECSYS2025",
+        "url": "https://dblp.org/db/conf/recsys/challenge2025.html"
     },
     {
         "name": "MICCAI2023",
@@ -8728,8 +8748,16 @@
         "url": "https://dblp.org/db/journals/ml/ml39.html"
     },
     {
+        "name": "MLJ2025",
+        "url": "https://dblp.org/db/journals/ml/ml114.html"
+    },
+    {
         "name": "MLJ2026",
         "url": "https://dblp.org/db/journals/ml/ml40.html"
+    },
+    {
+        "name": "MLJ2026",
+        "url": "https://dblp.org/db/journals/ml/ml115.html"
     },
     {
         "name": "TCAD2000",
@@ -19198,6 +19226,10 @@
     {
         "name": "IANDC2026",
         "url": "https://dblp.org/db/journals/iandc/iandc311.html"
+    },
+    {
+        "name": "IANDC2026",
+        "url": "https://dblp.org/db/journals/iandc/iandc312.html"
     },
     {
         "name": "SICOMP2000",
