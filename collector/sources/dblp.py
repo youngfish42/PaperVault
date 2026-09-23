@@ -3,14 +3,19 @@ import re
 import yaml
 from bs4 import BeautifulSoup
 
-from collector.http import SESSION, HEADERS
+from collector.http import SESSION, HEADERS, get_with_anubis
+from collector.anubis import AnubisUnsolvableError
 from collector.merge import _merge_paper_record
 from collector.sources.openreview import _extract_forum_id, _fetch_openreview_abstract
 
 
 def search_abs_from_dblp(url):
     try:
-        r = SESSION.get(url, headers=HEADERS)
+        r = get_with_anubis(SESSION, url, headers=HEADERS)
+    except AnubisUnsolvableError:
+        # 求解失败必须向上抛：若落入下面的通用回退，会对挑战页发起裸 GET
+        # 并把验证页当文章页解析，静默返回空摘要。
+        raise
     except Exception as e:
         msg = str(e)
         if "doesn't match either of 'aaai.org'" in msg:
@@ -73,7 +78,7 @@ def search_abs_from_dblp(url):
 
 
 def search_from_dblp(url, name, res):
-    r = SESSION.get(url, headers=HEADERS)
+    r = get_with_anubis(SESSION, url, headers=HEADERS)
     soup = BeautifulSoup(r.text, "html.parser")
     if name not in res:
         res[name] = []

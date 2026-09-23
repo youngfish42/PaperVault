@@ -36,7 +36,8 @@ PaperVault/
 ├── collector/                    # Multi-source data collector package for paper metadata
 │   ├── __init__.py               # Re-exports full legacy public API (HEADERS, SESSION, collect, do_collect, load_cache, save_cache, all search_from_* etc.) for backwards-compat
 │   ├── __main__.py               # `python -m collector` entrypoint (equivalent to the legacy `python collector.py`)
-│   ├── http.py                   # Shared requests.Session singleton + HEADERS (User-Agent) + urllib3 Retry policy; also suppresses BS4 XMLParsedAsHTMLWarning
+│   ├── anubis.py                 # Anubis PoW challenge solver (DBLP has been behind Anubis since 2026-09); `get_with_anubis` solves once per session and raises `AnubisUnsolvableError` on failure
+│   ├── http.py                   # Shared requests.Session singleton + HEADERS (User-Agent) + urllib3 Retry policy; re-exports the Anubis helpers; also suppresses BS4 XMLParsedAsHTMLWarning
 │   ├── merge.py                  # Field-level record merge helpers (_better_str/_list/_code, _merge_paper_record, _merge_with_cache)
 │   ├── progress.py               # COLLECT_PROGRESS_FILE / COLLECT_FAILURES_FILE constants + load/save_collect_progress
 │   ├── io.py                     # cache/cache.jsonl.gz reader/writer (load_cache, save_cache, _to_gz_path)
@@ -116,7 +117,7 @@ PaperVault/
 │   ├── nips_conf.json            # NeurIPS & MLSys proceedings
 │   └── thecvf_conf.json          # CVF Open Access (CVPR, ICCV, WACV)
 ├── discovery/                    # Auto-discovery of new conference editions
-│   ├── base.py                   # Discovery base class & shared HTTP utilities
+│   ├── base.py                   # Discovery base class & shared HTTP utilities (DBLP requests are routed through the shared Anubis solver session)
 │   ├── acl.py                    # ACL Anthology discovery
 │   ├── cvf.py                    # CVF Open Access discovery
 │   ├── dblp.py                   # DBLP discovery

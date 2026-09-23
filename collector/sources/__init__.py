@@ -12,6 +12,10 @@ class SourceSpec:
     required_conf_keys: tuple = ("name", "url")
     post_run_hook_name: Optional[str] = None
     empty_result_soft_fail: bool = False
+    # 采集结果为空时记 failure 且不写 progress（防止把反爬验证页/改版
+    # 页面误判为"空收录"后永久跳过）。ACL 用 empty_result_soft_fail
+    # 走的是带 tag 诊断的专属逻辑，两者互斥。
+    empty_result_is_failure: bool = False
 
 
 SOURCE_REGISTRY: tuple[SourceSpec, ...] = (
@@ -47,5 +51,6 @@ SOURCE_REGISTRY: tuple[SourceSpec, ...] = (
         tqdm_desc="[+] Collecting DBLP",
         search_fn_name="search_from_dblp",
         post_run_hook_name="_dblp_track_collected_name",
+        empty_result_is_failure=True,
     ),
 )
