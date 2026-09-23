@@ -1,12 +1,21 @@
-"""Guard test: a DBLP page that yields 0 papers must NOT be marked as
-collected in the per-URL progress (it would otherwise be skipped forever,
-e.g. when an anti-bot challenge page parses as empty)."""
+"""Guard tests for the DBLP empty-result semantics in `collector/pipeline.py`.
+
+A DBLP page that yields 0 papers is marked with an `empty` flag in the
+per-URL progress (instead of a failure entry): the URL is skipped while the
+marker is fresh and retried after EMPTY_RESULT_RETRY_TTL. This keeps
+genuinely-empty pages from being refetched every run while ensuring
+silently-blocked pages are never skipped forever."""
 
 from __future__ import annotations
 
 import json
+import time
 
 import collector
+from collector.pipeline import EMPTY_RESULT_RETRY_TTL
+
+TARGET_URL = "https://dblp.org/db/journals/aeog/aeog94.html"
+TARGET_KEY = f"DBLP::{TARGET_URL}"
 
 
 def _all_conf_progress():
@@ -45,24 +54,28 @@ def _run_collect(monkeypatch, tmp_path, progress, search_stub):
     return captured.get("progress", progress), json.loads(failures_file.read_text(encoding="utf-8"))
 
 
-def test_dblp_empty_result_not_marked_collected(monkeypatch, tmp_path):
+def _empty_stub(calls):
+    def _stub(url, name, res):
+        calls.append(url)
+        return res
+    return _stub
+
+
+def test_empty_result_marked_empty_not_failure(monkeypatch, tmp_path):
     progress = _all_conf_progress()
-    target_url = "https://dblp.org/db/journals/aeog/aeog94.html"
-    target_key = f"DBLP::{target_url}"
-    progress.pop(target_key)
+    progress.pop(TARGET_KEY)
 
     final_progress, failures = _run_collect(
-        monkeypatch, tmp_path, progress, lambda url, name, res: res
+        monkeypatch, tmp_path, progress, _empty_stub([])
     )
-    assert target_key not in final_progress
-    assert any(f["url"] == target_url and f["source"] == "DBLP" for f in failures)
+    entry = final_progress.get(TARGET_KEY)
+    assert entry is not None and entry.get("empty") is True
+    assert not any(f["url"] == TARGET_URL for f in failures)
 
 
-def test_dblp_non_empty_result_marked_collected(monkeypatch, tmp_path):
+def test_non_empty_result_marked_collected(monkeypatch, tmp_path):
     progress = _all_conf_progress()
-    target_url = "https://dblp.org/db/journals/aeog/aeog94.html"
-    target_key = f"DBLP::{target_url}"
-    progress.pop(target_key)
+    progress.pop(TARGET_KEY)
 
     def _stub(url, name, res):
         res.setdefault(name, []).append({
@@ -71,8 +84,37 @@ def test_dblp_non_empty_result_marked_collected(monkeypatch, tmp_path):
         })
         return res
 
-    final_progress, failures = _run_collect(
-        monkeypatch, tmp_path, progress, _stub
+    final_progress, failures = _run_collect(monkeypatch, tmp_path, progress, _stub)
+    entry = final_progress.get(TARGET_KEY)
+    assert entry is not None and not entry.get("empty")
+    assert not any(f["url"] == TARGET_URL for f in failures)
+
+
+def test_fresh_empty_marker_is_skipped(monkeypatch, tmp_path):
+    progress = _all_conf_progress()
+    progress[TARGET_KEY] = {
+        "name": "IJAEO2021",
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "empty": True,
+    }
+    calls = []
+    _run_collect(monkeypatch, tmp_path, progress, _empty_stub(calls))
+    assert calls == []
+
+
+def test_expired_empty_marker_is_retried_and_refreshed(monkeypatch, tmp_path):
+    progress = _all_conf_progress()
+    old_ts = time.strftime(
+        "%Y-%m-%dT%H:%M:%S", time.localtime(time.time() - EMPTY_RESULT_RETRY_TTL - 3600)
     )
-    assert target_key in final_progress
-    assert not any(f["url"] == target_url for f in failures)
+    progress[TARGET_KEY] = {"name": "IJAEO2021", "ts": old_ts, "empty": True}
+
+    calls = []
+    final_progress, failures = _run_collect(
+        monkeypatch, tmp_path, progress, _empty_stub(calls)
+    )
+    assert calls == [TARGET_URL]
+    entry = final_progress[TARGET_KEY]
+    assert entry.get("empty") is True
+    assert entry["ts"] != old_ts
+    assert not any(f["url"] == TARGET_URL for f in failures)

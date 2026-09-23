@@ -105,24 +105,52 @@ def test_get_with_anubis_gives_up_after_rounds(monkeypatch):
         get_with_anubis(session, url)
 
 
-def test_get_with_anubis_retries_rate_limits(monkeypatch):
-    monkeypatch.setattr(anubis.time, "sleep", lambda s: None)
+def test_get_with_anubis_retries_429_and_honours_retry_after(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(anubis.time, "sleep", lambda s: sleeps.append(s))
     url = "https://dblp.org/db/journals/aeog/aeog94.html"
+    limited = _resp(url, "slow down", status=429)
+    limited.headers["Retry-After"] = "7"
     session = FakeSession([
-        _resp(url, "slow down", status=503),
+        limited,
         _resp(url, "slow down", status=429),
         _resp(url, REAL_PAGE),
     ])
     resp = get_with_anubis(session, url)
     assert resp.status_code == 200
     assert resp.text == REAL_PAGE
+    assert sleeps[0] == 7.0  # Retry-After 优先
 
 
-def test_get_with_anubis_returns_last_response_when_rate_limit_persists(monkeypatch):
+def test_get_with_anubis_returns_last_response_when_429_persists(monkeypatch):
     monkeypatch.setattr(anubis.time, "sleep", lambda s: None)
     url = "https://dblp.org/db/journals/aeog/aeog94.html"
     session = FakeSession([
-        _resp(url, "slow down", status=503),
+        _resp(url, "slow down", status=429),
     ] * (anubis.RATE_LIMIT_ATTEMPTS + 1))
     resp = get_with_anubis(session, url)
+    assert resp.status_code == 429
+
+
+def test_get_with_anubis_does_not_retry_5xx_at_this_layer(monkeypatch):
+    """5xx 交由 session 自带的 urllib3 Retry（或调用方）处理，本层不重试，
+    避免双层重试叠加出数十次请求。"""
+    monkeypatch.setattr(anubis.time, "sleep", lambda s: None)
+    url = "https://dblp.org/db/journals/aeog/aeog94.html"
+    session = FakeSession([_resp(url, "server error", status=503)])
+    resp = get_with_anubis(session, url)
     assert resp.status_code == 503
+    assert len(session.calls) == 1
+
+
+def test_search_abs_from_dblp_propagates_unsolvable(monkeypatch):
+    """AnubisUnsolvableError 不得被 aaai 回退吞掉（否则会退化成对挑战页
+    的裸 GET 并静默返回空摘要）。"""
+    from collector.sources import dblp as dblp_source
+
+    def _raise(session, url, **kw):
+        raise AnubisUnsolvableError("cannot solve")
+
+    monkeypatch.setattr(dblp_source, "get_with_anubis", _raise)
+    with pytest.raises(AnubisUnsolvableError):
+        dblp_source.search_abs_from_dblp("https://dblp.org/rec/journals/aeog/X21.html")

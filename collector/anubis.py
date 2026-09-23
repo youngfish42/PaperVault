@@ -35,9 +35,8 @@ _CHALLENGE_RE = re.compile(
 # 求解与重试预算
 MAX_SOLVE_NONCE = 1 << 26          # 约 6700 万次哈希，远超难度 5-6 的期望次数
 MAX_CHALLENGE_ROUNDS = 3           # 同一 URL 最多连续求解几轮挑战
-RATE_LIMIT_STATUSES = (429, 500, 502, 503, 504)
 RATE_LIMIT_ATTEMPTS = 4
-RATE_LIMIT_BACKOFF = 3.0           # 第 n 次限流退避 RATE_LIMIT_BACKOFF * n 秒
+RATE_LIMIT_BACKOFF = 3.0           # 无 Retry-After 时，第 n 次 429 退避 RATE_LIMIT_BACKOFF * n 秒
 
 
 class AnubisUnsolvableError(RuntimeError):
@@ -104,11 +103,28 @@ def _pass_challenge(session: requests.Session, resp: requests.Response) -> None:
           f"(difficulty={difficulty}, nonce={nonce})")
 
 
+def _rate_limit_delay(resp: requests.Response, attempt: int) -> float:
+    """429 退避时长：优先遵循服务端 Retry-After，否则线性退避并加抖动。"""
+    raw = resp.headers.get("Retry-After")
+    if raw:
+        try:
+            return max(float(raw), 0.0)
+        except ValueError:
+            pass
+    import random
+
+    return RATE_LIMIT_BACKOFF * attempt + random.uniform(0, 1.0)
+
+
 def get_with_anubis(session: requests.Session, url: str, **kw) -> requests.Response:
     """GET 一个可能位于 Anubis 之后的 URL。
 
     - 命中挑战页：求解 PoW 种 cookie 后重发（最多 MAX_CHALLENGE_ROUNDS 轮）；
-    - 命中 429/5xx（runner 等数据中心 IP 常被 DBLP 限速）：短退避后重试；
+    - 命中 429（urllib3 Retry 不覆盖的状态码）：按 Retry-After / 线性退避
+      重试，超出次数后返回最后一次响应；
+    - 5xx 不在本层重试：collector 的 SESSION 已由 urllib3 Retry 处理
+      （两层叠加会让单个 URL 发出数十次请求），discovery 的调用方则用
+      ``raise_for_status`` 走自己的重试循环；
     - 其余情况直接返回响应。
     """
     kw.setdefault("timeout", 30)
@@ -124,10 +140,10 @@ def get_with_anubis(session: requests.Session, url: str, **kw) -> requests.Respo
                 )
             _pass_challenge(session, resp)
             continue
-        if resp.status_code in RATE_LIMIT_STATUSES:
+        if resp.status_code == 429:
             attempts += 1
             if attempts > RATE_LIMIT_ATTEMPTS:
                 return resp
-            time.sleep(RATE_LIMIT_BACKOFF * attempts)
+            time.sleep(_rate_limit_delay(resp, attempts))
             continue
         return resp

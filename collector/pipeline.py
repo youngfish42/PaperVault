@@ -23,6 +23,19 @@ from collector.sources.thecvf import search_from_thecvf
 from collector.sources.nips import search_from_nips
 from collector.sources.dblp import search_from_dblp
 
+# 空结果（empty 标记）的过期重试周期：标记后 30 天内跳过，过期重抓一次。
+# 兼顾两类情况：被静默拦截/改版的页面终会被重试，而合法空页不会每次
+# 运行都重抓并刷 failures。
+EMPTY_RESULT_RETRY_TTL = 30 * 86400
+
+
+def _progress_ts_to_epoch(ts: str) -> float:
+    """把 progress 里的本地时间串（%Y-%m-%dT%H:%M:%S）还原为 epoch；失败按 0（立即过期）。"""
+    try:
+        return time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%S"))
+    except Exception:
+        return 0.0
+
 
 def collect(cache_file=None, force=False, soft_timeout=None):
     import collector as _pkg
@@ -100,6 +113,11 @@ def collect(cache_file=None, force=False, soft_timeout=None):
             if isinstance(existing, dict) and existing.get("legacy"):
                 progress.pop(key, None)
         if key in progress:
+            entry = progress[key]
+            if isinstance(entry, dict) and entry.get("empty"):
+                # 空结果标记未过期才跳过；过期后放行走重试
+                if time.time() - _progress_ts_to_epoch(entry.get("ts", "")) >= EMPTY_RESULT_RETRY_TTL:
+                    return False
             return True
         if name in cache_conf:
             if source == "DBLP" and name in multi_volume_dblp_names:
@@ -163,19 +181,20 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                     before = len(res.get(name, []))
                     res = search_fn(url, name, res)
                     if len(res.get(name, [])) == before:
-                        # 0 篇不写 progress：反爬验证页 / 页面改版 / 暂无条目
-                        # 都不应被标成"已采集"，否则后续运行会永久跳过该 URL。
-                        msg = (
+                        # 0 篇：写 empty 标记而非 failure——反爬验证页会由
+                        # get_with_anubis 抛异常走外层 except，落到这里的主
+                        # 要是"页面确实为空 / 检测不到的拦截"。empty 标记让
+                        # URL 在 EMPTY_RESULT_RETRY_TTL 内被跳过、过期重试，
+                        # 避免合法空页每次运行都重抓并刷 failures。
+                        print(
                             f"[!] {spec.key} '{name}' matched 0 papers at {url}; "
-                            "not marking progress (blocked page, layout change, or genuinely empty)."
+                            f"marked as empty (retry after {EMPTY_RESULT_RETRY_TTL // 86400}d)."
                         )
-                        print(msg)
-                        failures.append({
-                            "source": spec.key,
+                        progress[f"{spec.key}::{url}"] = {
                             "name": name,
-                            "url": url,
-                            "error": "empty result",
-                        })
+                            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "empty": True,
+                        }
                     else:
                         progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
                 else:
