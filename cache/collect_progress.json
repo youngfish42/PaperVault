@@ -21580,6 +21580,1287 @@
     "DBLP::https://dblp.org/db/conf/icde/icde2026.html": {
       "name": "ICDE2026",
       "ts": "2026-08-29T14:18:48"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/hecktor2026.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-09-23T21:28:45"
+    },
+    "DBLP::https://dblp.org/db/conf/icmcs/icme2026.html": {
+      "name": "ICME2026",
+      "ts": "2026-09-23T21:29:35",
+      "empty": true
+    },
+    "DBLP::https://dblp.org/db/conf/isca/isca2026.html": {
+      "name": "ISCA2026",
+      "ts": "2026-09-23T21:30:27"
+    },
+    "DBLP::https://dblp.org/db/conf/crypto/crypto2026-4.html": {
+      "name": "CRYPTO2026",
+      "ts": "2026-09-23T21:31:18"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2000.html": {
+      "name": "SIGSPATIAL2000",
+      "ts": "2026-09-23T21:32:09"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2001.html": {
+      "name": "SIGSPATIAL2001",
+      "ts": "2026-09-23T21:33:01"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2002.html": {
+      "name": "SIGSPATIAL2002",
+      "ts": "2026-09-23T21:33:52"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2003.html": {
+      "name": "SIGSPATIAL2003",
+      "ts": "2026-09-23T21:34:43"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2004.html": {
+      "name": "SIGSPATIAL2004",
+      "ts": "2026-09-23T21:35:34"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2005.html": {
+      "name": "SIGSPATIAL2005",
+      "ts": "2026-09-23T21:36:25"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2006.html": {
+      "name": "SIGSPATIAL2006",
+      "ts": "2026-09-23T21:37:16"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2007.html": {
+      "name": "SIGSPATIAL2007",
+      "ts": "2026-09-23T21:38:07"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2008.html": {
+      "name": "SIGSPATIAL2008",
+      "ts": "2026-09-23T21:38:59"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/springl2008.html": {
+      "name": "SIGSPATIAL2008",
+      "ts": "2026-09-23T21:39:50"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2009.html": {
+      "name": "SIGSPATIAL2009",
+      "ts": "2026-09-23T21:40:41"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2009.html": {
+      "name": "SIGSPATIAL2009",
+      "ts": "2026-09-23T21:41:32"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/springl2009.html": {
+      "name": "SIGSPATIAL2009",
+      "ts": "2026-09-23T21:42:23"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:43:14"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:44:05"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/springl2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:44:56"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:45:47"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:46:38"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/hpdgis2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:47:28"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/dmg2010.html": {
+      "name": "SIGSPATIAL2010",
+      "ts": "2026-09-23T21:48:19"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:49:10"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:50:01"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/springl2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:50:52"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:51:43"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:52:34"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/sso2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:53:25"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/hpdgis2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:54:15"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/quest2011.html": {
+      "name": "SIGSPATIAL2011",
+      "ts": "2026-09-23T21:55:06"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T21:55:57"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geogrowd2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T21:56:49"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mobigis2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T21:57:40"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T21:58:31"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/healthgis2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T21:59:22"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T22:00:13"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2012.html": {
+      "name": "SIGSPATIAL2012",
+      "ts": "2026-09-23T22:01:03"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:01:54"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mobigis2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:02:45"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/comp2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:03:36"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geocrowd2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:04:27"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:05:18"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/healthgis2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:06:08"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:06:59"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:07:50"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mapinteract2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:08:41"
+    },
+    "DBLP::https://dblp.org/db/conf/gir/gir2013.html": {
+      "name": "SIGSPATIAL2013",
+      "ts": "2026-09-23T22:09:32"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:10:24"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mobigis2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:11:15"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/healthgis2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:12:06"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geocrowd2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:12:57"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:13:48"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:14:38"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mapinteract2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:15:29"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:16:19"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/phd2014.html": {
+      "name": "SIGSPATIAL2014",
+      "ts": "2026-09-23T22:17:10"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:18:01"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:18:52"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:19:43"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/melt2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:20:34"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mobigis2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:21:25"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:22:16"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/urbangis2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:23:07"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/phd2015.html": {
+      "name": "SIGSPATIAL2015",
+      "ts": "2026-09-23T22:23:58"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:24:49"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lbsn2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:25:40"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:26:31"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:27:21"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/urbangis2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:28:12"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/phd2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:29:04"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/mobigis2016.html": {
+      "name": "SIGSPATIAL2016",
+      "ts": "2026-09-23T22:29:55"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:30:48"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/urbangis2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:31:38"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/autonomousGIS2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:32:30"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:33:20"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/iwgs2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:34:11"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lens2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:35:02"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/predictgis2017.html": {
+      "name": "SIGSPATIAL2017",
+      "ts": "2026-09-23T22:35:52"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:36:44"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/aric2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:37:35"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:38:25"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gir2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:39:16"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/isa2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:40:06"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lens2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:40:57"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/predictgis2018.html": {
+      "name": "SIGSPATIAL2018",
+      "ts": "2026-09-23T22:41:48"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:42:39"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/aric2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:43:30"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geoed2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:44:21"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:45:11"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/predictgis2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:46:02"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/move2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:46:53"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/lens2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:47:43"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/spatialapi2019.html": {
+      "name": "SIGSPATIAL2019",
+      "ts": "2026-09-23T22:48:34"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2020.html": {
+      "name": "SIGSPATIAL2020",
+      "ts": "2026-09-23T22:49:25"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/covid2020.html": {
+      "name": "SIGSPATIAL2020",
+      "ts": "2026-09-23T22:50:17"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/aric2020.html": {
+      "name": "SIGSPATIAL2020",
+      "ts": "2026-09-23T22:51:08"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2020.html": {
+      "name": "SIGSPATIAL2020",
+      "ts": "2026-09-23T22:51:59"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2021.html": {
+      "name": "SIGSPATIAL2021",
+      "ts": "2026-09-23T22:52:50"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/hanimob2021.html": {
+      "name": "SIGSPATIAL2021",
+      "ts": "2026-09-23T22:53:41"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/aric2021.html": {
+      "name": "SIGSPATIAL2021",
+      "ts": "2026-09-23T22:54:32"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/spatialapi2021.html": {
+      "name": "SIGSPATIAL2021",
+      "ts": "2026-09-23T22:55:23"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2021.html": {
+      "name": "SIGSPATIAL2021",
+      "ts": "2026-09-23T22:56:14"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2022.html": {
+      "name": "SIGSPATIAL2022",
+      "ts": "2026-09-23T22:57:06"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/hanimob2022.html": {
+      "name": "SIGSPATIAL2022",
+      "ts": "2026-09-23T22:57:59"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/aric2022.html": {
+      "name": "SIGSPATIAL2022",
+      "ts": "2026-09-23T22:58:49"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/spatialapi2022.html": {
+      "name": "SIGSPATIAL2022",
+      "ts": "2026-09-23T22:59:40"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2022.html": {
+      "name": "SIGSPATIAL2022",
+      "ts": "2026-09-23T23:00:30"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2023.html": {
+      "name": "SIGSPATIAL2023",
+      "ts": "2026-09-23T23:01:21"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/geohumanities2023.html": {
+      "name": "SIGSPATIAL2023",
+      "ts": "2026-09-23T23:02:12"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2024.html": {
+      "name": "SIGSPATIAL2024",
+      "ts": "2026-09-23T23:03:04"
+    },
+    "DBLP::https://dblp.org/db/conf/gis/gis2025.html": {
+      "name": "SIGSPATIAL2025",
+      "ts": "2026-09-23T23:03:56"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2002.html": {
+      "name": "IGARSS2002",
+      "ts": "2026-09-23T23:05:16"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2003.html": {
+      "name": "IGARSS2003",
+      "ts": "2026-09-23T23:06:55"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2004.html": {
+      "name": "IGARSS2004",
+      "ts": "2026-09-23T23:08:23"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2005.html": {
+      "name": "IGARSS2005",
+      "ts": "2026-09-23T23:09:49"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2006.html": {
+      "name": "IGARSS2006",
+      "ts": "2026-09-23T23:10:50"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2007.html": {
+      "name": "IGARSS2007",
+      "ts": "2026-09-23T23:12:22"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2008.html": {
+      "name": "IGARSS2008",
+      "ts": "2026-09-23T23:13:52"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2009.html": {
+      "name": "IGARSS2009",
+      "ts": "2026-09-23T23:15:06"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2010.html": {
+      "name": "IGARSS2010",
+      "ts": "2026-09-23T23:16:34"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2011.html": {
+      "name": "IGARSS2011",
+      "ts": "2026-09-23T23:17:53"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2012.html": {
+      "name": "IGARSS2012",
+      "ts": "2026-09-23T23:19:59"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2013.html": {
+      "name": "IGARSS2013",
+      "ts": "2026-09-23T23:21:20"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2014.html": {
+      "name": "IGARSS2014",
+      "ts": "2026-09-23T23:22:49"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2015.html": {
+      "name": "IGARSS2015",
+      "ts": "2026-09-23T23:24:20"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2016.html": {
+      "name": "IGARSS2016",
+      "ts": "2026-09-23T23:26:27"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2017.html": {
+      "name": "IGARSS2017",
+      "ts": "2026-09-23T23:28:13"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2018.html": {
+      "name": "IGARSS2018",
+      "ts": "2026-09-23T23:30:43"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2019.html": {
+      "name": "IGARSS2019",
+      "ts": "2026-09-23T23:33:23"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2020.html": {
+      "name": "IGARSS2020",
+      "ts": "2026-09-23T23:35:12"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2021.html": {
+      "name": "IGARSS2021",
+      "ts": "2026-09-23T23:37:40"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2022.html": {
+      "name": "IGARSS2022",
+      "ts": "2026-09-23T23:39:51"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2023.html": {
+      "name": "IGARSS2023",
+      "ts": "2026-09-23T23:42:13"
+    },
+    "DBLP::https://dblp.org/db/conf/igarss/igarss2024.html": {
+      "name": "IGARSS2024",
+      "ts": "2026-09-23T23:45:18"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis1.html": {
+      "name": "IJGIS1987",
+      "ts": "2026-09-23T23:46:10"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis2.html": {
+      "name": "IJGIS1988",
+      "ts": "2026-09-23T23:47:01"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis3.html": {
+      "name": "IJGIS1989",
+      "ts": "2026-09-23T23:47:53"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis4.html": {
+      "name": "IJGIS1990",
+      "ts": "2026-09-23T23:48:45"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis5.html": {
+      "name": "IJGIS1991",
+      "ts": "2026-09-23T23:49:37"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis6.html": {
+      "name": "IJGIS1992",
+      "ts": "2026-09-23T23:50:29"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis7.html": {
+      "name": "IJGIS1993",
+      "ts": "2026-09-23T23:51:21"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis8.html": {
+      "name": "IJGIS1994",
+      "ts": "2026-09-23T23:52:13"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis9.html": {
+      "name": "IJGIS1995",
+      "ts": "2026-09-23T23:53:05"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis10.html": {
+      "name": "IJGIS1996",
+      "ts": "2026-09-23T23:53:57"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis11.html": {
+      "name": "IJGIS1997",
+      "ts": "2026-09-23T23:54:49"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis12.html": {
+      "name": "IJGIS1998",
+      "ts": "2026-09-23T23:55:41"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis13.html": {
+      "name": "IJGIS1999",
+      "ts": "2026-09-23T23:56:33"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis14.html": {
+      "name": "IJGIS2000",
+      "ts": "2026-09-23T23:57:25"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis15.html": {
+      "name": "IJGIS2001",
+      "ts": "2026-09-23T23:58:19"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis16.html": {
+      "name": "IJGIS2002",
+      "ts": "2026-09-23T23:59:11"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis17.html": {
+      "name": "IJGIS2003",
+      "ts": "2026-09-24T00:00:02"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis18.html": {
+      "name": "IJGIS2004",
+      "ts": "2026-09-24T00:00:54"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis19.html": {
+      "name": "IJGIS2005",
+      "ts": "2026-09-24T00:01:46"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis20.html": {
+      "name": "IJGIS2006",
+      "ts": "2026-09-24T00:02:38"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis21.html": {
+      "name": "IJGIS2007",
+      "ts": "2026-09-24T00:03:30"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis22.html": {
+      "name": "IJGIS2008",
+      "ts": "2026-09-24T00:04:22"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis23.html": {
+      "name": "IJGIS2009",
+      "ts": "2026-09-24T00:05:14"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis24.html": {
+      "name": "IJGIS2010",
+      "ts": "2026-09-24T00:06:06"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis25.html": {
+      "name": "IJGIS2011",
+      "ts": "2026-09-24T00:06:58"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis26.html": {
+      "name": "IJGIS2012",
+      "ts": "2026-09-24T00:07:50"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis27.html": {
+      "name": "IJGIS2013",
+      "ts": "2026-09-24T00:08:43"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis28.html": {
+      "name": "IJGIS2014",
+      "ts": "2026-09-24T00:09:36"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis29.html": {
+      "name": "IJGIS2015",
+      "ts": "2026-09-24T00:10:29"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis30.html": {
+      "name": "IJGIS2016",
+      "ts": "2026-09-24T00:11:21"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis31.html": {
+      "name": "IJGIS2017",
+      "ts": "2026-09-24T00:12:13"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis32.html": {
+      "name": "IJGIS2018",
+      "ts": "2026-09-24T00:13:05"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis33.html": {
+      "name": "IJGIS2019",
+      "ts": "2026-09-24T00:13:58"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis34.html": {
+      "name": "IJGIS2020",
+      "ts": "2026-09-24T00:14:50"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis35.html": {
+      "name": "IJGIS2021",
+      "ts": "2026-09-24T00:15:42"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis36.html": {
+      "name": "IJGIS2022",
+      "ts": "2026-09-24T00:16:36"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis37.html": {
+      "name": "IJGIS2023",
+      "ts": "2026-09-24T00:17:28"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis38.html": {
+      "name": "IJGIS2024",
+      "ts": "2026-09-24T00:18:20"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis39.html": {
+      "name": "IJGIS2025",
+      "ts": "2026-09-24T00:19:13"
+    },
+    "DBLP::https://dblp.org/db/journals/gis/gis40.html": {
+      "name": "IJGIS2026",
+      "ts": "2026-09-24T00:20:05"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis1.html": {
+      "name": "TGIS1996",
+      "ts": "2026-09-24T00:20:57"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis2.html": {
+      "name": "TGIS1997",
+      "ts": "2026-09-24T00:21:48"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis3.html": {
+      "name": "TGIS1999",
+      "ts": "2026-09-24T00:22:40"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis4.html": {
+      "name": "TGIS2000",
+      "ts": "2026-09-24T00:23:32"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis5.html": {
+      "name": "TGIS2001",
+      "ts": "2026-09-24T00:24:23"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis6.html": {
+      "name": "TGIS2002",
+      "ts": "2026-09-24T00:25:16"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis7.html": {
+      "name": "TGIS2003",
+      "ts": "2026-09-24T00:26:08"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis8.html": {
+      "name": "TGIS2004",
+      "ts": "2026-09-24T00:26:59"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis9.html": {
+      "name": "TGIS2005",
+      "ts": "2026-09-24T00:27:52"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis10.html": {
+      "name": "TGIS2006",
+      "ts": "2026-09-24T00:28:44"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis11.html": {
+      "name": "TGIS2007",
+      "ts": "2026-09-24T00:29:36"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis12.html": {
+      "name": "TGIS2008",
+      "ts": "2026-09-24T00:30:28"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis13.html": {
+      "name": "TGIS2009",
+      "ts": "2026-09-24T00:31:20"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis14.html": {
+      "name": "TGIS2010",
+      "ts": "2026-09-24T00:32:13"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis15.html": {
+      "name": "TGIS2011",
+      "ts": "2026-09-24T00:33:05"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis16.html": {
+      "name": "TGIS2012",
+      "ts": "2026-09-24T00:33:57"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis17.html": {
+      "name": "TGIS2013",
+      "ts": "2026-09-24T00:34:49"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis18.html": {
+      "name": "TGIS2014",
+      "ts": "2026-09-24T00:35:41"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis19.html": {
+      "name": "TGIS2015",
+      "ts": "2026-09-24T00:36:33"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis20.html": {
+      "name": "TGIS2016",
+      "ts": "2026-09-24T00:37:25"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis21.html": {
+      "name": "TGIS2017",
+      "ts": "2026-09-24T00:38:18"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis22.html": {
+      "name": "TGIS2018",
+      "ts": "2026-09-24T00:39:10"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis23.html": {
+      "name": "TGIS2019",
+      "ts": "2026-09-24T00:40:02"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis24.html": {
+      "name": "TGIS2020",
+      "ts": "2026-09-24T00:40:54"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis25.html": {
+      "name": "TGIS2021",
+      "ts": "2026-09-24T00:41:46"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis26.html": {
+      "name": "TGIS2022",
+      "ts": "2026-09-24T00:42:41"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis27.html": {
+      "name": "TGIS2023",
+      "ts": "2026-09-24T00:43:33"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis28.html": {
+      "name": "TGIS2024",
+      "ts": "2026-09-24T00:44:26"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis29.html": {
+      "name": "TGIS2025",
+      "ts": "2026-09-24T00:45:18"
+    },
+    "DBLP::https://dblp.org/db/journals/tgis/tgis30.html": {
+      "name": "TGIS2026",
+      "ts": "2026-09-24T00:46:11"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog9.html": {
+      "name": "IJAEO2007",
+      "ts": "2026-09-24T00:47:03"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog10.html": {
+      "name": "IJAEO2008",
+      "ts": "2026-09-24T00:47:55"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog11.html": {
+      "name": "IJAEO2009",
+      "ts": "2026-09-24T00:48:47"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog12.html": {
+      "name": "IJAEO2010",
+      "ts": "2026-09-24T00:49:39"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog13.html": {
+      "name": "IJAEO2011",
+      "ts": "2026-09-24T00:50:31"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog14.html": {
+      "name": "IJAEO2012",
+      "ts": "2026-09-24T00:51:23"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog15.html": {
+      "name": "IJAEO2012",
+      "ts": "2026-09-24T00:52:15"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog16.html": {
+      "name": "IJAEO2012",
+      "ts": "2026-09-24T00:53:07"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog17.html": {
+      "name": "IJAEO2012",
+      "ts": "2026-09-24T00:53:58"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog18.html": {
+      "name": "IJAEO2012",
+      "ts": "2026-09-24T00:54:51"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog19.html": {
+      "name": "IJAEO2012",
+      "ts": "2026-09-24T00:55:44"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog20.html": {
+      "name": "IJAEO2013",
+      "ts": "2026-09-24T00:56:36"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog21.html": {
+      "name": "IJAEO2013",
+      "ts": "2026-09-24T00:57:28"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog22.html": {
+      "name": "IJAEO2013",
+      "ts": "2026-09-24T00:58:20"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog23.html": {
+      "name": "IJAEO2013",
+      "ts": "2026-09-24T00:59:12"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog24.html": {
+      "name": "IJAEO2013",
+      "ts": "2026-09-24T01:00:04"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog25.html": {
+      "name": "IJAEO2013",
+      "ts": "2026-09-24T01:00:56"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog26.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:01:48"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog27.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:02:39"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog28.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:03:31"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog29.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:04:23"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog30.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:05:15"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog31.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:06:07"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog32.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:06:59"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog33.html": {
+      "name": "IJAEO2014",
+      "ts": "2026-09-24T01:07:51"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog34.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:08:43"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog35.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:09:35"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog36.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:10:27"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog37.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:11:19"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog38.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:12:11"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog39.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:13:03"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog40.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:13:55"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog41.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:14:47"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog42.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:15:39"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog43.html": {
+      "name": "IJAEO2015",
+      "ts": "2026-09-24T01:16:31"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog44.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:17:23"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog45.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:18:15"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog46.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:19:07"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog47.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:19:59"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog48.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:20:51"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog49.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:21:43"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog50.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:22:34"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog51.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:23:26"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog52.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:24:18"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog53.html": {
+      "name": "IJAEO2016",
+      "ts": "2026-09-24T01:25:10"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog54.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:26:02"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog55.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:26:54"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog56.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:27:46"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog57.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:28:38"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog58.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:29:32"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog59.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:30:24"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog60.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:31:15"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog61.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:32:07"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog62.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:32:59"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog63.html": {
+      "name": "IJAEO2017",
+      "ts": "2026-09-24T01:33:51"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog64.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:34:43"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog65.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:35:34"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog66.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:36:26"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog67.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:37:18"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog68.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:38:10"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog69.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:39:02"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog70.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:39:54"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog71.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:40:45"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog72.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:41:37"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog73.html": {
+      "name": "IJAEO2018",
+      "ts": "2026-09-24T01:42:29"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog74.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:43:21"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog75.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:44:13"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog76.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:45:05"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog77.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:45:57"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog78.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:46:49"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog79.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:47:41"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog80.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:48:33"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog81.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:49:25"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog82.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:50:18"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog83.html": {
+      "name": "IJAEO2019",
+      "ts": "2026-09-24T01:51:10"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog84.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:52:01"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog85.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:52:54"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog86.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:53:45"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog87.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:54:37"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog88.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:55:29"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog89.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:56:21"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog90.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:57:13"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog91.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:58:05"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog92.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:58:57"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog93.html": {
+      "name": "IJAEO2020",
+      "ts": "2026-09-24T01:59:49"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog94.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:00:41"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog95.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:01:33"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog96.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:02:24"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog97.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:03:16"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog98.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:04:09"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog99.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:05:01"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog100.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:05:53"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog101.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:06:45"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog102.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:07:37"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog103.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:08:29"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog104.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:09:21"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog105.html": {
+      "name": "IJAEO2021",
+      "ts": "2026-09-24T02:10:13"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog106.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:11:05"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog107.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:11:57"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog108.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:12:49"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog109.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:13:41"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog110.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:14:33"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog111.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:15:25"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog112.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:16:17"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog113.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:17:09"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog114.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:18:02"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog115.html": {
+      "name": "IJAEO2022",
+      "ts": "2026-09-24T02:18:54"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog116.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:19:46"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog117.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:20:40"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog118.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:21:32"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog119.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:22:24"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog120.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:23:16"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog121.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:24:08"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog122.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T02:25:00"
     }
   }
 }
