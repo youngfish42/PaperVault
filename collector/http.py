@@ -14,6 +14,7 @@ from bs4 import XMLParsedAsHTMLWarning
 
 from collector.anubis import (  # noqa: F401  (re-exported for callers)
     AnubisUnsolvableError,
+    RateLimitedError,
     get_with_anubis,
     is_challenge,
 )

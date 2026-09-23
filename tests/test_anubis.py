@@ -122,14 +122,47 @@ def test_get_with_anubis_retries_429_and_honours_retry_after(monkeypatch):
     assert sleeps[0] == 7.0  # Retry-After 优先
 
 
-def test_get_with_anubis_returns_last_response_when_429_persists(monkeypatch):
+def test_get_with_anubis_raises_when_429_persists(monkeypatch):
+    """429 重试耗尽必须抛 RateLimitedError（AnubisUnsolvableError 子类）——
+    若返回 429 响应，上游会把空响应体解析成 0 篇并写 empty 标记，持续限流
+    被静默掩盖。"""
     monkeypatch.setattr(anubis.time, "sleep", lambda s: None)
     url = "https://dblp.org/db/journals/aeog/aeog94.html"
     session = FakeSession([
         _resp(url, "slow down", status=429),
     ] * (anubis.RATE_LIMIT_ATTEMPTS + 1))
+    with pytest.raises(anubis.RateLimitedError):
+        get_with_anubis(session, url)
+    assert issubclass(anubis.RateLimitedError, anubis.AnubisUnsolvableError)
+
+
+def test_rate_limit_delay_caps_retry_after(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(anubis.time, "sleep", lambda s: sleeps.append(s))
+    url = "https://dblp.org/db/journals/aeog/aeog94.html"
+    limited = _resp(url, "slow down", status=429)
+    limited.headers["Retry-After"] = "3600"
+    session = FakeSession([limited, _resp(url, REAL_PAGE)])
     resp = get_with_anubis(session, url)
-    assert resp.status_code == 429
+    assert resp.status_code == 200
+    assert sleeps == [anubis.MAX_RATE_LIMIT_DELAY]
+
+
+def test_pass_challenge_malformed_payload_raises_unsolvable():
+    session = FakeSession([])
+    bad_json = _resp("https://dblp.org/x", CHALLENGE_PAGE.replace('"fast"', 'fast'))
+    with pytest.raises(anubis.AnubisUnsolvableError):
+        anubis._pass_challenge(session, bad_json)
+
+    missing_keys = _resp("https://dblp.org/x", CHALLENGE_PAGE.replace('"randomData"', '"randomDataX"'))
+    with pytest.raises(anubis.AnubisUnsolvableError):
+        anubis._pass_challenge(session, missing_keys)
+
+
+def test_pass_challenge_request_failure_raises_unsolvable():
+    session = FakeSession([requests.ConnectionError("boom")])
+    with pytest.raises(anubis.AnubisUnsolvableError):
+        anubis._pass_challenge(session, _resp("https://dblp.org/x", CHALLENGE_PAGE))
 
 
 def test_get_with_anubis_does_not_retry_5xx_at_this_layer(monkeypatch):

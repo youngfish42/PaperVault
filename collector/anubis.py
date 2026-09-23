@@ -37,10 +37,16 @@ MAX_SOLVE_NONCE = 1 << 26          # 约 6700 万次哈希，远超难度 5-6 �
 MAX_CHALLENGE_ROUNDS = 3           # 同一 URL 最多连续求解几轮挑战
 RATE_LIMIT_ATTEMPTS = 4
 RATE_LIMIT_BACKOFF = 3.0           # 无 Retry-After 时，第 n 次 429 退避 RATE_LIMIT_BACKOFF * n 秒
+MAX_RATE_LIMIT_DELAY = 60.0        # 单次 429 退避上限（含 Retry-After），防止长时间阻塞软超时
 
 
 class AnubisUnsolvableError(RuntimeError):
     """Anubis 挑战无法求解（预算耗尽 / 端点异常 / 算法变更）。"""
+
+
+class RateLimitedError(AnubisUnsolvableError):
+    """429 限流在重试预算内未解除。继承 AnubisUnsolvableError，使调用方的
+    反爬守卫（re-raise / failures 路径）对两类"被拦截"一视同仁。"""
 
 
 def is_challenge(resp: requests.Response) -> bool:
@@ -71,30 +77,42 @@ def _solve_pow(random_data: str, difficulty: int) -> tuple:
 
 
 def _pass_challenge(session: requests.Session, resp: requests.Response) -> None:
-    """解析挑战页、求解 PoW、请求 pass-challenge 端点种 cookie。"""
+    """解析挑战页、求解 PoW、请求 pass-challenge 端点种 cookie。
+
+    所有失败（坏 JSON / 缺字段 / 请求异常 / 被拒绝）统一转换为
+    :class:`AnubisUnsolvableError`，保证调用方的失败契约成立。
+    """
     m = _CHALLENGE_RE.search(resp.text)
     if not m:
         raise AnubisUnsolvableError("challenge page missing anubis_challenge JSON")
-    payload = json.loads(m.group(1))
-    challenge = payload["challenge"]
-    difficulty = payload["rules"]["difficulty"]
+    try:
+        payload = json.loads(m.group(1))
+        challenge = payload["challenge"]
+        difficulty = payload["rules"]["difficulty"]
+        random_data = challenge["randomData"]
+        challenge_id = challenge["id"]
+    except (ValueError, KeyError, TypeError) as e:
+        raise AnubisUnsolvableError(f"malformed challenge payload: {e}") from e
 
-    solution, nonce, elapsed = _solve_pow(challenge["randomData"], difficulty)
+    solution, nonce, elapsed = _solve_pow(random_data, difficulty)
 
     parsed = urlsplit(resp.url)
     base = f"{parsed.scheme}://{parsed.netloc}"
-    pr = session.get(
-        f"{base}/.within.website/x/cmd/anubis/api/pass-challenge",
-        params={
-            "id": challenge["id"],
-            "response": solution,
-            "nonce": nonce,
-            "redir": parsed.path,
-            "elapsedTime": max(int(elapsed * 1000), 1),
-        },
-        timeout=30,
-        allow_redirects=False,
-    )
+    try:
+        pr = session.get(
+            f"{base}/.within.website/x/cmd/anubis/api/pass-challenge",
+            params={
+                "id": challenge_id,
+                "response": solution,
+                "nonce": nonce,
+                "redir": parsed.path,
+                "elapsedTime": max(int(elapsed * 1000), 1),
+            },
+            timeout=30,
+            allow_redirects=False,
+        )
+    except requests.RequestException as e:
+        raise AnubisUnsolvableError(f"pass-challenge request failed: {e}") from e
     if pr.status_code not in (200, 302, 303):
         raise AnubisUnsolvableError(
             f"pass-challenge rejected with HTTP {pr.status_code}"
@@ -104,11 +122,12 @@ def _pass_challenge(session: requests.Session, resp: requests.Response) -> None:
 
 
 def _rate_limit_delay(resp: requests.Response, attempt: int) -> float:
-    """429 退避时长：优先遵循服务端 Retry-After，否则线性退避并加抖动。"""
+    """429 退避时长：优先遵循服务端 Retry-After（封顶 MAX_RATE_LIMIT_DELAY），
+    否则线性退避并加抖动。封顶避免单次 sleep 拖过采集软超时。"""
     raw = resp.headers.get("Retry-After")
     if raw:
         try:
-            return max(float(raw), 0.0)
+            return min(max(float(raw), 0.0), MAX_RATE_LIMIT_DELAY)
         except ValueError:
             pass
     import random
@@ -121,7 +140,8 @@ def get_with_anubis(session: requests.Session, url: str, **kw) -> requests.Respo
 
     - 命中挑战页：求解 PoW 种 cookie 后重发（最多 MAX_CHALLENGE_ROUNDS 轮）；
     - 命中 429（urllib3 Retry 不覆盖的状态码）：按 Retry-After / 线性退避
-      重试，超出次数后返回最后一次响应；
+      重试；预算耗尽抛 :class:`RateLimitedError`——若直接返回 429 响应，
+      上游会把空响应体解析成 0 篇并写 empty 标记，持续限流被静默掩盖；
     - 5xx 不在本层重试：collector 的 SESSION 已由 urllib3 Retry 处理
       （两层叠加会让单个 URL 发出数十次请求），discovery 的调用方则用
       ``raise_for_status`` 走自己的重试循环；
@@ -143,7 +163,9 @@ def get_with_anubis(session: requests.Session, url: str, **kw) -> requests.Respo
         if resp.status_code == 429:
             attempts += 1
             if attempts > RATE_LIMIT_ATTEMPTS:
-                return resp
+                raise RateLimitedError(
+                    f"still rate limited (429) after {RATE_LIMIT_ATTEMPTS} retries: {url}"
+                )
             time.sleep(_rate_limit_delay(resp, attempts))
             continue
         return resp
