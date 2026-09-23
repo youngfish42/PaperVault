@@ -54,9 +54,11 @@ class FakeSession:
 def test_is_challenge():
     assert is_challenge(_resp("https://dblp.org/x", CHALLENGE_PAGE))
     assert not is_challenge(_resp("https://dblp.org/x", REAL_PAGE))
-    plain = _resp("https://dblp.org/x", REAL_PAGE)
-    plain.headers["Content-Type"] = "application/json"
-    assert not is_challenge(plain)
+    # 不设 Content-Type 门槛：挑战页即使带非 html 类型也必须被识别，
+    # 否则会被当成正常页解析成 0 篇并写 empty 标记。
+    octet = _resp("https://dblp.org/x", CHALLENGE_PAGE)
+    octet.headers["Content-Type"] = "application/octet-stream"
+    assert is_challenge(octet)
 
 
 def test_solve_pow_satisfies_difficulty():

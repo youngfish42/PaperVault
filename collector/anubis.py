@@ -20,6 +20,7 @@ cookie，之后该 session 的请求即正常放行。
 
 import hashlib
 import json
+import random
 import re
 import time
 from urllib.parse import urlsplit
@@ -50,11 +51,13 @@ class RateLimitedError(AnubisUnsolvableError):
 
 
 def is_challenge(resp: requests.Response) -> bool:
-    """判断响应是否为 Anubis 挑战页。"""
-    content_type = resp.headers.get("Content-Type", "")
-    if "html" not in content_type and "text" not in content_type:
-        return False
-    return "anubis_challenge" in resp.text
+    """判断响应是否为 Anubis 挑战页。
+
+    只按页面标记判定，不设 Content-Type 门槛（门槛只会造成漏判：挑战页
+    一旦被当成正常页，上游会解析成 0 篇并写 empty 标记）。标记位于页面
+    <head> 内，扫描前 64KB 即可，避免为超大页面多做一次全文解码。
+    """
+    return "anubis_challenge" in resp.text[:65536]
 
 
 def _solve_pow(random_data: str, difficulty: int) -> tuple:
@@ -130,8 +133,6 @@ def _rate_limit_delay(resp: requests.Response, attempt: int) -> float:
             return min(max(float(raw), 0.0), MAX_RATE_LIMIT_DELAY)
         except ValueError:
             pass
-    import random
-
     return RATE_LIMIT_BACKOFF * attempt + random.uniform(0, 1.0)
 
 
