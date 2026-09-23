@@ -159,6 +159,25 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                         })
                     else:
                         progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                elif spec.empty_result_is_failure:
+                    before = len(res.get(name, []))
+                    res = search_fn(url, name, res)
+                    if len(res.get(name, [])) == before:
+                        # 0 篇不写 progress：反爬验证页 / 页面改版 / 暂无条目
+                        # 都不应被标成"已采集"，否则后续运行会永久跳过该 URL。
+                        msg = (
+                            f"[!] {spec.key} '{name}' matched 0 papers at {url}; "
+                            "not marking progress (blocked page, layout change, or genuinely empty)."
+                        )
+                        print(msg)
+                        failures.append({
+                            "source": spec.key,
+                            "name": name,
+                            "url": url,
+                            "error": "empty result",
+                        })
+                    else:
+                        progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
                 else:
                     res = search_fn(url, name, res)
                     progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}

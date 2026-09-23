@@ -1,0 +1,133 @@
+"""Anubis 反爬挑战求解器（DBLP 当前部署于 Anubis 之后）。
+
+DBLP 自 2026-09 起全站启用 Anubis（https://github.com/TecharoHQ/anubis）
+PoW 验证：普通请求会拿到 HTTP 200 的挑战页（"Making sure you're not a
+bot!"），直接解析会拿到 0 条论文。本模块按会话求解一次 PoW 并种下
+cookie，之后该 session 的请求即正常放行。
+
+算法与 Anubis 官方 JS worker 一致：
+``sha256(f"{randomData}{nonce}")``，要求哈希前 ``difficulty // 2`` 字节为 0，
+难度为奇数时下一个字节的高半字节也为 0。难度 5 约 100 万次哈希（1-2s）。
+
+使用方式::
+
+    from collector.anubis import get_with_anubis
+    resp = get_with_anubis(SESSION, url, headers=HEADERS)
+
+求解失败会抛出 :class:`AnubisUnsolvableError`，调用方应让该 URL 走失败
+路径（记 failures、不写 progress），避免把挑战页当成"空收录"。
+"""
+
+import hashlib
+import json
+import re
+import time
+from urllib.parse import urlsplit
+
+import requests
+
+# 挑战页内嵌的挑战 JSON（Anubis 全版本均带此 script id）
+_CHALLENGE_RE = re.compile(
+    r'<script id="anubis_challenge" type="application/json">(.*?)</script>',
+    re.S,
+)
+
+# 求解与重试预算
+MAX_SOLVE_NONCE = 1 << 26          # 约 6700 万次哈希，远超难度 5-6 的期望次数
+MAX_CHALLENGE_ROUNDS = 3           # 同一 URL 最多连续求解几轮挑战
+RATE_LIMIT_STATUSES = (429, 500, 502, 503, 504)
+RATE_LIMIT_ATTEMPTS = 4
+RATE_LIMIT_BACKOFF = 3.0           # 第 n 次限流退避 RATE_LIMIT_BACKOFF * n 秒
+
+
+class AnubisUnsolvableError(RuntimeError):
+    """Anubis 挑战无法求解（预算耗尽 / 端点异常 / 算法变更）。"""
+
+
+def is_challenge(resp: requests.Response) -> bool:
+    """判断响应是否为 Anubis 挑战页。"""
+    content_type = resp.headers.get("Content-Type", "")
+    if "html" not in content_type and "text" not in content_type:
+        return False
+    return "anubis_challenge" in resp.text
+
+
+def _solve_pow(random_data: str, difficulty: int) -> tuple:
+    """求解 PoW，返回 (hex_hash, nonce, elapsed_seconds)。"""
+    full_zero_bytes = difficulty // 2
+    odd_nibble = difficulty % 2 == 1
+    t0 = time.time()
+    nonce = 0
+    while nonce < MAX_SOLVE_NONCE:
+        digest = hashlib.sha256(f"{random_data}{nonce}".encode()).digest()
+        ok = not any(digest[:full_zero_bytes])
+        if ok and odd_nibble:
+            ok = digest[full_zero_bytes] >> 4 == 0
+        if ok:
+            return digest.hex(), nonce, time.time() - t0
+        nonce += 1
+    raise AnubisUnsolvableError(
+        f"PoW budget exhausted (difficulty={difficulty}, tried {nonce} nonces)"
+    )
+
+
+def _pass_challenge(session: requests.Session, resp: requests.Response) -> None:
+    """解析挑战页、求解 PoW、请求 pass-challenge 端点种 cookie。"""
+    m = _CHALLENGE_RE.search(resp.text)
+    if not m:
+        raise AnubisUnsolvableError("challenge page missing anubis_challenge JSON")
+    payload = json.loads(m.group(1))
+    challenge = payload["challenge"]
+    difficulty = payload["rules"]["difficulty"]
+
+    solution, nonce, elapsed = _solve_pow(challenge["randomData"], difficulty)
+
+    parsed = urlsplit(resp.url)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    pr = session.get(
+        f"{base}/.within.website/x/cmd/anubis/api/pass-challenge",
+        params={
+            "id": challenge["id"],
+            "response": solution,
+            "nonce": nonce,
+            "redir": parsed.path,
+            "elapsedTime": max(int(elapsed * 1000), 1),
+        },
+        timeout=30,
+        allow_redirects=False,
+    )
+    if pr.status_code not in (200, 302, 303):
+        raise AnubisUnsolvableError(
+            f"pass-challenge rejected with HTTP {pr.status_code}"
+        )
+    print(f"[+] Anubis challenge solved for {parsed.netloc} "
+          f"(difficulty={difficulty}, nonce={nonce})")
+
+
+def get_with_anubis(session: requests.Session, url: str, **kw) -> requests.Response:
+    """GET 一个可能位于 Anubis 之后的 URL。
+
+    - 命中挑战页：求解 PoW 种 cookie 后重发（最多 MAX_CHALLENGE_ROUNDS 轮）；
+    - 命中 429/5xx（runner 等数据中心 IP 常被 DBLP 限速）：短退避后重试；
+    - 其余情况直接返回响应。
+    """
+    kw.setdefault("timeout", 30)
+    rounds = 0
+    attempts = 0
+    while True:
+        resp = session.get(url, **kw)
+        if is_challenge(resp):
+            rounds += 1
+            if rounds > MAX_CHALLENGE_ROUNDS:
+                raise AnubisUnsolvableError(
+                    f"still challenged after {MAX_CHALLENGE_ROUNDS} solve rounds: {url}"
+                )
+            _pass_challenge(session, resp)
+            continue
+        if resp.status_code in RATE_LIMIT_STATUSES:
+            attempts += 1
+            if attempts > RATE_LIMIT_ATTEMPTS:
+                return resp
+            time.sleep(RATE_LIMIT_BACKOFF * attempts)
+            continue
+        return resp

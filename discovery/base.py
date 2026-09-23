@@ -4,9 +4,12 @@ import abc
 import os
 import time
 from typing import List, Dict, Any
+from urllib.parse import urlsplit
 
 import requests
 from requests.adapters import HTTPAdapter
+
+from collector.anubis import get_with_anubis, is_challenge
 
 CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "im.young@foxmail.com")
 
@@ -35,6 +38,21 @@ def _create_session() -> requests.Session:
     return session
 
 
+_ANUBIS_SESSION = None
+
+
+def _anubis_session() -> requests.Session:
+    """DBLP（Anubis 反爬）专用的进程级 Session：cookie 复用，PoW 只解一次。"""
+    global _ANUBIS_SESSION
+    if _ANUBIS_SESSION is None:
+        _ANUBIS_SESSION = _create_session()
+    return _ANUBIS_SESSION
+
+
+def _is_dblp_url(url: str) -> bool:
+    return "dblp" in urlsplit(url).netloc.lower()
+
+
 class BaseDiscovery(abc.ABC):
     """自动发现会议配置的抽象基类"""
 
@@ -50,6 +68,20 @@ class BaseDiscovery(abc.ABC):
 
     def _head_ok(self, url: str, timeout: int = 10) -> bool:
         """发送 HEAD 请求检查 URL 是否可访问，带重试。"""
+        # DBLP 在 Anubis 之后：HEAD 会拿到 200 挑战页而误判 exists，
+        # 改走 PoW 求解后的 GET，按最终状态码与内容判定。
+        if _is_dblp_url(url):
+            for attempt in range(2):
+                try:
+                    resp = get_with_anubis(
+                        _anubis_session(), url, headers=HEADERS, timeout=timeout
+                    )
+                    return resp.status_code == 200 and not is_challenge(resp)
+                except Exception:
+                    if attempt == 0:
+                        time.sleep(2)
+                        continue
+                    return False
         for attempt in range(2):
             try:
                 with _create_session() as session:
@@ -86,6 +118,12 @@ class BaseDiscovery(abc.ABC):
     def _get_text(self, url: str, timeout: int = 15, retries: int = 2) -> str:
         for attempt in range(retries):
             try:
+                if _is_dblp_url(url):
+                    resp = get_with_anubis(
+                        _anubis_session(), url, headers=HEADERS, timeout=timeout
+                    )
+                    resp.raise_for_status()
+                    return resp.text
                 with _create_session() as session:
                     resp = session.get(url, headers=HEADERS, timeout=timeout)
                     resp.raise_for_status()

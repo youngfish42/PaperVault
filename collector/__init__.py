@@ -10,6 +10,7 @@ import time
 from data_artifacts import ensure_cache_local, sync_cache_artifacts
 
 from .http import HEADERS, SESSION, _create_session
+from .anubis import AnubisUnsolvableError, get_with_anubis, is_challenge
 from .merge import (
     _better_str,
     _better_list,

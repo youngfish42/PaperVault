@@ -3,14 +3,14 @@ import re
 import yaml
 from bs4 import BeautifulSoup
 
-from collector.http import SESSION, HEADERS
+from collector.http import SESSION, HEADERS, get_with_anubis
 from collector.merge import _merge_paper_record
 from collector.sources.openreview import _extract_forum_id, _fetch_openreview_abstract
 
 
 def search_abs_from_dblp(url):
     try:
-        r = SESSION.get(url, headers=HEADERS)
+        r = get_with_anubis(SESSION, url, headers=HEADERS)
     except Exception as e:
         msg = str(e)
         if "doesn't match either of 'aaai.org'" in msg:
@@ -73,7 +73,7 @@ def search_abs_from_dblp(url):
 
 
 def search_from_dblp(url, name, res):
-    r = SESSION.get(url, headers=HEADERS)
+    r = get_with_anubis(SESSION, url, headers=HEADERS)
     soup = BeautifulSoup(r.text, "html.parser")
     if name not in res:
         res[name] = []
