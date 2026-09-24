@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-08-29
-- 🆕 **New Papers This Update**: 361
-- 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 650,459 papers / 120 publication series / 566,142 with abstracts / 110,994 with code
+- 📅 **Last Updated**: 2026-09-24
+- 🆕 **New Papers This Update**: 47,243
+- 📢 **New Conferences This Update**: 139
+- 📊 **Database Scale**: 697,702 papers / 129 publication series / 566,142 with abstracts / 110,994 with code
 
 <!-- recent-update-end -->
 
@@ -322,6 +322,20 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **PROCIEEE** 2000-2026 (27 editions)
 - **RTSS** 2000-2025 (26 editions)
 - **SCIS** 2001-2026 (26 editions)
+
+</details>
+<details>
+<summary><b>Others</b> (9 series)</summary>
+
+- **CEUS** 2003-2026 (24 editions)
+- **GEOINFORMATICA** 1997-2026 (30 editions)
+- **IGARSS** 2002-2024 (23 editions)
+- **IJAEO** 2007-2026 (20 editions)
+- **IJGIS** 1987-2026 (40 editions)
+- **JOSIS** 2010-2020 (11 editions)
+- **JSTARS** 2008-2026 (19 editions)
+- **SIGSPATIAL** 2000-2025 (26 editions)
+- **TGIS** 1996-2026 (30 editions)
 
 </details>
 
