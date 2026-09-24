@@ -22861,6 +22861,827 @@
     "DBLP::https://dblp.org/db/journals/aeog/aeog122.html": {
       "name": "IJAEO2023",
       "ts": "2026-09-24T02:25:00"
+    },
+    "DBLP::https://dblp.org/db/conf/kdd/kdd2026-2.html": {
+      "name": "KDD2026",
+      "ts": "2026-09-24T10:51:39"
+    },
+    "DBLP::https://dblp.org/db/conf/icml/terrabytes2025.html": {
+      "name": "ICML2025",
+      "ts": "2026-09-24T10:52:18"
+    },
+    "DBLP::https://dblp.org/db/conf/ijcai/democrai2025.html": {
+      "name": "IJCAI2025",
+      "ts": "2026-09-24T10:52:58"
+    },
+    "DBLP::https://dblp.org/db/conf/ijcai/ijcai2026.html": {
+      "name": "IJCAI2026",
+      "ts": "2026-09-24T10:53:51"
+    },
+    "DBLP::https://dblp.org/db/conf/recsys/challenge2025.html": {
+      "name": "RECSYS2025",
+      "ts": "2026-09-24T10:54:30"
+    },
+    "DBLP::https://dblp.org/db/journals/ml/ml114.html": {
+      "name": "MLJ2025",
+      "ts": "2026-09-24T10:55:14"
+    },
+    "DBLP::https://dblp.org/db/journals/ml/ml115.html": {
+      "name": "MLJ2026",
+      "ts": "2026-09-24T10:55:54"
+    },
+    "DBLP::https://dblp.org/db/journals/iandc/iandc312.html": {
+      "name": "IANDC2026",
+      "ts": "2026-09-24T10:56:34"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog123.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T10:57:14"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog124.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T10:57:54"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog125.html": {
+      "name": "IJAEO2023",
+      "ts": "2026-09-24T10:58:34"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog126.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T10:59:15"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog127.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T10:59:56"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog128.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:00:37"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog129.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:01:17"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog130.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:01:57"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog131.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:02:38"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog132.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:03:19"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog133.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:03:58"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog134.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:04:38"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog135.html": {
+      "name": "IJAEO2024",
+      "ts": "2026-09-24T11:05:17"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog136.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:05:57"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog137.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:06:37"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog138.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:07:17"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog139.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:07:58"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog140.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:08:38"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog141.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:09:19"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog142.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:10:00"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog143.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:10:41"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog144.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:11:23"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog145.html": {
+      "name": "IJAEO2025",
+      "ts": "2026-09-24T11:12:04"
+    },
+    "DBLP::https://dblp.org/db/journals/aeog/aeog146.html": {
+      "name": "IJAEO2026",
+      "ts": "2026-09-24T11:12:43"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban27.html": {
+      "name": "CEUS2003",
+      "ts": "2026-09-24T11:13:23"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban28.html": {
+      "name": "CEUS2004",
+      "ts": "2026-09-24T11:14:02"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban29.html": {
+      "name": "CEUS2005",
+      "ts": "2026-09-24T11:14:41"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban30.html": {
+      "name": "CEUS2006",
+      "ts": "2026-09-24T11:15:20"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban31.html": {
+      "name": "CEUS2007",
+      "ts": "2026-09-24T11:16:00"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban32.html": {
+      "name": "CEUS2008",
+      "ts": "2026-09-24T11:16:40"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban33.html": {
+      "name": "CEUS2009",
+      "ts": "2026-09-24T11:17:21"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban34.html": {
+      "name": "CEUS2010",
+      "ts": "2026-09-24T11:18:01"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban35.html": {
+      "name": "CEUS2011",
+      "ts": "2026-09-24T11:18:43"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban36.html": {
+      "name": "CEUS2012",
+      "ts": "2026-09-24T11:19:24"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban37.html": {
+      "name": "CEUS2013",
+      "ts": "2026-09-24T11:20:04"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban38.html": {
+      "name": "CEUS2013",
+      "ts": "2026-09-24T11:20:45"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban39.html": {
+      "name": "CEUS2013",
+      "ts": "2026-09-24T11:21:25"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban40.html": {
+      "name": "CEUS2013",
+      "ts": "2026-09-24T11:22:05"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban41.html": {
+      "name": "CEUS2013",
+      "ts": "2026-09-24T11:22:44"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban42.html": {
+      "name": "CEUS2013",
+      "ts": "2026-09-24T11:23:25"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban43.html": {
+      "name": "CEUS2014",
+      "ts": "2026-09-24T11:24:05"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban44.html": {
+      "name": "CEUS2014",
+      "ts": "2026-09-24T11:24:44"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban45.html": {
+      "name": "CEUS2014",
+      "ts": "2026-09-24T11:25:23"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban46.html": {
+      "name": "CEUS2014",
+      "ts": "2026-09-24T11:26:03"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban47.html": {
+      "name": "CEUS2014",
+      "ts": "2026-09-24T11:26:42"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban48.html": {
+      "name": "CEUS2014",
+      "ts": "2026-09-24T11:27:21"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban49.html": {
+      "name": "CEUS2015",
+      "ts": "2026-09-24T11:27:59"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban50.html": {
+      "name": "CEUS2015",
+      "ts": "2026-09-24T11:28:39"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban51.html": {
+      "name": "CEUS2015",
+      "ts": "2026-09-24T11:29:17"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban52.html": {
+      "name": "CEUS2015",
+      "ts": "2026-09-24T11:29:56"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban53.html": {
+      "name": "CEUS2015",
+      "ts": "2026-09-24T11:30:36"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban54.html": {
+      "name": "CEUS2015",
+      "ts": "2026-09-24T11:31:16"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban55.html": {
+      "name": "CEUS2016",
+      "ts": "2026-09-24T11:31:57"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban56.html": {
+      "name": "CEUS2016",
+      "ts": "2026-09-24T11:32:36"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban57.html": {
+      "name": "CEUS2016",
+      "ts": "2026-09-24T11:33:16"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban58.html": {
+      "name": "CEUS2016",
+      "ts": "2026-09-24T11:33:55"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban59.html": {
+      "name": "CEUS2016",
+      "ts": "2026-09-24T11:34:33"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban60.html": {
+      "name": "CEUS2016",
+      "ts": "2026-09-24T11:35:13"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban61.html": {
+      "name": "CEUS2017",
+      "ts": "2026-09-24T11:35:53"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban62.html": {
+      "name": "CEUS2017",
+      "ts": "2026-09-24T11:36:34"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban63.html": {
+      "name": "CEUS2017",
+      "ts": "2026-09-24T11:37:14"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban64.html": {
+      "name": "CEUS2017",
+      "ts": "2026-09-24T11:37:55"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban65.html": {
+      "name": "CEUS2017",
+      "ts": "2026-09-24T11:38:39"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban66.html": {
+      "name": "CEUS2017",
+      "ts": "2026-09-24T11:39:21"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban67.html": {
+      "name": "CEUS2018",
+      "ts": "2026-09-24T11:40:03"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban68.html": {
+      "name": "CEUS2018",
+      "ts": "2026-09-24T11:40:44"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban69.html": {
+      "name": "CEUS2018",
+      "ts": "2026-09-24T11:41:25"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban70.html": {
+      "name": "CEUS2018",
+      "ts": "2026-09-24T11:42:05"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban71.html": {
+      "name": "CEUS2018",
+      "ts": "2026-09-24T11:42:46"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban72.html": {
+      "name": "CEUS2018",
+      "ts": "2026-09-24T11:43:27"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban73.html": {
+      "name": "CEUS2019",
+      "ts": "2026-09-24T11:44:07"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban74.html": {
+      "name": "CEUS2019",
+      "ts": "2026-09-24T11:44:47"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban75.html": {
+      "name": "CEUS2019",
+      "ts": "2026-09-24T11:45:27"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban76.html": {
+      "name": "CEUS2019",
+      "ts": "2026-09-24T11:46:07"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban77.html": {
+      "name": "CEUS2019",
+      "ts": "2026-09-24T11:46:47"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban78.html": {
+      "name": "CEUS2019",
+      "ts": "2026-09-24T11:47:27"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban79.html": {
+      "name": "CEUS2020",
+      "ts": "2026-09-24T11:48:08"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban80.html": {
+      "name": "CEUS2020",
+      "ts": "2026-09-24T11:48:47"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban81.html": {
+      "name": "CEUS2020",
+      "ts": "2026-09-24T11:49:27"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban82.html": {
+      "name": "CEUS2020",
+      "ts": "2026-09-24T11:50:09"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban83.html": {
+      "name": "CEUS2020",
+      "ts": "2026-09-24T11:50:49"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban84.html": {
+      "name": "CEUS2020",
+      "ts": "2026-09-24T11:51:30"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban85.html": {
+      "name": "CEUS2021",
+      "ts": "2026-09-24T11:52:11"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban86.html": {
+      "name": "CEUS2021",
+      "ts": "2026-09-24T11:52:52"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban87.html": {
+      "name": "CEUS2021",
+      "ts": "2026-09-24T11:53:33"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban88.html": {
+      "name": "CEUS2021",
+      "ts": "2026-09-24T11:54:14"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban89.html": {
+      "name": "CEUS2021",
+      "ts": "2026-09-24T11:54:55"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban90.html": {
+      "name": "CEUS2021",
+      "ts": "2026-09-24T11:55:36"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban91.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T11:56:16"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban92.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T11:56:56"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban93.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T11:57:35"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban94.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T11:58:14"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban95.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T11:58:54"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban96.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T11:59:33"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban97.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T12:00:12"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban98.html": {
+      "name": "CEUS2022",
+      "ts": "2026-09-24T12:00:51"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban99.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:01:31"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban100.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:02:11"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban101.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:02:51"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban102.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:03:31"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban103.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:04:12"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban104.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:04:51"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban105.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:05:32"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban106.html": {
+      "name": "CEUS2023",
+      "ts": "2026-09-24T12:06:13"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban107.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:06:53"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban108.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:07:34"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban109.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:08:14"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban110.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:08:55"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban111.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:09:36"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban112.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:10:16"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban113.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:10:56"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban114.html": {
+      "name": "CEUS2024",
+      "ts": "2026-09-24T12:11:36"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban115.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:12:16"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban116.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:12:57"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban117.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:13:37"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban118.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:14:18"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban119.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:14:59"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban120.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:15:40"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban121.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:16:24"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban122.html": {
+      "name": "CEUS2025",
+      "ts": "2026-09-24T12:17:05"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban123.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:17:46"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban124.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:18:26"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban125.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:19:05"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban126.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:19:45"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban127.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:20:24"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban128.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:21:03"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban129.html": {
+      "name": "CEUS2026",
+      "ts": "2026-09-24T12:21:42"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica1.html": {
+      "name": "GeoInformatica1997",
+      "ts": "2026-09-24T12:22:23"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica2.html": {
+      "name": "GeoInformatica1998",
+      "ts": "2026-09-24T12:23:04"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica3.html": {
+      "name": "GeoInformatica1999",
+      "ts": "2026-09-24T12:23:45"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica4.html": {
+      "name": "GeoInformatica2000",
+      "ts": "2026-09-24T12:24:26"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica5.html": {
+      "name": "GeoInformatica2001",
+      "ts": "2026-09-24T12:25:08"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica6.html": {
+      "name": "GeoInformatica2002",
+      "ts": "2026-09-24T12:25:49"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica7.html": {
+      "name": "GeoInformatica2003",
+      "ts": "2026-09-24T12:26:29"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica8.html": {
+      "name": "GeoInformatica2004",
+      "ts": "2026-09-24T12:27:10"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica9.html": {
+      "name": "GeoInformatica2005",
+      "ts": "2026-09-24T12:27:51"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica10.html": {
+      "name": "GeoInformatica2006",
+      "ts": "2026-09-24T12:28:31"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica11.html": {
+      "name": "GeoInformatica2007",
+      "ts": "2026-09-24T12:29:10"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica12.html": {
+      "name": "GeoInformatica2008",
+      "ts": "2026-09-24T12:29:49"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica13.html": {
+      "name": "GeoInformatica2009",
+      "ts": "2026-09-24T12:30:27"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica14.html": {
+      "name": "GeoInformatica2010",
+      "ts": "2026-09-24T12:31:06"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica15.html": {
+      "name": "GeoInformatica2011",
+      "ts": "2026-09-24T12:31:46"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica16.html": {
+      "name": "GeoInformatica2012",
+      "ts": "2026-09-24T12:32:27"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica17.html": {
+      "name": "GeoInformatica2013",
+      "ts": "2026-09-24T12:33:06"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica18.html": {
+      "name": "GeoInformatica2014",
+      "ts": "2026-09-24T12:33:45"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica19.html": {
+      "name": "GeoInformatica2015",
+      "ts": "2026-09-24T12:34:24"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica20.html": {
+      "name": "GeoInformatica2016",
+      "ts": "2026-09-24T12:35:03"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica21.html": {
+      "name": "GeoInformatica2017",
+      "ts": "2026-09-24T12:35:42"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica22.html": {
+      "name": "GeoInformatica2018",
+      "ts": "2026-09-24T12:36:21"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica23.html": {
+      "name": "GeoInformatica2019",
+      "ts": "2026-09-24T12:37:00"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica24.html": {
+      "name": "GeoInformatica2020",
+      "ts": "2026-09-24T12:37:39"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica25.html": {
+      "name": "GeoInformatica2021",
+      "ts": "2026-09-24T12:38:18"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica26.html": {
+      "name": "GeoInformatica2022",
+      "ts": "2026-09-24T12:38:57"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica27.html": {
+      "name": "GeoInformatica2023",
+      "ts": "2026-09-24T12:39:36"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica28.html": {
+      "name": "GeoInformatica2024",
+      "ts": "2026-09-24T12:40:15"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica29.html": {
+      "name": "GeoInformatica2025",
+      "ts": "2026-09-24T12:40:53"
+    },
+    "DBLP::https://dblp.org/db/journals/geoinformatica/geoinformatica30.html": {
+      "name": "GeoInformatica2026",
+      "ts": "2026-09-24T12:41:34"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis1.html": {
+      "name": "JOSIS2010",
+      "ts": "2026-09-24T12:42:12"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis2.html": {
+      "name": "JOSIS2011",
+      "ts": "2026-09-24T12:42:51"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis3.html": {
+      "name": "JOSIS2011",
+      "ts": "2026-09-24T12:43:30"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis4.html": {
+      "name": "JOSIS2012",
+      "ts": "2026-09-24T12:44:10"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis5.html": {
+      "name": "JOSIS2012",
+      "ts": "2026-09-24T12:44:49"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis6.html": {
+      "name": "JOSIS2013",
+      "ts": "2026-09-24T12:45:29"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis7.html": {
+      "name": "JOSIS2013",
+      "ts": "2026-09-24T12:46:08"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis8.html": {
+      "name": "JOSIS2014",
+      "ts": "2026-09-24T12:46:49"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis9.html": {
+      "name": "JOSIS2014",
+      "ts": "2026-09-24T12:47:30"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis10.html": {
+      "name": "JOSIS2015",
+      "ts": "2026-09-24T12:48:09"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis11.html": {
+      "name": "JOSIS2015",
+      "ts": "2026-09-24T12:48:47"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis12.html": {
+      "name": "JOSIS2016",
+      "ts": "2026-09-24T12:49:26"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis13.html": {
+      "name": "JOSIS2016",
+      "ts": "2026-09-24T12:50:04"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis14.html": {
+      "name": "JOSIS2017",
+      "ts": "2026-09-24T12:50:43"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis15.html": {
+      "name": "JOSIS2017",
+      "ts": "2026-09-24T12:51:21"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis16.html": {
+      "name": "JOSIS2018",
+      "ts": "2026-09-24T12:52:00"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis17.html": {
+      "name": "JOSIS2018",
+      "ts": "2026-09-24T12:52:38"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis18.html": {
+      "name": "JOSIS2019",
+      "ts": "2026-09-24T12:53:17"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis19.html": {
+      "name": "JOSIS2019",
+      "ts": "2026-09-24T12:53:56"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis20.html": {
+      "name": "JOSIS2020",
+      "ts": "2026-09-24T12:54:34"
+    },
+    "DBLP::https://dblp.org/db/journals/josis/josis21.html": {
+      "name": "JOSIS2020",
+      "ts": "2026-09-24T12:55:13"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors1.html": {
+      "name": "JSTARS2008",
+      "ts": "2026-09-24T12:55:51"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors2.html": {
+      "name": "JSTARS2009",
+      "ts": "2026-09-24T12:56:30"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors3.html": {
+      "name": "JSTARS2010",
+      "ts": "2026-09-24T12:57:08"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors4.html": {
+      "name": "JSTARS2011",
+      "ts": "2026-09-24T12:57:48"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors5.html": {
+      "name": "JSTARS2012",
+      "ts": "2026-09-24T12:58:27"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors6.html": {
+      "name": "JSTARS2013",
+      "ts": "2026-09-24T12:59:07"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors7.html": {
+      "name": "JSTARS2014",
+      "ts": "2026-09-24T12:59:51"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors8.html": {
+      "name": "JSTARS2015",
+      "ts": "2026-09-24T13:00:34"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors9.html": {
+      "name": "JSTARS2016",
+      "ts": "2026-09-24T13:01:19"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors10.html": {
+      "name": "JSTARS2017",
+      "ts": "2026-09-24T13:02:02"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors11.html": {
+      "name": "JSTARS2018",
+      "ts": "2026-09-24T13:02:46"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors12.html": {
+      "name": "JSTARS2019",
+      "ts": "2026-09-24T13:03:29"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors13.html": {
+      "name": "JSTARS2020",
+      "ts": "2026-09-24T13:04:14"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors14.html": {
+      "name": "JSTARS2021",
+      "ts": "2026-09-24T13:05:05"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors15.html": {
+      "name": "JSTARS2022",
+      "ts": "2026-09-24T13:05:56"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors16.html": {
+      "name": "JSTARS2023",
+      "ts": "2026-09-24T13:06:45"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors17.html": {
+      "name": "JSTARS2024",
+      "ts": "2026-09-24T13:07:51"
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors18.html": {
+      "name": "JSTARS2025",
+      "ts": "2026-09-24T13:08:30",
+      "empty": true
+    },
+    "DBLP::https://dblp.org/db/journals/staeors/staeors19.html": {
+      "name": "JSTARS2026",
+      "ts": "2026-09-24T13:09:09"
     }
   }
 }
