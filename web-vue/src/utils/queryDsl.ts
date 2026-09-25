@@ -1029,17 +1029,42 @@ export const dslToCoarseParams = (dsl: string): CoarseBackendParams => {
 export type CountPlan =
   | { kind: 'none' }
   | { kind: 'single'; params: CoarseBackendParams }
-  | {
-      kind: 'or'
-      legs: CoarseBackendParams[]
-      /**
-       * True when every leg is a bare text-term query ({q} only). Such legs
-       * are typically synonyms with heavy result overlap, so their counts
-       * combine with Math.max; heterogeneous legs (different fields) barely
-       * overlap and combine with a sum instead.
-       */
-      textOnly: boolean
+  | { kind: 'or'; legs: CoarseBackendParams[] }
+
+/**
+ * Combine per-leg hit counts of a top-level OR plan into one estimate.
+ *
+ * Grouping is per leg, not per plan: legs carrying a ``q`` (bare text terms,
+ * or text terms constrained by year/venue) are typically synonyms whose
+ * result sets overlap heavily, so they merge with Math.max; legs without a
+ * ``q`` (pure author / venue / year) sit on different fields and barely
+ * overlap with anything, so they are summed. A plan-wide boolean cannot
+ * express this — ``(PY=2024 AND TS=llm) OR k1 OR k2`` must not sum the
+ * synonym legs just because one constrained leg is present.
+ *
+ * Legs whose count failed (null) are skipped; returns null when no leg
+ * produced a count at all.
+ */
+export const combineLegCounts = (
+  legs: CoarseBackendParams[],
+  counts: (number | null)[]
+): number | null => {
+  let textMax: number | null = null
+  let otherSum = 0
+  let sawOther = false
+  legs.forEach((params, i) => {
+    const c = counts[i]
+    if (c === null || c === undefined) return
+    if (typeof params.q === 'string') {
+      textMax = textMax === null ? c : Math.max(textMax, c)
+    } else {
+      otherSum += c
+      sawOther = true
     }
+  })
+  if (textMax === null && !sawOther) return null
+  return (textMax ?? 0) + otherSum
+}
 
 /**
  * Plan the backend queries needed to approximate a hit count for ``dsl``.
@@ -1062,12 +1087,7 @@ export const dslToCountPlan = (dsl: string): CountPlan => {
     const legs = flattenChain(ast, 'or')
       .map(leg => coarseParamsFromAst(leg, ''))
       .filter(p => Object.keys(p).length > 0)
-    if (legs.length >= 2) {
-      const textOnly = legs.every(
-        p => Object.keys(p).length === 1 && typeof p.q === 'string'
-      )
-      return { kind: 'or', legs, textOnly }
-    }
+    if (legs.length >= 2) return { kind: 'or', legs }
     if (legs.length === 1) return { kind: 'single', params: legs[0] }
   }
   return { kind: 'single', params: coarseParamsFromAst(ast, raw) }

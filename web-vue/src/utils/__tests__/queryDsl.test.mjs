@@ -525,7 +525,7 @@ test('dslToCoarseParams: empty input → no params', () => {
 // dslToCountPlan — count-oriented query planning (top-level OR → per-leg)
 // ---------------------------------------------------------------------------
 
-const { dslToCountPlan } = mod
+const { dslToCountPlan, combineLegCounts } = mod
 
 test('dslToCountPlan: empty input → none', () => {
   assert.deepEqual(dslToCountPlan(''), { kind: 'none' })
@@ -544,8 +544,6 @@ test('dslToCountPlan: top-level OR of text terms splits into per-leg queries', (
   const plan = dslToCountPlan('TS=federated OR TS="transfer learning"')
   assert.equal(plan.kind, 'or')
   assert.deepEqual(plan.legs, [{ q: 'federated' }, { q: 'transfer learning' }])
-  // Bare text-term legs → synonyms with heavy overlap → caller uses max.
-  assert.equal(plan.textOnly, true)
 })
 
 test('dslToCountPlan: field-qualified OR legs hoist their own params', () => {
@@ -556,8 +554,38 @@ test('dslToCountPlan: field-qualified OR legs hoist their own params', () => {
     { q: 'llm' },
     { conf: ['ICLR'] }
   ])
-  // Heterogeneous fields barely overlap → caller sums instead of max.
-  assert.equal(plan.textOnly, false)
+})
+
+test('combineLegCounts: bare text legs merge with max (synonym overlap)', () => {
+  const legs = [{ q: 'federated' }, { q: 'transfer learning' }]
+  assert.equal(combineLegCounts(legs, [100, 300]), 300)
+})
+
+test('combineLegCounts: non-text legs sum (disjoint fields)', () => {
+  const legs = [{ author: 'Yang Liu' }, { conf: ['ICLR'] }]
+  assert.equal(combineLegCounts(legs, [30, 500]), 530)
+})
+
+test('combineLegCounts: mixed plan max-es the text group AND sums the rest', () => {
+  // Regression guard: ``(PY=2024 AND TS=llm) OR k1 OR k2`` must NOT sum the
+  // heavily-overlapping text legs just because a constrained leg exists.
+  const legs = [
+    { q: 'llm', since: 2024, until: 2024 },
+    { q: 'k1' },
+    { q: 'k2' }
+  ]
+  assert.equal(combineLegCounts(legs, [400, 380, 350]), 400)
+  // And a text group plus an author leg: text max + author count.
+  const mixed = [{ q: 'llm' }, { q: 'k1' }, { author: 'Yang Liu' }]
+  assert.equal(combineLegCounts(mixed, [200, 150, 40]), 240)
+})
+
+test('combineLegCounts: failed legs are skipped; all-failed → null', () => {
+  const legs = [{ q: 'a' }, { author: 'X' }]
+  assert.equal(combineLegCounts(legs, [null, 40]), 40)
+  assert.equal(combineLegCounts(legs, [null, null]), null)
+  // A genuine zero count is still a count.
+  assert.equal(combineLegCounts([{ conf: ['ICLR'] }], [0]), 0)
 })
 
 test('dslToCountPlan: OR legs that narrow nothing are dropped', () => {
