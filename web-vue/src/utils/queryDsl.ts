@@ -1029,7 +1029,17 @@ export const dslToCoarseParams = (dsl: string): CoarseBackendParams => {
 export type CountPlan =
   | { kind: 'none' }
   | { kind: 'single'; params: CoarseBackendParams }
-  | { kind: 'or'; legs: CoarseBackendParams[] }
+  | {
+      kind: 'or'
+      legs: CoarseBackendParams[]
+      /**
+       * True when every leg is a bare text-term query ({q} only). Such legs
+       * are typically synonyms with heavy result overlap, so their counts
+       * combine with Math.max; heterogeneous legs (different fields) barely
+       * overlap and combine with a sum instead.
+       */
+      textOnly: boolean
+    }
 
 /**
  * Plan the backend queries needed to approximate a hit count for ``dsl``.
@@ -1040,8 +1050,9 @@ export type CountPlan =
  * collapses to 0 for the synonym-merge queries this app produces most.
  * Field-qualified legs (``AU=… OR TS=…``) work too: each leg hoists its own
  * author/conf/year params. Legs that narrow nothing (e.g. a bare ``NOT``)
- * are dropped; if fewer than two legs survive, the whole expression falls
- * back to a single coarse param set.
+ * are dropped; when exactly one usable leg survives it becomes the single
+ * param set directly (re-deriving params from the whole OR expression would
+ * yield an empty set, and the caller would count the entire corpus).
  */
 export const dslToCountPlan = (dsl: string): CountPlan => {
   const raw = normalizeQueryInput(dsl ?? '').trim()
@@ -1051,7 +1062,13 @@ export const dslToCountPlan = (dsl: string): CountPlan => {
     const legs = flattenChain(ast, 'or')
       .map(leg => coarseParamsFromAst(leg, ''))
       .filter(p => Object.keys(p).length > 0)
-    if (legs.length >= 2) return { kind: 'or', legs }
+    if (legs.length >= 2) {
+      const textOnly = legs.every(
+        p => Object.keys(p).length === 1 && typeof p.q === 'string'
+      )
+      return { kind: 'or', legs, textOnly }
+    }
+    if (legs.length === 1) return { kind: 'single', params: legs[0] }
   }
   return { kind: 'single', params: coarseParamsFromAst(ast, raw) }
 }

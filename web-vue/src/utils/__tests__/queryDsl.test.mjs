@@ -544,6 +544,8 @@ test('dslToCountPlan: top-level OR of text terms splits into per-leg queries', (
   const plan = dslToCountPlan('TS=federated OR TS="transfer learning"')
   assert.equal(plan.kind, 'or')
   assert.deepEqual(plan.legs, [{ q: 'federated' }, { q: 'transfer learning' }])
+  // Bare text-term legs → synonyms with heavy overlap → caller uses max.
+  assert.equal(plan.textOnly, true)
 })
 
 test('dslToCountPlan: field-qualified OR legs hoist their own params', () => {
@@ -554,13 +556,35 @@ test('dslToCountPlan: field-qualified OR legs hoist their own params', () => {
     { q: 'llm' },
     { conf: ['ICLR'] }
   ])
+  // Heterogeneous fields barely overlap → caller sums instead of max.
+  assert.equal(plan.textOnly, false)
 })
 
 test('dslToCountPlan: OR legs that narrow nothing are dropped', () => {
-  // The bare NOT leg contributes no params; with only one usable leg left,
-  // the plan falls back to a single coarse query for the whole expression
-  // (whose collectTextTerms skips the NOT subtree).
+  // The bare NOT leg contributes no params; the surviving text leg becomes
+  // the single param set directly.
   const plan = dslToCountPlan('NOT survey OR TS=a')
   assert.equal(plan.kind, 'single')
   assert.deepEqual(plan.params, { q: 'a' })
+})
+
+test('dslToCountPlan: single surviving non-text leg keeps its own params', () => {
+  // Regression guard: re-deriving params from the whole OR expression would
+  // yield {} (splitForBackend cannot hoist out of an OR, collectTextTerms
+  // skips author/year leaves) and the caller would count the entire corpus.
+  const plan = dslToCountPlan('AU="Yang Liu" OR NOT survey')
+  assert.equal(plan.kind, 'single')
+  assert.deepEqual(plan.params, { author: 'Yang Liu' })
+
+  const pyPlan = dslToCountPlan('PY=2024 OR NOT x')
+  assert.equal(pyPlan.kind, 'single')
+  assert.deepEqual(pyPlan.params, { since: 2024, until: 2024 })
+})
+
+test('dslToCountPlan: uncountable OR (all legs NOT-only) yields empty params', () => {
+  // The caller (fetchResultCount) must turn empty params into null ("count
+  // unknown") rather than firing an unfiltered whole-corpus query.
+  const plan = dslToCountPlan('NOT a OR NOT b')
+  assert.equal(plan.kind, 'single')
+  assert.deepEqual(plan.params, {})
 })

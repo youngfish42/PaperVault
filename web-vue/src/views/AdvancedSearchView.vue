@@ -202,12 +202,14 @@ const favRefreshingId = ref<number | null>(null)
  * The backend does not parse the DSL — ``q`` is a substring AND filter — so
  * the expression is first turned into a count plan (dslToCountPlan, the
  * same split the home search performs). A top-level OR is counted per leg
- * and combined with Math.max: AND-ing all terms into one ``q`` would
- * collapse synonym merges to 0, while summing leg counts would inflate on
- * overlap; max is never 0 while any leg has hits and is a close estimate
- * for the heavily-overlapping synonym ORs this app produces most. Residual
- * NOT/NEAR semantics are not reflected — the number is an approximation,
- * labelled "约/~" in the UI.
+ * and combined by shape: bare text-term legs are usually synonyms with
+ * heavily overlapping result sets, so Math.max stays close to the union
+ * (summing them would inflate several-fold); legs over different fields
+ * (author / venue / text) barely overlap, so their counts are summed
+ * (Math.max would report only a fraction of the union). Neither is exact —
+ * the number is an approximation, labelled "约/~" in the UI. A plan with
+ * no narrowing params at all (e.g. ``NOT a OR NOT b``) yields null — better
+ * "unknown" than the whole-corpus total.
  */
 const fetchResultCount = async (dsl: string): Promise<number | null> => {
   const plan = dslToCountPlan(dsl)
@@ -215,6 +217,7 @@ const fetchResultCount = async (dsl: string): Promise<number | null> => {
   const countOf = async (
     params: CoarseBackendParams
   ): Promise<number | null> => {
+    if (Object.keys(params).length === 0) return null
     try {
       const res = await searchPapers({ ...params, size: 1 })
       return res.meta?.total ?? null
@@ -225,7 +228,8 @@ const fetchResultCount = async (dsl: string): Promise<number | null> => {
   if (plan.kind === 'single') return countOf(plan.params)
   const counts = await Promise.all(plan.legs.map(countOf))
   const ok = counts.filter((c): c is number => c !== null)
-  return ok.length > 0 ? Math.max(...ok) : null
+  if (ok.length === 0) return null
+  return plan.textOnly ? Math.max(...ok) : ok.reduce((a, b) => a + b, 0)
 }
 
 const openSaveDialog = (): void => {
