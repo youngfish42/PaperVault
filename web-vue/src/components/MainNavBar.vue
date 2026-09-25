@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import { ref } from 'vue'
 import { onMounted } from 'vue'
 import { useI18n } from '@/utils/i18n'
+import { useAuth } from '@/composables/useAuth'
 
 /**
  * Shared top navigation strip. Replaces the per-view inline tab strips
@@ -20,6 +21,12 @@ const brandIconUrl = `${import.meta.env.BASE_URL}papervault-icon.png`
 const props = defineProps<{
   activeKey: 'home' | 'advanced' | 'settings' | 'docs'
   isDark: boolean
+  /**
+   * Optional current search expression. When present (home view passes its
+   * search box content), the Advanced Search tab carries it over so the
+   * builder opens pre-filled from the typed DSL.
+   */
+  query?: string
 }>()
 
 const emit = defineEmits<{
@@ -29,21 +36,10 @@ const emit = defineEmits<{
 const router = useRouter()
 const { t, toggle: toggleLang } = useI18n()
 const loginVisible = ref(false)
-const currentUser = ref<any>(null)
-const loadAuth = async (): Promise<void> => {
-  try {
-    const response = await fetch('/api/v1/auth/me')
-    const data = await response.json()
-    currentUser.value = data.authenticated ? data : null
-  } catch {
-    currentUser.value = null
-  }
-}
-const logout = async (): Promise<void> => {
-  await fetch('/api/v1/auth/logout', { method: 'POST' })
-  currentUser.value = null
-}
-onMounted(loadAuth)
+// Shared auth state (see composables/useAuth.ts): cached module-wide so the
+// Advanced Search page observes the same login status without re-fetching.
+const { isLoggedIn, displayName, ensureFetched, logout } = useAuth()
+onMounted(ensureFetched)
 
 const goHome = (): void => {
   if (props.activeKey === 'home') return
@@ -51,7 +47,8 @@ const goHome = (): void => {
 }
 const goAdvanced = (): void => {
   if (props.activeKey === 'advanced') return
-  router.push({ path: '/advanced' })
+  const q = props.query?.trim()
+  router.push({ path: '/advanced', query: q ? { q } : {} })
 }
 const goSettings = (): void => {
   if (props.activeKey === 'settings') return
@@ -113,12 +110,10 @@ const goDocs = (): void => {
         >GitHub</a
       >
       <div class="pv-nav-actions">
-        <template v-if="currentUser">
+        <template v-if="isLoggedIn">
           <el-dropdown>
             <el-button link type="primary">{{
-              currentUser.username ||
-              currentUser.user?.name ||
-              t('auth.loggedIn')
+              displayName || t('auth.loggedIn')
             }}</el-button>
             <template #dropdown
               ><el-dropdown-menu

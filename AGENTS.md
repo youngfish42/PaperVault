@@ -64,15 +64,19 @@ PaperVault/
 │   ├── api/
 │   │   ├── __init__.py
 │   │   └── v1/                   # All v1 blueprints (each mounted with `url_prefix="/api/v1"` via `register_blueprints`)
-│   │       ├── __init__.py       # Re-exports `health_bp`, `confs_bp`, `papers_bp`, `suggest_bp`, `ai_bp`
+│   │       ├── __init__.py       # Re-exports `health_bp`, `confs_bp`, `papers_bp`, `suggest_bp`, `ai_bp`, `auth_bp`, `admin_bp`, `saved_queries_bp`
 │   │       ├── health.py         # `GET /api/v1/healthz`
 │   │       ├── confs.py          # `GET /api/v1/confs`
-│   │       ├── papers.py         # `GET /api/v1/papers` (DSL-aware, Pydantic-validated)
+│   │       ├── papers.py         # `GET /api/v1/papers` (Pydantic-validated; `q` is a plain substring filter — DSL splitting happens client-side)
 │   │       ├── suggest.py        # `POST /api/v1/suggest` + `GET /api/v1/ai/providers` (catalog list)
-│   │       └── ai.py             # `POST /api/v1/ai/rerank` (LLM-driven result re-ranking)
+│   │       ├── ai.py             # `POST /api/v1/ai/rerank` (LLM-driven result re-ranking)
+│   │       ├── auth.py           # Session auth: `GET /auth/me`, `POST /auth/login|logout`, OAuth `GET /auth/oauth/<github|zhihu>` + callback (GitHub/Zhihu)
+│   │       ├── admin.py          # `GET /api/v1/admin/config` behind `require_admin` (admin session or `PAPERVAULT_ADMIN_USERS` whitelist)
+│   │       └── saved_queries.py  # Saved search queries (favorites): `GET|POST /saved_queries`, `PATCH|DELETE /saved_queries/<id>` behind `require_user`
 │   └── services/
 │       ├── __init__.py
 │       ├── papers.py             # `PaperRepository` (startup JSONL.gz → SQLite/FTS5 materialisation, read-only queries, atomic rebuild) + `search_papers` / `SearchCriteria`
+│       ├── user_store.py         # `UserStore` (per-user saved queries in a dedicated `users.sqlite3`, WAL, lazily mounted on `app.extensions["user_store"]`)
 │       ├── suggest.py            # `suggest_keywords` (multi-provider dispatch, provider resolution)
 │       ├── rerank.py             # `rank_papers` (LLM relevance scoring; JSON output parsing, score normalisation)
 │       ├── ai_clients.py         # Vendor-neutral SDK dispatch: `call_openai_compatible`, `call_anthropic` (with StepFun `thinking:disabled` compatibility)
@@ -104,7 +108,8 @@ PaperVault/
 │   ├── test_ai_rerank.py         # `POST /v1/ai/rerank` end-to-end (mocked LLM)
 │   ├── test_suggest_api.py       # `POST /v1/suggest` + `GET /v1/ai/providers`
 │   ├── test_suggest_dispatch.py  # Provider / protocol resolution in `services.suggest`
-│   └── test_suggest_topic_anchor.py  # Topic-anchor prompt shaping for `suggest_keywords`
+│   ├── test_suggest_topic_anchor.py  # Topic-anchor prompt shaping for `suggest_keywords`
+│   └── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -157,10 +162,13 @@ PaperVault/
 │   │   ├── router/index.ts       # Vue Router (hash mode); routes `/`, `/advanced`, `/settings`
 │   │   ├── api/
 │   │   │   ├── paper.ts          # Axios calls against the v1 surface: `/api/v1/papers`, `/api/v1/confs`, legacy `/api/v1/suggest` shim
-│   │   │   └── ai.ts             # P2/P3 AI endpoints: `listAiProviders` (`GET /v1/ai/providers`), `suggestKeywordsWithSettings` (`POST /v1/suggest` with per-request provider/API key, 120s timeout)
+│   │   │   ├── ai.ts             # P2/P3 AI endpoints: `listAiProviders` (`GET /v1/ai/providers`), `suggestKeywordsWithSettings` (`POST /v1/suggest` with per-request provider/API key, 120s timeout)
+│   │   │   └── savedQueries.ts   # Saved-query favorites CRUD against `/api/v1/saved_queries` (requires login)
+│   │   ├── composables/
+│   │   │   └── useAuth.ts        # Shared module-level auth state (`GET /v1/auth/me`, cached once); consumed by MainNavBar and the favorites UI
 │   │   ├── views/
 │   │   │   ├── HomeView.vue              # Landing + Smart Search (DSL-aware single-box); also owns the AI search + rerank flow
-│   │   │   ├── AdvancedSearchView.vue    # Visual query builder that compiles to the WoS-style DSL
+│   │   │   ├── AdvancedSearchView.vue    # Visual query builder ⇄ text DSL (copy / import via `parseDslToRows`); saved-query favorites drawer
 │   │   │   └── SettingsView.vue          # AI provider settings page (P2-C shell + P2-D `AiSuggestSection`)
 │   │   ├── components/
 │   │   │   ├── MainNavBar.vue            # Top navigation bar shared across Home / Advanced / Settings
@@ -179,8 +187,9 @@ PaperVault/
 │   │       ├── file.ts                   # CSV / TXT export utilities
 │   │       ├── i18n.ts                   # Lightweight in-house i18n (CN / EN)
 │   │       ├── fields.ts                 # Field metadata (display names, validators) for the query DSL
-│   │       ├── queryDsl.ts               # WoS-style query DSL parser / splitter / evaluator
+│   │       ├── queryDsl.ts               # WoS-style query DSL parser / splitter / evaluator / `buildDsl` / `parseDslToRows` (text ⇄ builder rows)
 │   │       ├── queryMerge.ts             # `quoteIfNeeded` + OR-merge helper used by `AiSearchDialog` and `AiSuggestPanel`
+│   │       ├── clipboard.ts              # `copyText` (async Clipboard API + textarea/execCommand fallback)
 │   │       ├── aiSettings.ts             # localStorage (non-secret settings) + sessionStorage (API key) adapter for the AI panel
 │   │       └── __tests__/
 │   │           └── queryDsl.test.mjs     # `node:test` regression suite for the DSL parser
@@ -231,6 +240,8 @@ The Flask server runs on `http://127.0.0.1:5001` by default. Override the bind a
 - `PAPERVAULT_CORS_ORIGINS` - Comma-separated CORS allow-list (empty by default)
 - `PAPERVAULT_MAX_PAGE_SIZE` / `PAPERVAULT_DEFAULT_PAGE_SIZE` - Pagination guards for `/api/v1/papers` (defaults 200 / 50)
 - `PAPERVAULT_SEARCH_DB_PATH` - Optional path for the derived SQLite/FTS5 search index; defaults to `papers.sqlite3` beside `cache/cache.jsonl.gz`
+- `PAPERVAULT_USER_DB_PATH` - Optional path for the per-user data store (saved search queries); defaults to `users.sqlite3` beside `cache/cache.jsonl.gz`. Separate from `papers.sqlite3` on purpose: the papers index is read-only and atomically rebuilt, user data must survive rebuilds
+- `PAPERVAULT_SAVED_QUERIES_MAX_PER_USER` - Per-user saved-query quota for `POST /api/v1/saved_queries` (default `100`; exceeding it returns 403 `QUOTA_EXCEEDED`)
 - `CONTACT_EMAIL` - Contact email injected into `User-Agent` for discovery / scraping (default `im.young@foxmail.com`)
 
 *AI providers (used by `/api/v1/suggest` and `/api/v1/ai/rerank`)*
@@ -392,7 +403,8 @@ Other frontend scripts:
 - **Abstract fetchers**: Adding a new publisher = one new module under `papervault/services/abstract_fetchers/<host>.py` that subclasses `Fetcher`, declares its `allowed_hosts` / `source`, and is registered in `abstract_fetchers/__init__.py:FETCHER_REGISTRY`. Do **not** open a second dispatcher or bypass the registry. Any "Abstract" label stripping (heading + inline label) **must** go through `_http.strip_abstract_label` (first-match by default, `all_matches=True` when the template emits duplicates) — do not open-code `re.sub` / lambdas per fetcher. Every new fetcher **must** ship at least one real-page fixture under `tests/fixtures/abstract_fetchers/` and one regression case in `tests/test_abstract_fetchers.py`; layout variants (modern vs legacy, short-modern → legacy fallback, meta-only pages, non-article path guards) each get their own fixture so a template change fails a specific test rather than the whole suite.
 - **Vue/TypeScript**: Use Composition API with `<script setup>` syntax. Component names use PascalCase. Element Plus components and icons are auto-imported (no manual imports needed for most usage). `auto-imports.d.ts` and `components.d.ts` are generated by `unplugin-*` and **must not** be hand-edited.
 - **API Endpoints**: All backend API routes are versioned under `/api/v1/*` in production (proxied via Vite's dev server in development). Legacy `/api/search` and `/api/get_guess_you_like` have been removed — do not re-introduce unversioned endpoints.
-- **Query DSL**: User-visible search syntax (Smart Search box and Advanced Search builder) is defined in `web-vue/src/utils/queryDsl.ts` + `fields.ts`; any change to the grammar or field set **must** be paired with a new case in `web-vue/src/utils/__tests__/queryDsl.test.mjs` to prevent the kind of regression that the existing suite already pins down (e.g. `AU="Xiaowen Jiang"` → empty-result). OR-merge helpers for AI-picked keywords are isolated in `web-vue/src/utils/queryMerge.ts` and reused by `AiSearchDialog` / `AiSuggestPanel`.
+- **Query DSL**: User-visible search syntax (Smart Search box and Advanced Search builder) is defined in `web-vue/src/utils/queryDsl.ts` + `fields.ts`; any change to the grammar or field set **must** be paired with a new case in `web-vue/src/utils/__tests__/queryDsl.test.mjs` to prevent the kind of regression that the existing suite already pins down (e.g. `AU="Xiaowen Jiang"` → empty-result). The builder ⇄ text conversion is `buildDsl` (rows → text) and `parseDslToRows` (text → rows); the row model only covers flat AND/OR/NOT chains of term/list/range leaves — nested groups / NEAR / leading NOT degrade to a single raw-text topic row with `supported: false` (semantics preserved, rows not individually editable). Count-only callers (e.g. the saved-query preview) must go through `dslToCountPlan` + `combineLegCounts` (single coarse param set, or one param set per top-level OR leg — legs carrying a text `q` merge with `Math.max` as they are usually heavily-overlapping synonyms, legs on other fields are summed; the decision is per leg, never a plan-wide switch; a plan with no narrowing params yields "unknown", never an unfiltered whole-corpus count) — never forward raw DSL text as the backend `q` param (it is a plain substring AND filter and would zero out), and never AND a top-level OR into one `q` (a lower bound that collapses to 0 for synonym merges). The displayed count is an approximation and is labelled "约/~" in the UI. Any change to either direction **must** keep their round-trip tests green. OR-merge helpers for AI-picked keywords are isolated in `web-vue/src/utils/queryMerge.ts` and reused by `AiSearchDialog` / `AiSuggestPanel`.
+- **Per-user server data**: Mutable per-user state (saved search queries) lives in the dedicated `users.sqlite3` via `papervault/services/user_store.py:UserStore` (lazily mounted on `app.extensions["user_store"]`), **never** in `papers.sqlite3` (read-only, atomically rebuilt). New per-user endpoints reuse the `require_user` decorator in `papervault/api/v1/saved_queries.py` (identity = OAuth `provider:id`, admin session → `admin:<username>`). Frontend login state must come from the shared `web-vue/src/composables/useAuth.ts` — do not re-fetch `/v1/auth/me` per component.
 - **AI secrets on the frontend**: The API key entered on the Settings page lives in **sessionStorage** (wiped when the tab closes); non-secret knobs (provider / base URL / model / temperature / max_keywords / max_tokens) live in **localStorage**. The split is enforced by `web-vue/src/utils/aiSettings.ts` — do not mix the two.
 - **Environment Variables**: Frontend variables must use `VITE_` or `VUE_` prefix (configured in `vite.config.ts`).
 - **Imports/Resolvers**: The `@` alias points to `web-vue/src`.
@@ -405,10 +417,14 @@ All endpoints are mounted under `/api/v1` by `papervault/app.py:create_app` (via
 |---------------|---------|---------|----------|
 | `GET /api/v1/healthz` | `papervault/api/v1/health.py` | — | `{ "status": "ok", "papers": int, "confs": int }` (forces `PaperRepository.ensure_loaded()`) |
 | `GET /api/v1/confs` | `papervault/api/v1/confs.py` | — | `{ "items": ConfOut[], "total": int }` with `ConfOut = { name, total, years: [{year, count}] }` |
-| `GET /api/v1/papers` | `papervault/api/v1/papers.py` | Query params validated by `PaperSearchParams` (Pydantic v2): `q?`, `field?∈{title,author,any}` (default `title`), `conf?` (repeatable / comma-separated), `since?`, `until?` (1900–2100), `author?`, `sort?∈{±year,±conf,±title}` (default `-year`), `page?≥1`, `size?≥1` (capped at `settings.max_page_size`, default `50`). The `q` field accepts the WoS-style DSL parsed inside `papers.py` | `{ "items": PaperOut[], "meta": PageMeta }` |
+| `GET /api/v1/papers` | `papervault/api/v1/papers.py` | Query params validated by `PaperSearchParams` (Pydantic v2): `q?`, `field?∈{title,author,any}` (default `title`), `conf?` (repeatable / comma-separated), `since?`, `until?` (1900–2100), `author?`, `sort?∈{±year,±conf,±title}` (default `-year`), `page?≥1`, `size?≥1` (capped at `settings.max_page_size`, default `50`). **The backend does NOT parse the DSL**: `q` is an AND-ed substring filter over title/abstract, so DSL text must first be split client-side — `splitForBackend` (main search) or `dslToCoarseParams` (count-only callers such as the saved-query preview) hoist `q`/`author`/`conf`/`since`/`until`, and residual OR/NOT/NEAR clauses are evaluated client-side | `{ "items": PaperOut[], "meta": PageMeta }` |
 | `POST /api/v1/suggest` | `papervault/api/v1/suggest.py` | JSON body validated by `SuggestRequest`: `{ "query": str (1–200), "provider"?, "base_url"?, "model"?, "api_key"?, "protocol"?∈{openai-compatible,anthropic}, "temperature"?∈[0,2], "max_keywords"?∈[1,50], "max_tokens"?∈[1,4096] }` | `SuggestResponse = { keywords: string[], timecost_ms: float, model: str, provider: str, protocol: str }` |
 | `GET /api/v1/ai/providers` | `papervault/api/v1/suggest.py:list_providers` | — | `{ "items": ProviderPreset[] }` — the shipped catalog: `openai`, `deepseek`, `anthropic`, `qwen`, `glm`, `stepfun`, `custom` |
 | `POST /api/v1/ai/rerank` | `papervault/api/v1/ai.py` | JSON body validated by `RerankRequest`: `{ "query": str (1–200), "paper_ids": string[] (1–300), "provider"?, "base_url"?, "model"?, "api_key"?, "protocol"?, "temperature"? }`. Duplicates in `paper_ids` are collapsed while preserving order | `RerankResponse = { ordered: [{paper_id, score∈[0,1]}], skipped_ids: string[], timecost_ms, model, provider, protocol }` — stale ids surface in `skipped_ids`; if every id is stale the endpoint short-circuits without invoking the LLM |
+| `GET /api/v1/saved_queries` | `papervault/api/v1/saved_queries.py` | Login required (`require_user`; identity = OAuth `provider:id` or admin session) | `{ "items": SavedQueryOut[], "total": int }` with `SavedQueryOut = { id, name, dsl, last_count, created_at, updated_at }`, newest update first |
+| `POST /api/v1/saved_queries` | `papervault/api/v1/saved_queries.py` | JSON body validated by `SavedQueryCreateIn`: `{ "name": str (1–80), "dsl": str (1–2000), "last_count"?: int ≥ 0 \| null }` | 201 `SavedQueryOut`; 403 `QUOTA_EXCEEDED` past `settings.saved_queries_max_per_user` |
+| `PATCH /api/v1/saved_queries/<id>` | `papervault/api/v1/saved_queries.py` | JSON body validated by `SavedQueryUpdateIn` (all of `name` / `dsl` / `last_count` optional, at least one required; explicit `last_count: null` clears the stored count) | Updated `SavedQueryOut`; 404 when missing or owned by another user |
+| `DELETE /api/v1/saved_queries/<id>` | `papervault/api/v1/saved_queries.py` | — | `{ "deleted": true }`; 404 when missing or owned by another user |
 
 Errors from any route are normalised by `papervault.errors.register_error_handlers` into a unified envelope `{ "error": { "code": str, "message": str, "details"?: any } }` (HTTP status is preserved on the response). `ApiError` / `NotFoundError` / `UpstreamError` are first-class; raw `HTTPException`s have their `name` upcased into `code` and unexpected exceptions degrade to `INTERNAL_ERROR` / 500. The independent request-id is attached to logs and the `X-Request-Id` response header by `papervault.logging` middleware — it is **not** embedded in the JSON body. Non-`/api/` GET requests fall through to a SPA history fallback that serves `static/dist/index.html`.
 

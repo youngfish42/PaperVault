@@ -748,9 +748,14 @@ const renderRow = (row: DslRow): string => {
       .join(',')}`
   }
   if (/\s/.test(value)) {
-    // If the user already wrote operators, wrap in parens; otherwise quote
-    // the phrase so we keep WoS-style exact phrase semantics.
-    if (/\b(AND|OR|NOT|NEAR)\b/i.test(value) || /[()]/.test(value)) {
+    // If the user already wrote operators (or a leading-mid minus NOT like
+    // ``-survey``), wrap in parens; otherwise quote the phrase so we keep
+    // WoS-style exact phrase semantics.
+    if (
+      /\b(AND|OR|NOT|NEAR)\b/i.test(value) ||
+      /[()]/.test(value) ||
+      /(^|\s)-\S/.test(value)
+    ) {
       return `${tag}=(${value})`
     }
     return `${tag}="${value}"`
@@ -791,4 +796,299 @@ export function buildDsl(input: BuildDslInput | DslRow[]): string {
     parts.push(`SO=${state.confs.join(',')}`)
   }
   return parts.filter(Boolean).join(' ')
+}
+
+/** ---------------------------------------------------------------------
+ * parseDslToRows — inverse of buildDsl, used by the Advanced Search page
+ * to import a text DSL back into the visual row builder.
+ *
+ * The row model can only express a flat AND/OR/NOT chain of term/list/
+ * range leaves, so round-tripping is faithful exactly for:
+ *   - a single leaf,
+ *   - an AND chain of leaves (NOT-wrapped leaves → op 'NOT'),
+ *   - an OR chain whose legs are leaves or pure AND chains of leaves
+ *     (matches the precedence the rebuilt text will parse back with).
+ * Anything else (NEAR, parenthesised OR groups inside an AND, NOT around a
+ * group, a leading NOT, OR-of-NOT) has no row representation. In that case
+ * the function still succeeds but returns a single topic row holding the
+ * original text plus ``supported: false`` — renderRow wraps it as
+ * ``TS=(original)``, which preserves the original semantics exactly while
+ * signalling to the UI that the rows are not individually editable.
+ * ------------------------------------------------------------------- */
+
+export interface ParseRowsResult {
+  /** Builder rows; year rows use value ``from-to`` like the UI's year row. */
+  rows: DslRow[]
+  /** false when the AST contains structures the row model cannot express. */
+  supported: boolean
+}
+
+interface RowLeaf {
+  field: string
+  value: string
+  negated: boolean
+}
+
+/**
+ * Reduce a node to a leaf (term / list / range), remembering a NOT wrapper.
+ * Returns null for anything structured (and / or / near / not-of-group).
+ */
+const leafFromNode = (node: AstNode): RowLeaf | null => {
+  let negated = false
+  let n = node
+  if (n.kind === 'not') {
+    negated = true
+    n = n.node
+  }
+  switch (n.kind) {
+    case 'term': {
+      // AK mirrors TS by design; fold it back so the builder's fixed field
+      // list (which has no keywords option) can represent the row.
+      const field =
+        n.field === 'keywords' || n.field === null ? 'topic' : n.field
+      return { field, value: n.value, negated }
+    }
+    case 'list':
+      return {
+        field: n.field === 'keywords' ? 'topic' : n.field,
+        value: n.values.join(','),
+        negated
+      }
+    case 'range':
+      return {
+        field: n.field,
+        value: `${Math.min(n.from, n.to)}-${Math.max(n.from, n.to)}`,
+        negated
+      }
+    default:
+      return null
+  }
+}
+
+/** Flatten same-kind nesting: `(a AND b) AND c` ≡ `a AND b AND c`. */
+const flattenChain = (node: AstNode, kind: 'and' | 'or'): AstNode[] => {
+  if (node.kind === kind) return node.nodes.flatMap(n => flattenChain(n, kind))
+  return [node]
+}
+
+/** An OR leg: a leaf, or a pure AND chain of leaves. */
+const andUnitToLeaves = (node: AstNode): RowLeaf[] | null => {
+  const leaves = flattenChain(node, 'and').map(leafFromNode)
+  if (leaves.some(l => l === null)) return null
+  return leaves as RowLeaf[]
+}
+
+const toRow = (leaf: RowLeaf, op: 'AND' | 'OR' | 'NOT'): DslRow => ({
+  field: leaf.field,
+  value: leaf.value,
+  op
+})
+
+const rowsFromAst = (ast: AstNode): DslRow[] | null => {
+  if (ast.kind === 'empty') return []
+
+  let rows: DslRow[]
+  if (ast.kind === 'or') {
+    rows = []
+    for (const clause of flattenChain(ast, 'or')) {
+      const leaves = andUnitToLeaves(clause)
+      if (!leaves) return null
+      // `a OR NOT b` has no row form: the rebuilt `a NOT b` would AND.
+      if (leaves[0].negated) return null
+      leaves.forEach((leaf, i) => {
+        rows.push(toRow(leaf, i === 0 ? 'OR' : leaf.negated ? 'NOT' : 'AND'))
+      })
+    }
+  } else {
+    // Single leaf or a pure AND chain (flattenChain is the identity for
+    // non-and nodes, so this also covers the lone-leaf case).
+    const leaves = andUnitToLeaves(ast)
+    if (!leaves) return null
+    rows = leaves.map(leaf => toRow(leaf, leaf.negated ? 'NOT' : 'AND'))
+  }
+
+  if (rows.length === 0) return rows
+  // The first row's op is ignored by buildDsl, so a leading NOT would be
+  // silently dropped on rebuild — refuse to claim fidelity for that.
+  if (rows[0].op === 'NOT') return null
+  rows[0] = { ...rows[0], op: 'AND' }
+  return rows
+}
+
+export const parseDslToRows = (input: string): ParseRowsResult => {
+  const text = normalizeQueryInput(input ?? '').trim()
+  if (!text) return { rows: [], supported: true }
+  const rows = rowsFromAst(parseDsl(text))
+  if (rows) return { rows, supported: true }
+  return { rows: [{ field: 'topic', value: text }], supported: false }
+}
+
+/** ---------------------------------------------------------------------
+ * DSL → coarse backend params / count plan
+ *
+ * The backend does NOT parse the DSL: ``q`` is matched as AND-ed substrings
+ * over title/abstract, so forwarding raw DSL text (``TS=a AND PY=2024``)
+ * would AND the literal tokens ``ts=a`` / ``and`` / ``py=2024`` and return
+ * zero hits. These helpers mirror useHomeSearch's param building: hoist
+ * AND-able qualifiers via splitForBackend, and when nothing could be
+ * hoisted fall back to a cleaned free-text ``q`` so the backend does not
+ * scan the whole corpus.
+ *
+ * ``dslToCoarseParams`` squeezes the whole expression into ONE param set;
+ * for a top-level OR it ANDs all text terms into ``q`` — a lower bound that
+ * can collapse to 0 for synonym merges. ``dslToCountPlan`` is the count-
+ * oriented wrapper: it splits a top-level OR into one param set per leg so
+ * the caller can count the legs individually and combine them.
+ * ------------------------------------------------------------------- */
+
+export interface CoarseBackendParams {
+  q?: string
+  author?: string
+  conf?: string[]
+  since?: number
+  until?: number
+}
+
+/**
+ * Collect the values of text-ish term leaves (topic / title / abstract /
+ * keywords / unfielded) for the coarse-q fallback. NOT subtrees are skipped
+ * — excluded terms must never enter an AND filter. Field-qualified non-text
+ * leaves (author / conf / year) are skipped because their values (names,
+ * venue acronyms, years) virtually never appear in title/abstract text, so
+ * AND-ing them would zero out the count.
+ */
+const collectTextTerms = (node: AstNode, acc: string[]): void => {
+  switch (node.kind) {
+    case 'term':
+      if (
+        node.field === null ||
+        node.field === 'topic' ||
+        node.field === 'title' ||
+        node.field === 'abstract' ||
+        node.field === 'keywords'
+      ) {
+        acc.push(node.value)
+      }
+      return
+    case 'and':
+    case 'or':
+      node.nodes.forEach(n => collectTextTerms(n, acc))
+      return
+    case 'near':
+      collectTextTerms(node.left, acc)
+      collectTextTerms(node.right, acc)
+      return
+    default:
+      return
+  }
+}
+
+/**
+ * Coarse params for an already-parsed AST. ``rawFallback`` is forwarded as
+ * ``q`` only when the AST is empty (malformed input); pass '' for OR legs,
+ * where an unparseable leg should simply contribute nothing.
+ */
+const coarseParamsFromAst = (
+  ast: AstNode,
+  rawFallback: string
+): CoarseBackendParams => {
+  const split = splitForBackend(ast)
+  const out: CoarseBackendParams = {}
+  if (split.q) {
+    out.q = split.q
+  } else if (ast.kind === 'empty') {
+    if (rawFallback) out.q = rawFallback
+  } else if (
+    !split.author &&
+    !split.conf &&
+    split.since == null &&
+    split.until == null
+  ) {
+    // Nothing hoistable (nested OR / NOT / NEAR). Collect the actual text
+    // terms from the AST rather than cleaning the raw string — the latter
+    // would leave field tags (``TS=``) in ``q`` and AND them into a
+    // guaranteed-zero substring filter. The backend still gets a coarse
+    // pre-filter instead of scanning the whole corpus.
+    const terms: string[] = []
+    collectTextTerms(ast, terms)
+    if (terms.length > 0) out.q = terms.join(' ')
+  }
+  if (split.author) out.author = split.author
+  if (split.conf && split.conf.length > 0) out.conf = split.conf
+  if (split.since != null) out.since = split.since
+  if (split.until != null) out.until = split.until
+  return out
+}
+
+export const dslToCoarseParams = (dsl: string): CoarseBackendParams => {
+  const raw = normalizeQueryInput(dsl ?? '').trim()
+  if (!raw) return {}
+  return coarseParamsFromAst(parseDsl(raw), raw)
+}
+
+export type CountPlan =
+  | { kind: 'none' }
+  | { kind: 'single'; params: CoarseBackendParams }
+  | { kind: 'or'; legs: CoarseBackendParams[] }
+
+/**
+ * Combine per-leg hit counts of a top-level OR plan into one estimate.
+ *
+ * Grouping is per leg, not per plan: legs carrying a ``q`` (bare text terms,
+ * or text terms constrained by year/venue) are typically synonyms whose
+ * result sets overlap heavily, so they merge with Math.max; legs without a
+ * ``q`` (pure author / venue / year) sit on different fields and barely
+ * overlap with anything, so they are summed. A plan-wide boolean cannot
+ * express this — ``(PY=2024 AND TS=llm) OR k1 OR k2`` must not sum the
+ * synonym legs just because one constrained leg is present.
+ *
+ * Legs whose count failed (null) are skipped; returns null when no leg
+ * produced a count at all.
+ */
+export const combineLegCounts = (
+  legs: CoarseBackendParams[],
+  counts: (number | null)[]
+): number | null => {
+  let textMax: number | null = null
+  let otherSum = 0
+  let sawOther = false
+  legs.forEach((params, i) => {
+    const c = counts[i]
+    if (c === null || c === undefined) return
+    if (typeof params.q === 'string') {
+      textMax = textMax === null ? c : Math.max(textMax, c)
+    } else {
+      otherSum += c
+      sawOther = true
+    }
+  })
+  if (textMax === null && !sawOther) return null
+  return (textMax ?? 0) + otherSum
+}
+
+/**
+ * Plan the backend queries needed to approximate a hit count for ``dsl``.
+ *
+ * A top-level OR becomes one param set per leg (`kind: 'or'`) so the caller
+ * can count each disjunct separately — the backend has no text-OR, and
+ * squeezing all legs into one ``q`` would AND them into a lower bound that
+ * collapses to 0 for the synonym-merge queries this app produces most.
+ * Field-qualified legs (``AU=… OR TS=…``) work too: each leg hoists its own
+ * author/conf/year params. Legs that narrow nothing (e.g. a bare ``NOT``)
+ * are dropped; when exactly one usable leg survives it becomes the single
+ * param set directly (re-deriving params from the whole OR expression would
+ * yield an empty set, and the caller would count the entire corpus).
+ */
+export const dslToCountPlan = (dsl: string): CountPlan => {
+  const raw = normalizeQueryInput(dsl ?? '').trim()
+  if (!raw) return { kind: 'none' }
+  const ast = parseDsl(raw)
+  if (ast.kind === 'or') {
+    const legs = flattenChain(ast, 'or')
+      .map(leg => coarseParamsFromAst(leg, ''))
+      .filter(p => Object.keys(p).length > 0)
+    if (legs.length >= 2) return { kind: 'or', legs }
+    if (legs.length === 1) return { kind: 'single', params: legs[0] }
+  }
+  return { kind: 'single', params: coarseParamsFromAst(ast, raw) }
 }
