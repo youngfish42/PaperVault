@@ -109,7 +109,14 @@ const toggleDark = useToggle(isDark)
 
 watch(
   () => route.query.q,
-  () => home.consumeQueryParam(route)
+  () => {
+    // Navigating away (e.g. the /advanced?q=... hand-off) also mutates
+    // route.query while HomeView is still mounted; without this guard we
+    // would fire a redundant search — and its fullscreen loading mask — on
+    // the way out.
+    if (route.path !== '/') return
+    home.consumeQueryParam(route)
+  }
 )
 
 onMounted(async () => {

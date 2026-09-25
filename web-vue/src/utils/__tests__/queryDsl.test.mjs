@@ -458,3 +458,65 @@ test('parseDslToRows: CJK fullwidth input imports cleanly', () => {
   assert.equal(back.rows[1].field, 'year')
   assert.equal(back.rows[1].value, '2024')
 })
+
+// ---------------------------------------------------------------------------
+// dslToCoarseParams — DSL → coarse backend filter params (result counts).
+// The backend treats ``q`` as AND-ed substrings and never parses the DSL,
+// so raw DSL text must never be forwarded as ``q``.
+// ---------------------------------------------------------------------------
+
+const { dslToCoarseParams } = mod
+
+test('dslToCoarseParams: hoists topic/year instead of forwarding raw DSL as q', () => {
+  // Regression guard for the saved-query count bug: raw DSL
+  // (``TS=federated AND PY=2024-2026``) as ``q`` would AND the literal
+  // tokens ``ts=federated``/``and``/``py=2024-2026`` and always return 0.
+  const p = dslToCoarseParams('TS=federated AND PY=2024-2026')
+  assert.equal(p.q, 'federated')
+  assert.equal(p.since, 2024)
+  assert.equal(p.until, 2026)
+})
+
+test('dslToCoarseParams: AU-only query sends author and NO q', () => {
+  const p = dslToCoarseParams('AU="Xiaowen Jiang"')
+  assert.equal(p.q, undefined)
+  assert.equal(p.author, 'Xiaowen Jiang')
+})
+
+test('dslToCoarseParams: SO list and author hoist together', () => {
+  const p = dslToCoarseParams('AU="Yang Liu" SO=ICLR,NeurIPS PY=2024-2026')
+  assert.equal(p.q, undefined)
+  assert.equal(p.author, 'Yang Liu')
+  assert.deepEqual(p.conf, ['ICLR', 'NeurIPS'])
+  assert.equal(p.since, 2024)
+  assert.equal(p.until, 2026)
+})
+
+test('dslToCoarseParams: top-level OR falls back to a cleaned coarse q', () => {
+  // Nothing is hoisted for an OR tree; without a coarse q the backend would
+  // scan the whole corpus and return ~621k as the "count".
+  const p = dslToCoarseParams('TS=federated OR TS="transfer learning"')
+  assert.equal(p.q, 'federated transfer learning')
+  assert.equal(p.author, undefined)
+  assert.equal(p.conf, undefined)
+})
+
+test('dslToCoarseParams: NOT-excluded terms never enter the coarse q', () => {
+  // and{or{a,b}, not{survey}} — "survey" must not be AND-ed into q.
+  const p = dslToCoarseParams('TS=(a OR b) NOT survey')
+  assert.equal(p.q, 'a b')
+})
+
+test('dslToCoarseParams: non-text field values stay out of the coarse q', () => {
+  // Author names / venue acronyms / years virtually never appear in
+  // title/abstract text, so including them would zero out the count.
+  const p = dslToCoarseParams('AU="Yang Liu" OR SO=ICLR')
+  assert.equal(p.q, undefined)
+  assert.equal(p.author, undefined)
+  assert.equal(p.conf, undefined)
+})
+
+test('dslToCoarseParams: empty input → no params', () => {
+  assert.deepEqual(dslToCoarseParams(''), {})
+  assert.deepEqual(dslToCoarseParams('   '), {})
+})

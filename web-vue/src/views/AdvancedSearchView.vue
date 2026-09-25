@@ -15,7 +15,12 @@ import {
 import { useAuth } from '@/composables/useAuth'
 import { copyText } from '@/utils/clipboard'
 import { useI18n } from '@/utils/i18n'
-import { buildDsl, parseDslToRows, type DslRow } from '@/utils/queryDsl'
+import {
+  buildDsl,
+  dslToCoarseParams,
+  parseDslToRows,
+  type DslRow
+} from '@/utils/queryDsl'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -189,10 +194,19 @@ const favName = ref('')
 const favSaving = ref(false)
 const favRefreshingId = ref<number | null>(null)
 
-/** Run the DSL against the corpus and return just the hit count. */
+/**
+ * Run the DSL against the corpus and return just the hit count.
+ *
+ * The backend does not parse the DSL — ``q`` is a substring AND filter — so
+ * the expression is first approximated into coarse backend params
+ * (dslToCoarseParams, the same split the home search performs). Residual
+ * OR/NOT/NEAR clauses are evaluated client-side during a real search, so
+ * this count is the same upper-bound approximation shown as the search
+ * total.
+ */
 const fetchResultCount = async (dsl: string): Promise<number | null> => {
   try {
-    const res = await searchPapers({ q: dsl, size: 1 })
+    const res = await searchPapers({ ...dslToCoarseParams(dsl), size: 1 })
     return res.meta?.total ?? null
   } catch {
     // A failed count must not block saving / refreshing; store null instead.
@@ -349,6 +363,11 @@ const formatTime = (iso: string): string => {
  * param so a later refresh does not resurrect it over the user's edits.
  */
 const consumeRouteQuery = (): void => {
+  // Guard against the route change that happens when leaving this page
+  // (runSearch pushes `/?q=...`): while the component is still mounted the
+  // watcher below would otherwise consume the outgoing query and
+  // router.replace would strip it from the home navigation.
+  if (route.path !== '/advanced') return
   const q = route.query.q
   if (typeof q === 'string' && q.trim()) {
     importText.value = q.trim()
