@@ -9068,6 +9068,10 @@
         "url": "https://dblp.org/db/journals/tos/tos21.html"
     },
     {
+        "name": "TOS2026",
+        "url": "https://dblp.org/db/journals/tos/tos22.html"
+    },
+    {
         "name": "TPDS2000",
         "url": "https://dblp.org/db/journals/tpds/tpds11.html"
     },
@@ -9164,8 +9168,16 @@
         "url": "https://dblp.org/db/journals/tpds/tpds34.html"
     },
     {
+        "name": "TPDS2025",
+        "url": "https://dblp.org/db/journals/tpds/tpds36.html"
+    },
+    {
         "name": "TPDS2026",
         "url": "https://dblp.org/db/journals/tpds/tpds35.html"
+    },
+    {
+        "name": "TPDS2026",
+        "url": "https://dblp.org/db/journals/tpds/tpds37.html"
     },
     {
         "name": "ALT2000",
