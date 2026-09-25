@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, shallowRef } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, shallowRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import MainNavBar from '@/components/MainNavBar.vue'
-import { listConfs } from '@/api/paper'
+import { listConfs, searchPapers } from '@/api/paper'
+import {
+  createSavedQuery,
+  deleteSavedQuery,
+  listSavedQueries,
+  updateSavedQuery,
+  type SavedQuery
+} from '@/api/savedQueries'
+import { useAuth } from '@/composables/useAuth'
+import { copyText } from '@/utils/clipboard'
 import { useI18n } from '@/utils/i18n'
-import { buildDsl, type DslRow } from '@/utils/queryDsl'
+import { buildDsl, parseDslToRows, type DslRow } from '@/utils/queryDsl'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
+const { isLoggedIn, ensureFetched } = useAuth()
 
 /**
  * Web of Science-style advanced search:
@@ -101,13 +112,262 @@ const runSearch = (): void => {
   router.push({ path: '/', query: { q: expr } })
 }
 
+/** ---------------------------------------------------------------------
+ * Text ↔ builder conversion (issue #196): the composed DSL can be copied
+ * out, and any text DSL can be parsed back into builder rows.
+ * ------------------------------------------------------------------- */
+
+const importText = ref('')
+
+/**
+ * Replace the builder rows / year range with whatever ``raw`` parses to.
+ * Only the first AND-joined year row is folded into the dedicated year-range
+ * inputs (which always re-join as a hard AND); NOT/OR year rows and any
+ * further year rows stay as builder rows so their semantics survive.
+ * Anything the row model cannot express (nested groups, NEAR, leading NOT)
+ * degrades to a single topic row holding the original text, with a warning.
+ */
+const applyDslToBuilder = (raw: string): void => {
+  const { rows: parsed, supported } = parseDslToRows(raw)
+  yearRange.from = ''
+  yearRange.to = ''
+  let yearFolded = false
+  const next: BuilderRow[] = []
+  for (const r of parsed) {
+    const joinOp = r.op ?? 'AND'
+    if (r.field === 'year' && joinOp === 'AND' && !yearFolded) {
+      const m = r.value.match(/^(\d{4})\s*-\s*(\d{4})$/)
+      if (m) {
+        yearRange.from = m[1]
+        yearRange.to = m[2]
+        yearFolded = true
+        continue
+      }
+      if (/^\d{4}$/.test(r.value)) {
+        yearRange.from = r.value
+        yearFolded = true
+        continue
+      }
+    }
+    next.push(newRow(r.field, r.value, joinOp))
+  }
+  rows.splice(0, rows.length, ...(next.length ? next : [newRow('topic', '')]))
+  if (!supported) {
+    ElMessage.warning(t('adv.import.unsupported'))
+  }
+}
+
+const handleImport = (): void => {
+  const text = importText.value.trim()
+  if (!text) {
+    ElMessage.warning(t('adv.import.empty'))
+    return
+  }
+  applyDslToBuilder(text)
+}
+
+const copyDsl = async (): Promise<void> => {
+  const expr = composedDsl.value.trim()
+  if (!expr) {
+    ElMessage.warning(t('adv.warn.empty'))
+    return
+  }
+  const ok = await copyText(expr)
+  if (ok) ElMessage.success(t('adv.copyOk'))
+  else ElMessage.warning(t('adv.copyFail'))
+}
+
+/** ---------------------------------------------------------------------
+ * Saved queries (favorites) — server-side, per logged-in user.
+ * ------------------------------------------------------------------- */
+
+const favDrawerVisible = ref(false)
+const favList = shallowRef<SavedQuery[]>([])
+const favLoading = ref(false)
+const favSaveVisible = ref(false)
+const favName = ref('')
+const favSaving = ref(false)
+const favRefreshingId = ref<number | null>(null)
+
+/** Run the DSL against the corpus and return just the hit count. */
+const fetchResultCount = async (dsl: string): Promise<number | null> => {
+  try {
+    const res = await searchPapers({ q: dsl, size: 1 })
+    return res.meta?.total ?? null
+  } catch {
+    // A failed count must not block saving / refreshing; store null instead.
+    return null
+  }
+}
+
+const openSaveDialog = (): void => {
+  const expr = composedDsl.value.trim()
+  if (!expr) {
+    ElMessage.warning(t('adv.warn.empty'))
+    return
+  }
+  if (!isLoggedIn.value) {
+    ElMessage.warning(t('fav.loginRequired'))
+    return
+  }
+  favName.value = ''
+  favSaveVisible.value = true
+}
+
+const saveFavorite = async (): Promise<void> => {
+  const name = favName.value.trim()
+  const dsl = composedDsl.value.trim()
+  if (!name) {
+    ElMessage.warning(t('fav.nameRequired'))
+    return
+  }
+  favSaving.value = true
+  try {
+    const total = await fetchResultCount(dsl)
+    await createSavedQuery({ name, dsl, last_count: total })
+    ElMessage.success(t('fav.saved'))
+    favSaveVisible.value = false
+    if (favDrawerVisible.value) await loadFavorites()
+  } catch {
+    // The axios interceptor already surfaced the error toast.
+  } finally {
+    favSaving.value = false
+  }
+}
+
+const loadFavorites = async (): Promise<void> => {
+  favLoading.value = true
+  try {
+    const res = await listSavedQueries()
+    favList.value = res.items ?? []
+  } catch {
+    // toasted by the interceptor
+  } finally {
+    favLoading.value = false
+  }
+}
+
+const openFavorites = async (): Promise<void> => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning(t('fav.loginRequired'))
+    return
+  }
+  favDrawerVisible.value = true
+  await loadFavorites()
+}
+
+const loadFavorite = (item: SavedQuery): void => {
+  applyDslToBuilder(item.dsl)
+  importText.value = item.dsl
+  favDrawerVisible.value = false
+  ElMessage.success(t('fav.loaded'))
+}
+
+const copyFavorite = async (item: SavedQuery): Promise<void> => {
+  const ok = await copyText(item.dsl)
+  if (ok) ElMessage.success(t('adv.copyOk'))
+  else ElMessage.warning(t('adv.copyFail'))
+}
+
+const refreshFavorite = async (item: SavedQuery): Promise<void> => {
+  favRefreshingId.value = item.id
+  try {
+    const total = await fetchResultCount(item.dsl)
+    if (total === null) {
+      // A failed count must not wipe a previously recorded one.
+      ElMessage.error(t('fav.refreshFailed'))
+      return
+    }
+    const updated = await updateSavedQuery(item.id, { last_count: total })
+    favList.value = favList.value.map(x => (x.id === item.id ? updated : x))
+    ElMessage.success(t('fav.refreshed', { n: String(total) }))
+  } catch {
+    // toasted by the interceptor
+  } finally {
+    favRefreshingId.value = null
+  }
+}
+
+const renameFavorite = async (item: SavedQuery): Promise<void> => {
+  let name: string
+  try {
+    const res = await ElMessageBox.prompt(
+      t('fav.renamePrompt'),
+      t('fav.rename'),
+      {
+        inputValue: item.name,
+        confirmButtonText: t('fav.confirm'),
+        cancelButtonText: t('fav.cancel')
+      }
+    )
+    name = (res.value ?? '').trim()
+  } catch {
+    return // user cancelled
+  }
+  if (!name || name === item.name) return
+  try {
+    const updated = await updateSavedQuery(item.id, { name })
+    favList.value = favList.value.map(x => (x.id === item.id ? updated : x))
+    ElMessage.success(t('fav.saved'))
+  } catch {
+    // toasted by the interceptor
+  }
+}
+
+const removeFavorite = async (item: SavedQuery): Promise<void> => {
+  try {
+    await ElMessageBox.confirm(
+      t('fav.deleteConfirm', { name: item.name }),
+      t('fav.delete'),
+      {
+        type: 'warning',
+        confirmButtonText: t('fav.confirm'),
+        cancelButtonText: t('fav.cancel')
+      }
+    )
+  } catch {
+    return // user cancelled
+  }
+  try {
+    await deleteSavedQuery(item.id)
+    favList.value = favList.value.filter(x => x.id !== item.id)
+    ElMessage.success(t('fav.deleted'))
+  } catch {
+    // toasted by the interceptor
+  }
+}
+
+/** Render an ISO timestamp from the backend in the user's locale. */
+const formatTime = (iso: string): string => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
+}
+
+/**
+ * Query hand-off: HomeView and saved-query deep links arrive as
+ * /#/advanced?q=... — pre-fill the builder from the text DSL, then clear the
+ * param so a later refresh does not resurrect it over the user's edits.
+ */
+const consumeRouteQuery = (): void => {
+  const q = route.query.q
+  if (typeof q === 'string' && q.trim()) {
+    importText.value = q.trim()
+    applyDslToBuilder(q)
+    router.replace({ query: {} })
+  }
+}
+
+watch(() => route.query.q, consumeRouteQuery)
+
 onMounted(async () => {
+  ensureFetched()
   try {
     const res = await listConfs()
     availableConfs.value = (res.items || []).map(c => c.name)
   } catch (err) {
     console.error('Failed to load confs', err)
   }
+  consumeRouteQuery()
 })
 </script>
 
@@ -209,14 +469,40 @@ onMounted(async () => {
           </div>
 
           <div class="pv-adv-preview">
-            <div class="pv-adv-preview-label">{{ t('adv.preview') }}</div>
+            <div class="pv-adv-preview-head">
+              <div class="pv-adv-preview-label">{{ t('adv.preview') }}</div>
+              <el-button size="small" text icon="CopyDocument" @click="copyDsl">
+                {{ t('adv.copy') }}
+              </el-button>
+            </div>
             <code class="pv-adv-preview-code">{{
               composedDsl || t('adv.previewEmpty')
             }}</code>
           </div>
 
+          <div class="pv-adv-import">
+            <div class="pv-adv-import-label">{{ t('adv.import.label') }}</div>
+            <el-input
+              v-model="importText"
+              type="textarea"
+              :rows="2"
+              :placeholder="t('adv.import.placeholder')"
+            />
+            <div class="pv-adv-import-actions">
+              <el-button size="small" icon="Download" @click="handleImport">
+                {{ t('adv.import.apply') }}
+              </el-button>
+            </div>
+          </div>
+
           <div class="pv-adv-actions">
             <el-button @click="clearAll">{{ t('adv.clear') }}</el-button>
+            <el-button icon="Star" @click="openSaveDialog">
+              {{ t('fav.save') }}
+            </el-button>
+            <el-button icon="Collection" @click="openFavorites">
+              {{ t('fav.list') }}
+            </el-button>
             <el-button type="primary" icon="Search" @click="runSearch">
               {{ t('adv.search') }}
             </el-button>
@@ -249,6 +535,111 @@ onMounted(async () => {
         </el-card>
       </div>
     </section>
+
+    <!-- 收藏检索式：命名保存 -->
+    <el-dialog
+      v-model="favSaveVisible"
+      :title="t('fav.saveTitle')"
+      width="480px"
+    >
+      <div class="pv-fav-save">
+        <code class="pv-fav-save-dsl">{{ composedDsl }}</code>
+        <el-input
+          v-model="favName"
+          :placeholder="t('fav.namePh')"
+          maxlength="80"
+          show-word-limit
+          @keyup.enter="saveFavorite"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="favSaveVisible = false">
+          {{ t('fav.cancel') }}
+        </el-button>
+        <el-button type="primary" :loading="favSaving" @click="saveFavorite">
+          {{ t('fav.confirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 收藏检索式列表 -->
+    <el-drawer
+      v-model="favDrawerVisible"
+      :title="t('fav.list')"
+      size="min(520px, 92vw)"
+    >
+      <div v-loading="favLoading" class="pv-fav-list">
+        <el-empty
+          v-if="!favLoading && favList.length === 0"
+          :description="t('fav.empty')"
+        />
+        <div v-for="item in favList" :key="item.id" class="pv-fav-item">
+          <div class="pv-fav-item-head">
+            <span class="pv-fav-item-name" :title="item.name">{{
+              item.name
+            }}</span>
+            <el-tag size="small" type="info" effect="plain">
+              {{
+                item.last_count === null
+                  ? t('fav.countUnknown')
+                  : t('fav.count', { n: item.last_count })
+              }}
+            </el-tag>
+          </div>
+          <code class="pv-fav-item-dsl">{{ item.dsl }}</code>
+          <div class="pv-fav-item-foot">
+            <span class="pv-fav-item-time">{{
+              t('fav.updatedAt', { time: formatTime(item.updated_at) })
+            }}</span>
+            <div class="pv-fav-item-ops">
+              <el-button
+                size="small"
+                text
+                type="primary"
+                icon="Upload"
+                @click="loadFavorite(item)"
+              >
+                {{ t('fav.load') }}
+              </el-button>
+              <el-button
+                size="small"
+                text
+                icon="CopyDocument"
+                @click="copyFavorite(item)"
+              >
+                {{ t('adv.copy') }}
+              </el-button>
+              <el-button
+                size="small"
+                text
+                icon="Refresh"
+                :loading="favRefreshingId === item.id"
+                @click="refreshFavorite(item)"
+              >
+                {{ t('fav.refresh') }}
+              </el-button>
+              <el-button
+                size="small"
+                text
+                icon="EditPen"
+                @click="renameFavorite(item)"
+              >
+                {{ t('fav.rename') }}
+              </el-button>
+              <el-button
+                size="small"
+                text
+                type="danger"
+                icon="Delete"
+                @click="removeFavorite(item)"
+              >
+                {{ t('fav.delete') }}
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
   </main>
 </template>
 
@@ -587,6 +978,98 @@ onMounted(async () => {
   border-radius: 3px;
   font-family: 'Fira Code', Consolas, monospace;
   font-size: 12px;
+}
+
+/* ---------- 预览复制 / 文本导入 / 收藏 ---------- */
+.pv-adv-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.pv-adv-preview-head .pv-adv-preview-label {
+  margin-bottom: 0;
+}
+.pv-adv-import {
+  margin-top: 14px;
+}
+.pv-adv-import-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary, #909399);
+  margin-bottom: 6px;
+}
+.pv-adv-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.pv-fav-save {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pv-fav-save-dsl {
+  display: block;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  background: var(--el-fill-color-lighter, #fafbfc);
+  border-radius: 4px;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.pv-fav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pv-fav-item {
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.pv-fav-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pv-fav-item-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--el-text-color-primary, #303133);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-fav-item-dsl {
+  display: block;
+  margin-top: 6px;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #606266);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.pv-fav-item-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.pv-fav-item-time {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder, #a8abb2);
+}
+.pv-fav-item-ops {
+  display: flex;
+  flex-wrap: wrap;
+}
+.pv-fav-item-ops .el-button + .el-button {
+  margin-left: 0;
 }
 
 @media (max-width: 768px) {

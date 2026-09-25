@@ -748,9 +748,14 @@ const renderRow = (row: DslRow): string => {
       .join(',')}`
   }
   if (/\s/.test(value)) {
-    // If the user already wrote operators, wrap in parens; otherwise quote
-    // the phrase so we keep WoS-style exact phrase semantics.
-    if (/\b(AND|OR|NOT|NEAR)\b/i.test(value) || /[()]/.test(value)) {
+    // If the user already wrote operators (or a leading-mid minus NOT like
+    // ``-survey``), wrap in parens; otherwise quote the phrase so we keep
+    // WoS-style exact phrase semantics.
+    if (
+      /\b(AND|OR|NOT|NEAR)\b/i.test(value) ||
+      /[()]/.test(value) ||
+      /(^|\s)-\S/.test(value)
+    ) {
       return `${tag}=(${value})`
     }
     return `${tag}="${value}"`
@@ -791,4 +796,129 @@ export function buildDsl(input: BuildDslInput | DslRow[]): string {
     parts.push(`SO=${state.confs.join(',')}`)
   }
   return parts.filter(Boolean).join(' ')
+}
+
+/** ---------------------------------------------------------------------
+ * parseDslToRows — inverse of buildDsl, used by the Advanced Search page
+ * to import a text DSL back into the visual row builder.
+ *
+ * The row model can only express a flat AND/OR/NOT chain of term/list/
+ * range leaves, so round-tripping is faithful exactly for:
+ *   - a single leaf,
+ *   - an AND chain of leaves (NOT-wrapped leaves → op 'NOT'),
+ *   - an OR chain whose legs are leaves or pure AND chains of leaves
+ *     (matches the precedence the rebuilt text will parse back with).
+ * Anything else (NEAR, parenthesised OR groups inside an AND, NOT around a
+ * group, a leading NOT, OR-of-NOT) has no row representation. In that case
+ * the function still succeeds but returns a single topic row holding the
+ * original text plus ``supported: false`` — renderRow wraps it as
+ * ``TS=(original)``, which preserves the original semantics exactly while
+ * signalling to the UI that the rows are not individually editable.
+ * ------------------------------------------------------------------- */
+
+export interface ParseRowsResult {
+  /** Builder rows; year rows use value ``from-to`` like the UI's year row. */
+  rows: DslRow[]
+  /** false when the AST contains structures the row model cannot express. */
+  supported: boolean
+}
+
+interface RowLeaf {
+  field: string
+  value: string
+  negated: boolean
+}
+
+/**
+ * Reduce a node to a leaf (term / list / range), remembering a NOT wrapper.
+ * Returns null for anything structured (and / or / near / not-of-group).
+ */
+const leafFromNode = (node: AstNode): RowLeaf | null => {
+  let negated = false
+  let n = node
+  if (n.kind === 'not') {
+    negated = true
+    n = n.node
+  }
+  switch (n.kind) {
+    case 'term': {
+      // AK mirrors TS by design; fold it back so the builder's fixed field
+      // list (which has no keywords option) can represent the row.
+      const field =
+        n.field === 'keywords' || n.field === null ? 'topic' : n.field
+      return { field, value: n.value, negated }
+    }
+    case 'list':
+      return {
+        field: n.field === 'keywords' ? 'topic' : n.field,
+        value: n.values.join(','),
+        negated
+      }
+    case 'range':
+      return {
+        field: n.field,
+        value: `${Math.min(n.from, n.to)}-${Math.max(n.from, n.to)}`,
+        negated
+      }
+    default:
+      return null
+  }
+}
+
+/** Flatten same-kind nesting: `(a AND b) AND c` ≡ `a AND b AND c`. */
+const flattenChain = (node: AstNode, kind: 'and' | 'or'): AstNode[] => {
+  if (node.kind === kind) return node.nodes.flatMap(n => flattenChain(n, kind))
+  return [node]
+}
+
+/** An OR leg: a leaf, or a pure AND chain of leaves. */
+const andUnitToLeaves = (node: AstNode): RowLeaf[] | null => {
+  const leaves = flattenChain(node, 'and').map(leafFromNode)
+  if (leaves.some(l => l === null)) return null
+  return leaves as RowLeaf[]
+}
+
+const toRow = (leaf: RowLeaf, op: 'AND' | 'OR' | 'NOT'): DslRow => ({
+  field: leaf.field,
+  value: leaf.value,
+  op
+})
+
+const rowsFromAst = (ast: AstNode): DslRow[] | null => {
+  if (ast.kind === 'empty') return []
+
+  let rows: DslRow[]
+  if (ast.kind === 'or') {
+    rows = []
+    for (const clause of flattenChain(ast, 'or')) {
+      const leaves = andUnitToLeaves(clause)
+      if (!leaves) return null
+      // `a OR NOT b` has no row form: the rebuilt `a NOT b` would AND.
+      if (leaves[0].negated) return null
+      leaves.forEach((leaf, i) => {
+        rows.push(toRow(leaf, i === 0 ? 'OR' : leaf.negated ? 'NOT' : 'AND'))
+      })
+    }
+  } else {
+    // Single leaf or a pure AND chain (flattenChain is the identity for
+    // non-and nodes, so this also covers the lone-leaf case).
+    const leaves = andUnitToLeaves(ast)
+    if (!leaves) return null
+    rows = leaves.map(leaf => toRow(leaf, leaf.negated ? 'NOT' : 'AND'))
+  }
+
+  if (rows.length === 0) return rows
+  // The first row's op is ignored by buildDsl, so a leading NOT would be
+  // silently dropped on rebuild — refuse to claim fidelity for that.
+  if (rows[0].op === 'NOT') return null
+  rows[0] = { ...rows[0], op: 'AND' }
+  return rows
+}
+
+export const parseDslToRows = (input: string): ParseRowsResult => {
+  const text = normalizeQueryInput(input ?? '').trim()
+  if (!text) return { rows: [], supported: true }
+  const rows = rowsFromAst(parseDsl(text))
+  if (rows) return { rows, supported: true }
+  return { rows: [{ field: 'topic', value: text }], supported: false }
 }

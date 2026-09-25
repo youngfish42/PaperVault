@@ -94,7 +94,10 @@ const handleAiSearchPick = (payload: {
 }
 
 const goAdvanced = (): void => {
-  router.push({ path: '/advanced' })
+  // Hand the current smart-search expression to the builder so the user can
+  // keep refining it as rows instead of retyping it.
+  const q = searchContent.query.trim()
+  router.push({ path: '/advanced', query: q ? { q } : {} })
 }
 
 const goSettings = (): void => {
@@ -120,6 +123,7 @@ onMounted(async () => {
     <MainNavBar
       active-key="home"
       :is-dark="isDark"
+      :query="searchContent.query"
       @toggle-dark="toggleDark()"
     />
 

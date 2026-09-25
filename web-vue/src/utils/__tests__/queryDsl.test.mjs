@@ -291,3 +291,170 @@ test('evaluateDsl: NOT excludes matching papers', () => {
 test('evaluateDsl: empty AST is permissive (matches everything)', () => {
   assert.equal(evaluateDsl(samplePaper, parseDsl('')), true)
 })
+
+// ---------------------------------------------------------------------------
+// parseDslToRows — text DSL → Advanced Search builder rows
+// ---------------------------------------------------------------------------
+
+const { parseDslToRows, buildDsl } = mod
+
+/** Round-trip helper: rows → DSL text → rows again must be faithful. */
+const roundTrip = rows => {
+  const dsl = buildDsl(rows)
+  const back = parseDslToRows(dsl)
+  return { dsl, back }
+}
+
+test('parseDslToRows: empty / whitespace input → no rows, supported', () => {
+  assert.deepEqual(parseDslToRows(''), { rows: [], supported: true })
+  assert.deepEqual(parseDslToRows('   '), { rows: [], supported: true })
+})
+
+test('parseDslToRows: buildDsl → parseDslToRows round-trips multi-field rows', () => {
+  const rows = [
+    { field: 'topic', value: 'federated learning' },
+    { field: 'author', value: 'Yang Liu', op: 'AND' },
+    { field: 'conf', value: 'ICLR,NeurIPS', op: 'AND' },
+    { field: 'year', value: '2024-2026', op: 'AND' }
+  ]
+  const { dsl, back } = roundTrip(rows)
+  assert.equal(back.supported, true)
+  assert.deepEqual(
+    back.rows.map(r => ({ field: r.field, value: r.value, op: r.op })),
+    rows.map((r, i) => ({ ...r, op: i === 0 ? 'AND' : r.op }))
+  )
+  // And the re-imported rows must compile to the same text again.
+  assert.equal(buildDsl(back.rows), dsl)
+})
+
+test('parseDslToRows: OR and NOT joins survive the round-trip', () => {
+  const rows = [
+    { field: 'topic', value: 'diffusion' },
+    { field: 'topic', value: 'flow matching', op: 'OR' },
+    { field: 'abstract', value: 'survey', op: 'NOT' }
+  ]
+  const { dsl, back } = roundTrip(rows)
+  assert.equal(back.supported, true)
+  assert.equal(buildDsl(back.rows), dsl)
+  // Semantics must be identical, not just the text: both ASTs evaluate the
+  // same way on a probe paper.
+  const paper = {
+    title: 'Diffusion Models',
+    abstract: 'A survey of flows.',
+    authors: [],
+    conf: 'ICLR',
+    year: 2025
+  }
+  assert.equal(
+    evaluateDsl(paper, parseDsl(dsl)),
+    evaluateDsl(paper, parseDsl(buildDsl(back.rows)))
+  )
+})
+
+test('parseDslToRows: precedence-legal mixed AND/OR stays supported', () => {
+  // `a AND b OR c` parses as `(a AND b) OR c`; the rebuilt text from rows
+  // parses back to the very same tree, so this IS faithfully representable.
+  const dsl = 'TS=diffusion AND TI=score OR AU="Yang Liu"'
+  const back = parseDslToRows(dsl)
+  assert.equal(back.supported, true)
+  assert.equal(buildDsl(back.rows), dsl)
+})
+
+test('parseDslToRows: parenthesised OR inside AND → degrade keeps original text', () => {
+  const dsl = 'TS=(federated OR privacy) AND PY=2020-2026'
+  const back = parseDslToRows(dsl)
+  assert.equal(back.supported, false)
+  // Degrade path: a single topic row holding the original expression; the
+  // rebuilt DSL must preserve the original semantics exactly.
+  assert.equal(back.rows.length, 1)
+  assert.equal(back.rows[0].field, 'topic')
+  const paper = {
+    title: 'Federated Learning',
+    abstract: '',
+    authors: [],
+    conf: 'ICLR',
+    year: 2023
+  }
+  assert.equal(
+    evaluateDsl(paper, parseDsl(buildDsl(back.rows))),
+    evaluateDsl(paper, parseDsl(dsl))
+  )
+})
+
+test('parseDslToRows: NEAR degrades but preserves semantics', () => {
+  const dsl = 'privacy NEAR/5 utility'
+  const back = parseDslToRows(dsl)
+  assert.equal(back.supported, false)
+  assert.equal(back.rows.length, 1)
+  assert.equal(evaluateDsl(samplePaper, parseDsl(buildDsl(back.rows))), true)
+})
+
+test('parseDslToRows: leading NOT degrades instead of silently dropping it', () => {
+  // The first row's op is ignored by buildDsl, so claiming support here
+  // would turn `NOT survey` into `survey` on rebuild.
+  const back = parseDslToRows('NOT TS=survey')
+  assert.equal(back.supported, false)
+  const paper = {
+    title: 'A survey',
+    abstract: '',
+    authors: [],
+    conf: '',
+    year: 2024
+  }
+  assert.equal(evaluateDsl(paper, parseDsl(buildDsl(back.rows))), false)
+})
+
+test('parseDslToRows: operator-free degrade (-a b) still preserves NOT semantics', () => {
+  // `-a b` parses as and{not{a}, b}; the leading NOT has no row form, so it
+  // degrades. The rebuilt DSL must keep matching "b-but-not-a", not become
+  // the phrase substring "-a b".
+  const back = parseDslToRows('-a b')
+  assert.equal(back.supported, false)
+  const rebuilt = buildDsl(back.rows)
+  const onlyB = {
+    title: 'has b here',
+    abstract: '',
+    authors: [],
+    conf: '',
+    year: 2024
+  }
+  const both = {
+    title: 'has a and b',
+    abstract: '',
+    authors: [],
+    conf: '',
+    year: 2024
+  }
+  assert.equal(
+    evaluateDsl(onlyB, parseDsl(rebuilt)),
+    evaluateDsl(onlyB, parseDsl('-a b'))
+  )
+  assert.equal(
+    evaluateDsl(both, parseDsl(rebuilt)),
+    evaluateDsl(both, parseDsl('-a b'))
+  )
+  assert.equal(evaluateDsl(both, parseDsl(rebuilt)), false)
+})
+
+test('parseDslToRows: AK list folds to topic rows', () => {
+  const back = parseDslToRows('AK=transformer,diffusion')
+  assert.equal(back.supported, true)
+  assert.equal(back.rows[0].field, 'topic')
+  assert.equal(back.rows[0].value, 'transformer,diffusion')
+})
+
+test('parseDslToRows: AK folds back to topic (builder has no keywords field)', () => {
+  const back = parseDslToRows('AK=transformer')
+  assert.equal(back.supported, true)
+  assert.equal(back.rows[0].field, 'topic')
+  assert.equal(back.rows[0].value, 'transformer')
+})
+
+test('parseDslToRows: CJK fullwidth input imports cleanly', () => {
+  const back = parseDslToRows('AU＝"Yang Liu" AND PY＝2024')
+  assert.equal(back.supported, true)
+  assert.equal(back.rows[0].field, 'author')
+  assert.equal(back.rows[0].value, 'Yang Liu')
+  assert.equal(back.rows[1].field, 'year')
+  assert.equal(back.rows[1].value, '2024')
+})
