@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PageMeta(BaseModel):
@@ -185,3 +185,56 @@ class RerankResponse(BaseModel):
     model: str
     provider: str
     protocol: str
+
+
+def _strip_str(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
+class SavedQueryCreateIn(BaseModel):
+    """Payload for ``POST /v1/saved_queries``."""
+
+    name: str = Field(min_length=1, max_length=80)
+    dsl: str = Field(min_length=1, max_length=2000)
+    last_count: Optional[int] = Field(default=None, ge=0)
+
+    @field_validator("name", "dsl", mode="before")
+    @classmethod
+    def _strip(cls, value: Any):
+        return _strip_str(value)
+
+
+class SavedQueryUpdateIn(BaseModel):
+    """Payload for ``PATCH /v1/saved_queries/<id>``.
+
+    Every field is optional, but at least one must be present in the
+    payload. ``last_count`` is explicitly nullable: sending it as JSON
+    ``null`` clears the stored count, while omitting it leaves it
+    untouched (the API layer inspects ``model_fields_set``).
+    """
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    dsl: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+    last_count: Optional[int] = Field(default=None, ge=0)
+
+    @field_validator("name", "dsl", mode="before")
+    @classmethod
+    def _strip(cls, value: Any):
+        return _strip_str(value)
+
+    @model_validator(mode="after")
+    def _at_least_one_field(self):
+        if not self.model_fields_set:
+            raise ValueError("at least one field must be provided")
+        return self
+
+
+class SavedQueryOut(BaseModel):
+    id: int
+    name: str
+    dsl: str
+    last_count: Optional[int] = None
+    created_at: str
+    updated_at: str

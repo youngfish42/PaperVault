@@ -4,11 +4,12 @@ from .ai import bp as ai_bp
 from .confs import bp as confs_bp
 from .health import bp as health_bp
 from .papers import bp as papers_bp
+from .saved_queries import bp as saved_queries_bp
 from .suggest import bp as suggest_bp
 from .auth import bp as auth_bp
 from .admin import bp as admin_bp
 
-__all__ = ["health_bp", "confs_bp", "papers_bp", "suggest_bp", "ai_bp", "auth_bp", "admin_bp"]
+__all__ = ["health_bp", "confs_bp", "papers_bp", "suggest_bp", "ai_bp", "auth_bp", "admin_bp", "saved_queries_bp"]
 
 
 def register_blueprints(app):
@@ -19,3 +20,4 @@ def register_blueprints(app):
     app.register_blueprint(ai_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(admin_bp, url_prefix="/api/v1")
+    app.register_blueprint(saved_queries_bp, url_prefix="/api/v1")
