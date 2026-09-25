@@ -17,8 +17,9 @@ import { copyText } from '@/utils/clipboard'
 import { useI18n } from '@/utils/i18n'
 import {
   buildDsl,
-  dslToCoarseParams,
+  dslToCountPlan,
   parseDslToRows,
+  type CoarseBackendParams,
   type DslRow
 } from '@/utils/queryDsl'
 
@@ -195,23 +196,36 @@ const favSaving = ref(false)
 const favRefreshingId = ref<number | null>(null)
 
 /**
- * Run the DSL against the corpus and return just the hit count.
+ * Run the DSL against the corpus and return just the (approximate) hit
+ * count.
  *
  * The backend does not parse the DSL — ``q`` is a substring AND filter — so
- * the expression is first approximated into coarse backend params
- * (dslToCoarseParams, the same split the home search performs). Residual
- * OR/NOT/NEAR clauses are evaluated client-side during a real search, so
- * this count is the same upper-bound approximation shown as the search
- * total.
+ * the expression is first turned into a count plan (dslToCountPlan, the
+ * same split the home search performs). A top-level OR is counted per leg
+ * and combined with Math.max: AND-ing all terms into one ``q`` would
+ * collapse synonym merges to 0, while summing leg counts would inflate on
+ * overlap; max is never 0 while any leg has hits and is a close estimate
+ * for the heavily-overlapping synonym ORs this app produces most. Residual
+ * NOT/NEAR semantics are not reflected — the number is an approximation,
+ * labelled "约/~" in the UI.
  */
 const fetchResultCount = async (dsl: string): Promise<number | null> => {
-  try {
-    const res = await searchPapers({ ...dslToCoarseParams(dsl), size: 1 })
-    return res.meta?.total ?? null
-  } catch {
-    // A failed count must not block saving / refreshing; store null instead.
-    return null
+  const plan = dslToCountPlan(dsl)
+  if (plan.kind === 'none') return null
+  const countOf = async (
+    params: CoarseBackendParams
+  ): Promise<number | null> => {
+    try {
+      const res = await searchPapers({ ...params, size: 1 })
+      return res.meta?.total ?? null
+    } catch {
+      return null
+    }
   }
+  if (plan.kind === 'single') return countOf(plan.params)
+  const counts = await Promise.all(plan.legs.map(countOf))
+  const ok = counts.filter((c): c is number => c !== null)
+  return ok.length > 0 ? Math.max(...ok) : null
 }
 
 const openSaveDialog = (): void => {

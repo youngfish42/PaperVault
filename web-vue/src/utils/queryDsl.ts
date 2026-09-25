@@ -924,20 +924,21 @@ export const parseDslToRows = (input: string): ParseRowsResult => {
 }
 
 /** ---------------------------------------------------------------------
- * dslToCoarseParams — approximate a DSL expression with the backend's
- * coarse filter params (``q`` / ``author`` / ``conf`` / ``since`` /
- * ``until``), for callers that only need a count or a pre-narrowed page
- * (e.g. the saved-query result-count preview).
+ * DSL → coarse backend params / count plan
  *
  * The backend does NOT parse the DSL: ``q`` is matched as AND-ed substrings
  * over title/abstract, so forwarding raw DSL text (``TS=a AND PY=2024``)
  * would AND the literal tokens ``ts=a`` / ``and`` / ``py=2024`` and return
- * zero hits. This helper mirrors useHomeSearch's param building: hoist
+ * zero hits. These helpers mirror useHomeSearch's param building: hoist
  * AND-able qualifiers via splitForBackend, and when nothing could be
  * hoisted fall back to a cleaned free-text ``q`` so the backend does not
- * scan the whole corpus. Residual OR / NOT / NEAR semantics are NOT
- * reflected in the result — the count is the same upper-bound
- * approximation the main search UI already shows as its total.
+ * scan the whole corpus.
+ *
+ * ``dslToCoarseParams`` squeezes the whole expression into ONE param set;
+ * for a top-level OR it ANDs all text terms into ``q`` — a lower bound that
+ * can collapse to 0 for synonym merges. ``dslToCountPlan`` is the count-
+ * oriented wrapper: it splits a top-level OR into one param set per leg so
+ * the caller can count the legs individually and combine them.
  * ------------------------------------------------------------------- */
 
 export interface CoarseBackendParams {
@@ -982,25 +983,28 @@ const collectTextTerms = (node: AstNode, acc: string[]): void => {
   }
 }
 
-export const dslToCoarseParams = (dsl: string): CoarseBackendParams => {
-  const raw = normalizeQueryInput(dsl ?? '').trim()
-  if (!raw) return {}
-  const ast = parseDsl(raw)
+/**
+ * Coarse params for an already-parsed AST. ``rawFallback`` is forwarded as
+ * ``q`` only when the AST is empty (malformed input); pass '' for OR legs,
+ * where an unparseable leg should simply contribute nothing.
+ */
+const coarseParamsFromAst = (
+  ast: AstNode,
+  rawFallback: string
+): CoarseBackendParams => {
   const split = splitForBackend(ast)
   const out: CoarseBackendParams = {}
   if (split.q) {
     out.q = split.q
   } else if (ast.kind === 'empty') {
-    // Parser produced nothing (malformed input) — forward the raw text so
-    // the backend still narrows something.
-    out.q = raw
+    if (rawFallback) out.q = rawFallback
   } else if (
     !split.author &&
     !split.conf &&
     split.since == null &&
     split.until == null
   ) {
-    // Nothing hoistable (top-level OR / NOT / NEAR). Collect the actual text
+    // Nothing hoistable (nested OR / NOT / NEAR). Collect the actual text
     // terms from the AST rather than cleaning the raw string — the latter
     // would leave field tags (``TS=``) in ``q`` and AND them into a
     // guaranteed-zero substring filter. The backend still gets a coarse
@@ -1014,4 +1018,40 @@ export const dslToCoarseParams = (dsl: string): CoarseBackendParams => {
   if (split.since != null) out.since = split.since
   if (split.until != null) out.until = split.until
   return out
+}
+
+export const dslToCoarseParams = (dsl: string): CoarseBackendParams => {
+  const raw = normalizeQueryInput(dsl ?? '').trim()
+  if (!raw) return {}
+  return coarseParamsFromAst(parseDsl(raw), raw)
+}
+
+export type CountPlan =
+  | { kind: 'none' }
+  | { kind: 'single'; params: CoarseBackendParams }
+  | { kind: 'or'; legs: CoarseBackendParams[] }
+
+/**
+ * Plan the backend queries needed to approximate a hit count for ``dsl``.
+ *
+ * A top-level OR becomes one param set per leg (`kind: 'or'`) so the caller
+ * can count each disjunct separately — the backend has no text-OR, and
+ * squeezing all legs into one ``q`` would AND them into a lower bound that
+ * collapses to 0 for the synonym-merge queries this app produces most.
+ * Field-qualified legs (``AU=… OR TS=…``) work too: each leg hoists its own
+ * author/conf/year params. Legs that narrow nothing (e.g. a bare ``NOT``)
+ * are dropped; if fewer than two legs survive, the whole expression falls
+ * back to a single coarse param set.
+ */
+export const dslToCountPlan = (dsl: string): CountPlan => {
+  const raw = normalizeQueryInput(dsl ?? '').trim()
+  if (!raw) return { kind: 'none' }
+  const ast = parseDsl(raw)
+  if (ast.kind === 'or') {
+    const legs = flattenChain(ast, 'or')
+      .map(leg => coarseParamsFromAst(leg, ''))
+      .filter(p => Object.keys(p).length > 0)
+    if (legs.length >= 2) return { kind: 'or', legs }
+  }
+  return { kind: 'single', params: coarseParamsFromAst(ast, raw) }
 }

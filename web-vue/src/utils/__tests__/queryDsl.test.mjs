@@ -520,3 +520,47 @@ test('dslToCoarseParams: empty input → no params', () => {
   assert.deepEqual(dslToCoarseParams(''), {})
   assert.deepEqual(dslToCoarseParams('   '), {})
 })
+
+// ---------------------------------------------------------------------------
+// dslToCountPlan — count-oriented query planning (top-level OR → per-leg)
+// ---------------------------------------------------------------------------
+
+const { dslToCountPlan } = mod
+
+test('dslToCountPlan: empty input → none', () => {
+  assert.deepEqual(dslToCountPlan(''), { kind: 'none' })
+})
+
+test('dslToCountPlan: AND query stays a single hoisted param set', () => {
+  const plan = dslToCountPlan('TS=federated AND PY=2024-2026')
+  assert.equal(plan.kind, 'single')
+  assert.deepEqual(plan.params, { q: 'federated', since: 2024, until: 2026 })
+})
+
+test('dslToCountPlan: top-level OR of text terms splits into per-leg queries', () => {
+  // Regression guard for the review finding: AND-ing all OR terms into one
+  // q ("federated transfer learning") is a lower bound that collapses to 0
+  // for synonym merges — legs must be counted separately.
+  const plan = dslToCountPlan('TS=federated OR TS="transfer learning"')
+  assert.equal(plan.kind, 'or')
+  assert.deepEqual(plan.legs, [{ q: 'federated' }, { q: 'transfer learning' }])
+})
+
+test('dslToCountPlan: field-qualified OR legs hoist their own params', () => {
+  const plan = dslToCountPlan('AU="Yang Liu" OR TS=llm OR SO=ICLR')
+  assert.equal(plan.kind, 'or')
+  assert.deepEqual(plan.legs, [
+    { author: 'Yang Liu' },
+    { q: 'llm' },
+    { conf: ['ICLR'] }
+  ])
+})
+
+test('dslToCountPlan: OR legs that narrow nothing are dropped', () => {
+  // The bare NOT leg contributes no params; with only one usable leg left,
+  // the plan falls back to a single coarse query for the whole expression
+  // (whose collectTextTerms skips the NOT subtree).
+  const plan = dslToCountPlan('NOT survey OR TS=a')
+  assert.equal(plan.kind, 'single')
+  assert.deepEqual(plan.params, { q: 'a' })
+})
