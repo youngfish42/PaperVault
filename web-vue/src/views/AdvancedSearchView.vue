@@ -87,6 +87,9 @@ const clearAll = (): void => {
   rows.splice(0, rows.length, newRow('topic', ''))
   yearRange.from = ''
   yearRange.to = ''
+  // Clear the expression panel too — even a dirty edit should not survive
+  // an explicit "clear everything".
+  exprText.value = ''
 }
 
 const composedDsl = computed(() => {
@@ -109,6 +112,7 @@ const composedDsl = computed(() => {
 })
 
 const runSearch = (): void => {
+  commitExpr()
   const expr = composedDsl.value.trim()
   if (!expr) {
     ElMessage.warning(t('adv.warn.empty'))
@@ -120,11 +124,43 @@ const runSearch = (): void => {
 }
 
 /** ---------------------------------------------------------------------
- * Text ↔ builder conversion (issue #196): the composed DSL can be copied
- * out, and any text DSL can be parsed back into builder rows.
+ * Text ↔ builder conversion (issue #196): the expression panel below the
+ * rows is a live, editable view of the composed DSL. Builder edits sync
+ * into the text while it is untouched; once the user edits or pastes
+ * text, the panel turns "dirty" and offers 应用到检索条件 / 还原 to push
+ * the text back into the rows or discard the edit.
  * ------------------------------------------------------------------- */
 
-const importText = ref('')
+const exprText = ref('')
+
+const exprDirty = computed(
+  () => exprText.value.trim() !== composedDsl.value.trim()
+)
+
+/**
+ * Which side the user touched most recently. While the text is dirty the
+ * panel and the builder rows can diverge; when search / save later commits
+ * the expression, the side edited LAST must win — otherwise the stale side
+ * would silently overwrite edits the user just made on the other side.
+ */
+const lastEdit = ref<'builder' | 'expr'>('builder')
+
+// Builder edits sync into the text only while the text still shows what the
+// builder last produced. Comparing against the watcher's old value (not the
+// fresh composedDsl) is what tells "user diverged" from "builder moved" —
+// reading exprDirty here would always see the already-updated composedDsl.
+watch(composedDsl, (v, old) => {
+  if (exprText.value.trim() === (old ?? '').trim()) {
+    exprText.value = v
+  } else {
+    // The text is dirty and the builder moved underneath it.
+    lastEdit.value = 'builder'
+  }
+})
+
+const onExprInput = (): void => {
+  lastEdit.value = 'expr'
+}
 
 /**
  * Replace the builder rows / year range with whatever ``raw`` parses to.
@@ -160,23 +196,83 @@ const applyDslToBuilder = (raw: string): void => {
   }
   rows.splice(0, rows.length, ...(next.length ? next : [newRow('topic', '')]))
   if (!supported) {
-    ElMessage.warning(t('adv.import.unsupported'))
+    ElMessage.warning(t('adv.expr.unsupported'))
   }
 }
 
-const handleImport = (): void => {
-  const text = importText.value.trim()
+/** Parse the panel text into the builder rows and normalise the text. */
+const doApplyExpr = (): void => {
+  applyDslToBuilder(exprText.value.trim())
+  exprText.value = composedDsl.value
+}
+
+/**
+ * Explicit 应用到检索条件 click: push the edited / pasted expression back
+ * into the builder rows. When the rows were edited after the text, applying
+ * would overwrite those newer edits — make that trade explicit first.
+ */
+const applyExpr = async (): Promise<void> => {
+  const text = exprText.value.trim()
   if (!text) {
-    ElMessage.warning(t('adv.import.empty'))
+    ElMessage.warning(t('adv.expr.empty'))
     return
   }
-  applyDslToBuilder(text)
+  if (lastEdit.value === 'builder') {
+    try {
+      await ElMessageBox.confirm(
+        t('adv.expr.applyConfirm'),
+        t('adv.expr.apply'),
+        {
+          type: 'warning',
+          confirmButtonText: t('fav.confirm'),
+          cancelButtonText: t('fav.cancel')
+        }
+      )
+    } catch {
+      return // user cancelled
+    }
+  }
+  doApplyExpr()
 }
 
+const resetExpr = (): void => {
+  exprText.value = composedDsl.value
+}
+
+/**
+ * Commit any pending text edit before an action (search / save) consumes the
+ * expression, so the text the user sees and the query that runs never
+ * diverge. When both sides were edited, the most recent side wins: if the
+ * builder rows changed after the text, the stale text is discarded (with a
+ * notice) instead of overwriting the newer rows. A cleared panel carries no
+ * query either, so it likewise falls back to the composed conditions rather
+ * than aborting the action. Copy deliberately does NOT go through here — it
+ * stays read-only.
+ */
+const commitExpr = (): void => {
+  if (!exprDirty.value) return
+  const text = exprText.value.trim()
+  if (!text || lastEdit.value === 'builder') {
+    // Only notify when something actually remains to search — otherwise the
+    // caller's own empty warning suffices and a double toast would fire.
+    if (text && composedDsl.value.trim()) {
+      ElMessage.info(t('adv.expr.discarded'))
+    }
+    resetExpr()
+    return
+  }
+  doApplyExpr()
+}
+
+/**
+ * Copy is a read-only action: it copies the text exactly as shown in the
+ * panel and must NOT commit it back into the rows (a dirty text would
+ * silently rewrite — or even collapse — the conditions the user built).
+ */
 const copyDsl = async (): Promise<void> => {
-  const expr = composedDsl.value.trim()
+  const expr = exprText.value.trim()
   if (!expr) {
-    ElMessage.warning(t('adv.warn.empty'))
+    ElMessage.warning(t('adv.expr.empty'))
     return
   }
   const ok = await copyText(expr)
@@ -231,6 +327,7 @@ const fetchResultCount = async (dsl: string): Promise<number | null> => {
 }
 
 const openSaveDialog = (): void => {
+  commitExpr()
   const expr = composedDsl.value.trim()
   if (!expr) {
     ElMessage.warning(t('adv.warn.empty'))
@@ -288,7 +385,7 @@ const openFavorites = async (): Promise<void> => {
 
 const loadFavorite = (item: SavedQuery): void => {
   applyDslToBuilder(item.dsl)
-  importText.value = item.dsl
+  exprText.value = composedDsl.value
   favDrawerVisible.value = false
   ElMessage.success(t('fav.loaded'))
 }
@@ -386,8 +483,8 @@ const consumeRouteQuery = (): void => {
   if (route.path !== '/advanced') return
   const q = route.query.q
   if (typeof q === 'string' && q.trim()) {
-    importText.value = q.trim()
     applyDslToBuilder(q)
+    exprText.value = composedDsl.value
     router.replace({ query: {} })
   }
 }
@@ -503,38 +600,51 @@ onMounted(async () => {
             />
           </div>
 
-          <div class="pv-adv-preview">
-            <div class="pv-adv-preview-head">
-              <div class="pv-adv-preview-label">{{ t('adv.preview') }}</div>
+          <div class="pv-adv-expr">
+            <div class="pv-adv-expr-head">
+              <div class="pv-adv-expr-label">{{ t('adv.expr.label') }}</div>
               <el-button size="small" text icon="CopyDocument" @click="copyDsl">
                 {{ t('adv.copy') }}
               </el-button>
             </div>
-            <code class="pv-adv-preview-code">{{
-              composedDsl || t('adv.previewEmpty')
-            }}</code>
-          </div>
-
-          <div class="pv-adv-import">
-            <div class="pv-adv-import-label">{{ t('adv.import.label') }}</div>
+            <div class="pv-adv-expr-hint">{{ t('adv.expr.hint') }}</div>
             <el-input
-              v-model="importText"
+              v-model="exprText"
               type="textarea"
-              :rows="2"
-              :placeholder="t('adv.import.placeholder')"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              :placeholder="t('adv.expr.placeholder')"
+              :aria-label="t('adv.expr.label')"
+              class="pv-adv-expr-input"
+              @input="onExprInput"
             />
-            <div class="pv-adv-import-actions">
-              <el-button size="small" icon="Download" @click="handleImport">
-                {{ t('adv.import.apply') }}
-              </el-button>
+            <div v-if="exprDirty" class="pv-adv-expr-dirty">
+              <span class="pv-adv-expr-dirty-text">
+                {{ t('adv.expr.dirty') }}
+              </span>
+              <div class="pv-adv-expr-dirty-actions">
+                <el-button size="small" text @click="resetExpr">
+                  {{ t('adv.expr.reset') }}
+                </el-button>
+                <el-button
+                  v-if="exprText.trim()"
+                  size="small"
+                  type="primary"
+                  icon="Upload"
+                  @click="applyExpr"
+                >
+                  {{ t('adv.expr.apply') }}
+                </el-button>
+              </div>
             </div>
           </div>
 
           <div class="pv-adv-actions">
             <el-button @click="clearAll">{{ t('adv.clear') }}</el-button>
-            <el-button icon="Star" @click="openSaveDialog">
-              {{ t('fav.save') }}
-            </el-button>
+            <el-tooltip :content="t('fav.saveTip')" placement="top">
+              <el-button icon="Star" @click="openSaveDialog">
+                {{ t('fav.save') }}
+              </el-button>
+            </el-tooltip>
             <el-button icon="Collection" @click="openFavorites">
               {{ t('fav.list') }}
             </el-button>
@@ -578,6 +688,7 @@ onMounted(async () => {
       width="480px"
     >
       <div class="pv-fav-save">
+        <span class="pv-fav-save-label">{{ t('fav.saveWhat') }}</span>
         <code class="pv-fav-save-dsl">{{ composedDsl }}</code>
         <el-input
           v-model="favName"
@@ -836,28 +947,49 @@ onMounted(async () => {
 .pv-adv-year-sep {
   color: var(--el-text-color-secondary, #909399);
 }
-.pv-adv-preview {
+.pv-adv-expr {
   margin-top: 14px;
   padding: 12px 14px;
   background: var(--el-color-primary-light-9, #ecf5ff);
   border-left: 3px solid var(--el-color-primary, #6f5ed3);
   border-radius: 4px;
 }
-.pv-adv-preview-label {
+.pv-adv-expr-label {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--el-color-primary, #6f5ed3);
-  margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.pv-adv-preview-code {
-  display: block;
+.pv-adv-expr-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary, #909399);
+  margin-bottom: 8px;
+}
+.pv-adv-expr-input :deep(.el-textarea__inner) {
   font-family: 'Fira Code', Consolas, monospace;
   font-size: 13px;
   color: var(--el-text-color-primary, #303133);
-  word-break: break-all;
-  white-space: pre-wrap;
+}
+.pv-adv-expr-dirty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.pv-adv-expr-dirty-text {
+  font-size: 12px;
+  color: var(--el-color-warning, #e6a23c);
+}
+.pv-adv-expr-dirty-actions {
+  display: flex;
+  align-items: center;
+}
+.pv-adv-expr-dirty-actions .el-button + .el-button {
+  margin-left: 8px;
 }
 .pv-adv-actions {
   display: flex;
@@ -1015,34 +1147,21 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-/* ---------- 预览复制 / 文本导入 / 收藏 ---------- */
-.pv-adv-preview-head {
+/* ---------- 检索式面板 / 收藏 ---------- */
+.pv-adv-expr-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
 }
-.pv-adv-preview-head .pv-adv-preview-label {
-  margin-bottom: 0;
-}
-.pv-adv-import {
-  margin-top: 14px;
-}
-.pv-adv-import-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-text-color-secondary, #909399);
-  margin-bottom: 6px;
-}
-.pv-adv-import-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
 .pv-fav-save {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.pv-fav-save-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
 }
 .pv-fav-save-dsl {
   display: block;
