@@ -62,6 +62,20 @@ class Settings:
             else None
         )
     )
+    # ``None`` means "derive users.sqlite3 beside cache_path". Same
+    # derivation philosophy as ``search_db_path``: keeping the derivation in
+    # UserStore makes custom cache paths in tests and deployments
+    # automatically get an isolated user database.
+    user_db_path: Path | None = field(
+        default_factory=lambda: (
+            Path(value)
+            if (value := os.environ.get("PAPERVAULT_USER_DB_PATH"))
+            else None
+        )
+    )
+    saved_queries_max_per_user: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_SAVED_QUERIES_MAX_PER_USER", 100)
+    )
     static_folder: Path = _BASE_DIR / "static" / "dist"
 
     host: str = field(default_factory=lambda: _env_str("HOST", "127.0.0.1"))

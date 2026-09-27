@@ -94,7 +94,10 @@ const handleAiSearchPick = (payload: {
 }
 
 const goAdvanced = (): void => {
-  router.push({ path: '/advanced' })
+  // Hand the current smart-search expression to the builder so the user can
+  // keep refining it as rows instead of retyping it.
+  const q = searchContent.query.trim()
+  router.push({ path: '/advanced', query: q ? { q } : {} })
 }
 
 const goSettings = (): void => {
@@ -106,7 +109,14 @@ const toggleDark = useToggle(isDark)
 
 watch(
   () => route.query.q,
-  () => home.consumeQueryParam(route)
+  () => {
+    // Navigating away (e.g. the /advanced?q=... hand-off) also mutates
+    // route.query while HomeView is still mounted; without this guard we
+    // would fire a redundant search — and its fullscreen loading mask — on
+    // the way out.
+    if (route.path !== '/') return
+    home.consumeQueryParam(route)
+  }
 )
 
 onMounted(async () => {
@@ -120,6 +130,7 @@ onMounted(async () => {
     <MainNavBar
       active-key="home"
       :is-dark="isDark"
+      :query="searchContent.query"
       @toggle-dark="toggleDark()"
     />
 
