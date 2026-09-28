@@ -165,10 +165,11 @@ PaperVault/
 │   │   │   ├── ai.ts             # P2/P3 AI endpoints: `listAiProviders` (`GET /v1/ai/providers`), `suggestKeywordsWithSettings` (`POST /v1/suggest` with per-request provider/API key, 120s timeout)
 │   │   │   └── savedQueries.ts   # Saved-query favorites CRUD against `/api/v1/saved_queries` (requires login)
 │   │   ├── composables/
-│   │   │   └── useAuth.ts        # Shared module-level auth state (`GET /v1/auth/me`, cached once); consumed by MainNavBar and the favorites UI
+│   │   │   ├── useAuth.ts        # Shared module-level auth state (`GET /v1/auth/me`, cached once); consumed by MainNavBar and the favorites UI
+│   │   │   └── useHomeSearch.ts  # Shared search pipeline (DSL → splitForBackend → paged fetch → group by conf/year → SearchResultList); `useHomeSearch({ suggest })` — the AI keyword guess can be disabled by pages without a guess panel (e.g. Advanced Search)
 │   │   ├── views/
 │   │   │   ├── HomeView.vue              # Landing + Smart Search (DSL-aware single-box); also owns the AI search + rerank flow
-│   │   │   ├── AdvancedSearchView.vue    # Visual query builder ⇄ live editable expression panel (two-way sync via `parseDslToRows`); saved-query favorites drawer
+│   │   │   ├── AdvancedSearchView.vue    # Visual query builder ⇄ live editable expression panel (two-way sync via `parseDslToRows`); runs searches in place via shared `useHomeSearch` (builder folds into a summary bar with 收藏此检索式 next to the results); saved-query favorites drawer
 │   │   │   └── SettingsView.vue          # AI provider settings page (P2-C shell + P2-D `AiSuggestSection`)
 │   │   ├── components/
 │   │   │   ├── MainNavBar.vue            # Top navigation bar shared across Home / Advanced / Settings

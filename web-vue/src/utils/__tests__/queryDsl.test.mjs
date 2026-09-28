@@ -194,6 +194,33 @@ test('splitForBackend: top-level OR cannot be hoisted → stays in residual', ()
   assert.equal(split.residual.kind, 'or')
 })
 
+test('splitForBackend: repeated AU keeps the first hoisted AND the rest in residual', () => {
+  // The backend author param carries a single value. Overwriting it (last
+  // wins) would silently DROP the earlier author condition and widen the
+  // results; residual-keeping preserves co-author narrowing.
+  const split = splitForBackend(
+    parseDsl('AU="Yang Liu" AND AU="Xiaowen Jiang"')
+  )
+  assert.equal(split.author, 'Yang Liu')
+  assert.equal(split.residual.kind, 'term')
+  assert.equal(split.residual.field, 'author')
+  assert.equal(split.residual.value, 'Xiaowen Jiang')
+
+  // …and the residual actually filters co-authorship client-side.
+  const paper = {
+    title: 'x',
+    abstract: '',
+    authors: ['Yang Liu', 'Xiaowen Jiang'],
+    conf: 'ICLR',
+    year: '2024'
+  }
+  assert.equal(evaluateDsl(paper, split.residual), true)
+  assert.equal(
+    evaluateDsl({ ...paper, authors: ['Yang Liu'] }, split.residual),
+    false
+  )
+})
+
 test('splitForBackend: AI-merged "seed OR (kw1 OR kw2 OR kw3)" keeps q=null AND residual=whole OR', () => {
   // P3-B's ``buildOrMerge`` emits a parenthesized OR group after a bare
   // seed, e.g. ``time series llm OR ("time-series forecasting" OR

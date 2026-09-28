@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MainNavBar from '@/components/MainNavBar.vue'
-import { listConfs, searchPapers } from '@/api/paper'
+import ConfsTree from '@/components/ConfsTree.vue'
+import SearchResultList from '@/components/SearchResultList.vue'
+import { searchPapers } from '@/api/paper'
 import {
   createSavedQuery,
   deleteSavedQuery,
@@ -13,6 +15,7 @@ import {
   type SavedQuery
 } from '@/api/savedQueries'
 import { useAuth } from '@/composables/useAuth'
+import { useHomeSearch } from '@/composables/useHomeSearch'
 import { copyText } from '@/utils/clipboard'
 import { useI18n } from '@/utils/i18n'
 import {
@@ -36,9 +39,33 @@ const { isLoggedIn, ensureFetched } = useAuth()
  *   - Each row is a (field, value) pair joined to the previous one by an
  *     AND/OR/NOT operator.
  *   - A year range row maps to PY=since-until.
- *   - "Search" composes the rows into a DSL string and navigates back to
- *     the home page with the expression pre-filled in the main search box.
+ *   - "Search" runs the composed DSL in place (sharing the home page's
+ *     ``useHomeSearch`` pipeline); the builder collapses into a summary bar
+ *     that keeps 收藏此检索式 next to the freshly returned results.
  */
+
+// Results reuse the home search pipeline; the AI keyword sidebar is disabled
+// because a DSL expression makes a poor LLM topic seed and this page has no
+// guess panel.
+const home = useHomeSearch({ suggest: false })
+// Destructure so templates auto-unwrap the refs.
+const {
+  firstEntry,
+  queryResult,
+  searchMeta,
+  activeAst,
+  searchContent,
+  originalTopic
+} = home
+const searchResultRef = shallowRef<InstanceType<
+  typeof SearchResultList
+> | null>(null)
+home.setSearchResultRef(searchResultRef)
+
+/** Snapshot of the expression that produced the on-screen results. */
+const executedDsl = ref('')
+/** After a search the builder folds into a one-line summary bar. */
+const builderCollapsed = ref(false)
 
 interface BuilderRow extends DslRow {
   id: number
@@ -68,7 +95,7 @@ const newRow = (
 
 const rows = reactive<BuilderRow[]>([newRow('topic', '')])
 
-const availableConfs = shallowRef<string[]>([])
+const availableConfs = home.availableConfs
 const yearRange = reactive({ from: '', to: '' })
 
 const addRow = (): void => {
@@ -90,6 +117,22 @@ const clearAll = (): void => {
   // Clear the expression panel too — even a dirty edit should not survive
   // an explicit "clear everything".
   exprText.value = ''
+  // The on-screen results belong to the cleared query: hide them and drop
+  // the executed expression from the URL so a refresh starts clean.
+  firstEntry.value = true
+  executedDsl.value = ''
+  builderCollapsed.value = false
+  router.replace({ query: {} })
+}
+
+/** Split a flat row chain at OR boundaries (a row with op='OR' starts a new leg). */
+const splitOrLegs = <T extends DslRow>(list: T[]): T[][] => {
+  const legs: T[][] = []
+  for (const r of list) {
+    if (r.op === 'OR' || legs.length === 0) legs.push([])
+    legs[legs.length - 1].push(r)
+  }
+  return legs
 }
 
 const composedDsl = computed(() => {
@@ -97,20 +140,32 @@ const composedDsl = computed(() => {
     .filter(r => r.value.trim().length > 0)
     .map(r => ({ field: r.field, value: r.value.trim(), op: r.op }))
 
-  // Append the year range as a synthetic AND row so it always narrows.
+  // The year range is a hard AND over the whole expression. A flat chain
+  // parses AND tighter than OR, so a single trailing year row would only
+  // constrain the LAST leg — distribute it into every OR leg instead:
+  // (A OR B) AND py ≡ (A AND py) OR (B AND py).
   const from = yearRange.from.trim()
   const to = yearRange.to.trim()
-  if (from && to) {
-    compactRows.push({ field: 'year', value: `${from}-${to}`, op: 'AND' })
-  } else if (from) {
-    compactRows.push({ field: 'year', value: from, op: 'AND' })
-  } else if (to) {
-    compactRows.push({ field: 'year', value: to, op: 'AND' })
+  const yearValue = from && to ? `${from}-${to}` : from || to
+  if (yearValue) {
+    const yearRow: DslRow = { field: 'year', value: yearValue, op: 'AND' }
+    if (compactRows.some(r => r.op === 'OR')) {
+      const distributed: DslRow[] = []
+      for (const leg of splitOrLegs(compactRows))
+        distributed.push(...leg, yearRow)
+      return buildDsl(distributed)
+    }
+    compactRows.push(yearRow)
   }
 
   return buildDsl(compactRows)
 })
 
+/**
+ * Run the composed expression in place: commit any pending text edit, hand
+ * the DSL to the shared search pipeline, and fold the builder into the
+ * summary bar so the results (and the 收藏此检索式 entry) take the focus.
+ */
 const runSearch = (): void => {
   commitExpr()
   const expr = composedDsl.value.trim()
@@ -118,9 +173,67 @@ const runSearch = (): void => {
     ElMessage.warning(t('adv.warn.empty'))
     return
   }
-  // Hand the composed expression to HomeView via the router query string so
-  // a refresh / shareable URL behaves identically.
-  router.push({ path: '/', query: { q: expr } })
+  executedDsl.value = expr
+  searchContent.query = expr
+  originalTopic.value = expr
+  builderCollapsed.value = true
+  // Keep the executed expression in the URL so a refresh / shared link
+  // reproduces this exact search (consumeRouteQuery skips our own replace
+  // via the executedDsl guard).
+  router.replace({ query: { q: expr, run: '1' } })
+  home.search()
+}
+
+/**
+ * Author click on a result row: instead of navigating away, constrain the
+ * current conditions by this author and let the user re-run the search here.
+ * The flat row chain parses AND tighter than OR, so appending a trailing
+ * AND row would only narrow the LAST OR leg. Since (A OR B) AND au is
+ * logically (A AND au) OR (B AND au), the author is distributed into every
+ * OR leg — that is the only flat-chain encoding of "narrow everything".
+ */
+const handleSearchAuthor = (author: string): void => {
+  builderCollapsed.value = false
+  const hasAuthor = (list: BuilderRow[]): boolean =>
+    list.some(r => r.field === 'author' && r.value.trim() === author)
+  const filled = rows.filter(r => r.value.trim().length > 0)
+  if (!filled.some(r => r.op === 'OR')) {
+    if (hasAuthor(rows)) return // row already exists — just reveal the builder
+    rows.push(newRow('author', author, 'AND'))
+  } else {
+    // Split the flat chain at OR boundaries and add the author to every leg
+    // that lacks it. A leg already carrying this author needs no change;
+    // only when EVERY leg has it is the click a no-op. (A global any-row
+    // dedupe would silently leave unconstrained legs like the TS=… branch
+    // of `AU="X" OR TS=llm`.)
+    const next: BuilderRow[] = []
+    let changed = false
+    for (const leg of splitOrLegs(filled)) {
+      for (const r of leg) next.push(newRow(r.field, r.value, r.op))
+      if (!hasAuthor(leg)) {
+        next.push(newRow('author', author, 'AND'))
+        changed = true
+      }
+    }
+    if (!changed) return
+    rows.splice(0, rows.length, ...next)
+  }
+  // The builder now diverges from the executed query: hide the stale
+  // results and drop the executed expression from the URL (same contract
+  // as loadFavorite / clearAll) so a refresh cannot resurrect the old
+  // search over the just-added condition.
+  firstEntry.value = true
+  executedDsl.value = ''
+  router.replace({ query: {} })
+  ElMessage.success(t('adv.results.authorAdded'))
+}
+
+const copyExecuted = async (): Promise<void> => {
+  const expr = executedDsl.value.trim()
+  if (!expr) return
+  const ok = await copyText(expr)
+  if (ok) ElMessage.success(t('adv.copyOk'))
+  else ElMessage.warning(t('adv.copyFail'))
 }
 
 /** ---------------------------------------------------------------------
@@ -164,11 +277,13 @@ const onExprInput = (): void => {
 
 /**
  * Replace the builder rows / year range with whatever ``raw`` parses to.
- * Only the first AND-joined year row is folded into the dedicated year-range
- * inputs (which always re-join as a hard AND); NOT/OR year rows and any
- * further year rows stay as builder rows so their semantics survive.
- * Anything the row model cannot express (nested groups, NEAR, leading NOT)
- * degrades to a single topic row holding the original text, with a warning.
+ * AND-joined year rows fold into the dedicated year-range inputs; since
+ * ``composedDsl`` distributes the range into every OR leg, exact duplicates
+ * of the already-folded range are dropped so a compose → parse round trip
+ * is a fixed point. NOT/OR year rows and year rows with a DIFFERENT value
+ * stay as builder rows so their semantics survive. Anything the row model
+ * cannot express (nested groups, NEAR, leading NOT) degrades to a single
+ * topic row holding the original text, with a warning.
  */
 const applyDslToBuilder = (raw: string): void => {
   const { rows: parsed, supported } = parseDslToRows(raw)
@@ -178,18 +293,21 @@ const applyDslToBuilder = (raw: string): void => {
   const next: BuilderRow[] = []
   for (const r of parsed) {
     const joinOp = r.op ?? 'AND'
-    if (r.field === 'year' && joinOp === 'AND' && !yearFolded) {
+    if (r.field === 'year' && joinOp === 'AND') {
       const m = r.value.match(/^(\d{4})\s*-\s*(\d{4})$/)
-      if (m) {
-        yearRange.from = m[1]
-        yearRange.to = m[2]
-        yearFolded = true
-        continue
-      }
-      if (/^\d{4}$/.test(r.value)) {
-        yearRange.from = r.value
-        yearFolded = true
-        continue
+      const single = /^\d{4}$/.test(r.value)
+      if (m || single) {
+        const f = m ? m[1] : r.value
+        const t = m ? m[2] : ''
+        if (!yearFolded) {
+          yearRange.from = f
+          yearRange.to = t
+          yearFolded = true
+          continue
+        }
+        // An exact duplicate of the folded range is one of the distributed
+        // OR-leg copies — drop it instead of adding a redundant row.
+        if (yearRange.from === f && yearRange.to === t) continue
       }
     }
     next.push(newRow(r.field, r.value, joinOp))
@@ -204,6 +322,15 @@ const applyDslToBuilder = (raw: string): void => {
 const doApplyExpr = (): void => {
   applyDslToBuilder(exprText.value.trim())
   exprText.value = composedDsl.value
+  // The builder now diverges from the executed query: hide the stale
+  // results and drop the executed expression from the URL (same contract
+  // as loadFavorite / clearAll / handleSearchAuthor) so a refresh cannot
+  // resurrect the old search over the just-applied conditions. When this
+  // runs through commitExpr → runSearch, the search immediately
+  // re-establishes both.
+  firstEntry.value = true
+  executedDsl.value = ''
+  router.replace({ query: {} })
 }
 
 /**
@@ -386,6 +513,14 @@ const openFavorites = async (): Promise<void> => {
 const loadFavorite = (item: SavedQuery): void => {
   applyDslToBuilder(item.dsl)
   exprText.value = composedDsl.value
+  // The builder now holds a different query than the results on screen —
+  // hide the stale results (and their summary bar) until the user re-runs,
+  // and drop the executed query from the URL so a refresh does not
+  // resurrect it over the just-loaded conditions.
+  firstEntry.value = true
+  executedDsl.value = ''
+  builderCollapsed.value = false
+  router.replace({ query: {} })
   favDrawerVisible.value = false
   ElMessage.success(t('fav.loaded'))
 }
@@ -472,19 +607,30 @@ const formatTime = (iso: string): string => {
 
 /**
  * Query hand-off: HomeView and saved-query deep links arrive as
- * /#/advanced?q=... — pre-fill the builder from the text DSL, then clear the
- * param so a later refresh does not resurrect it over the user's edits.
+ * /#/advanced?q=... — pre-fill the builder from the text DSL. Links produced
+ * by an executed search additionally carry ``run=1``; those re-run the search
+ * so a refresh / shared URL reproduces the results. An edit-mode hand-off
+ * (no ``run``) clears the param so a later refresh does not resurrect it
+ * over the user's edits.
  */
 const consumeRouteQuery = (): void => {
-  // Guard against the route change that happens when leaving this page
-  // (runSearch pushes `/?q=...`): while the component is still mounted the
-  // watcher below would otherwise consume the outgoing query and
-  // router.replace would strip it from the home navigation.
+  // Only react while actually on this page — the watcher below also fires on
+  // the way out, when consuming the param would be wrong.
   if (route.path !== '/advanced') return
   const q = route.query.q
-  if (typeof q === 'string' && q.trim()) {
-    applyDslToBuilder(q)
-    exprText.value = composedDsl.value
+  if (typeof q !== 'string' || !q.trim()) return
+  const text = q.trim()
+  // Skip our own runSearch URL replace: the results on screen already come
+  // from exactly this expression.
+  if (text === executedDsl.value) return
+  applyDslToBuilder(text)
+  exprText.value = composedDsl.value
+  // An incoming expression must be visible: expand the builder even when
+  // results from a previous search are on screen.
+  builderCollapsed.value = false
+  if (route.query.run === '1') {
+    runSearch()
+  } else {
     router.replace({ query: {} })
   }
 }
@@ -493,12 +639,7 @@ watch(() => route.query.q, consumeRouteQuery)
 
 onMounted(async () => {
   ensureFetched()
-  try {
-    const res = await listConfs()
-    availableConfs.value = (res.items || []).map(c => c.name)
-  } catch (err) {
-    console.error('Failed to load confs', err)
-  }
+  await home.initConfs()
   consumeRouteQuery()
 })
 </script>
@@ -513,7 +654,41 @@ onMounted(async () => {
     />
 
     <section class="pv-container pv-adv-body">
-      <div class="pv-adv-grid">
+      <!-- 搜索后的摘要条：执行时的检索式快照 + 结果数 + 收藏/复制/修改入口 -->
+      <div v-if="!firstEntry && builderCollapsed" class="pv-adv-summary">
+        <div class="pv-adv-summary-main">
+          <span class="pv-adv-summary-label">{{
+            t('adv.executed.label')
+          }}</span>
+          <code class="pv-adv-summary-dsl" :title="executedDsl">{{
+            executedDsl
+          }}</code>
+          <el-tag size="small" type="info" effect="plain">
+            {{ t('fav.count', { n: searchMeta.total }) }}
+          </el-tag>
+        </div>
+        <div class="pv-adv-summary-actions">
+          <el-tooltip :content="t('fav.saveTip')" placement="top">
+            <el-button size="small" icon="Star" @click="openSaveDialog">
+              {{ t('fav.save') }}
+            </el-button>
+          </el-tooltip>
+          <el-button size="small" icon="CopyDocument" @click="copyExecuted">
+            {{ t('adv.copy') }}
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            icon="Edit"
+            @click="builderCollapsed = false"
+          >
+            {{ t('adv.results.modify') }}
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="firstEntry || !builderCollapsed" class="pv-adv-grid">
         <el-card shadow="never" class="pv-adv-card pv-adv-card--builder">
           <template #header>
             <div class="pv-adv-card-header">
@@ -678,6 +853,24 @@ onMounted(async () => {
             </div>
           </div>
         </el-card>
+      </div>
+
+      <!-- 原地检索结果：会议树 + 结果列表（复用首页管线，无 AI 侧栏） -->
+      <div v-if="!firstEntry" class="pv-adv-results">
+        <aside class="pv-adv-results-side">
+          <ConfsTree
+            :data="queryResult"
+            :meta="searchMeta"
+            @click="home.handleTreeClick"
+          />
+        </aside>
+        <div class="pv-adv-results-main">
+          <SearchResultList
+            ref="searchResultRef"
+            :ast="activeAst"
+            @search-author="handleSearchAuthor"
+          />
+        </div>
       </div>
     </section>
 
@@ -996,6 +1189,72 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+}
+
+/* ---------- 搜索后摘要条 ---------- */
+.pv-adv-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-left: 3px solid var(--el-color-primary, #6f5ed3);
+  border-radius: var(--pv-card-radius);
+}
+.pv-adv-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pv-adv-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-color-primary, #6f5ed3);
+  white-space: nowrap;
+}
+.pv-adv-summary-dsl {
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--el-text-color-primary, #303133);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pv-adv-summary-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.pv-adv-summary-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+/* ---------- 原地检索结果区 ---------- */
+.pv-adv-results {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.pv-adv-results-side {
+  position: sticky;
+  top: var(--pv-sticky-top);
+}
+@media (max-width: 900px) {
+  .pv-adv-results {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pv-adv-results-side {
+    position: static;
+    display: none;
+  }
 }
 
 /* ---------- 右侧 cheatsheet ---------- */
