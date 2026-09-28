@@ -7,7 +7,7 @@ import { suggestKeywordsWithSettings } from '@/api/ai'
 import { loadAiSettings, loadApiKey, toApiPayload } from '@/utils/aiSettings'
 import { useI18n } from '@/utils/i18n'
 // prettier-ignore
-import { parseDsl, splitForBackend, normalizeQueryInput, type AstNode } from '@/utils/queryDsl'
+import { parseDsl, splitForBackend, normalizeQueryInput, collectTextTerms, type AstNode } from '@/utils/queryDsl'
 const MAX_FETCH = 5000
 const PAGE_SIZE = 200
 type SearchMeta = { total: number; fetched: number; truncated: boolean }
@@ -17,7 +17,11 @@ type TreeSelection = {
   key?: string
   parent?: string
 }
-export function useHomeSearch() {
+export function useHomeSearch(options?: { suggest?: boolean }) {
+  // ``suggest`` defaults on so the home page keeps its AI keyword sidebar;
+  // the advanced-search page disables it — feeding a DSL expression into the
+  // LLM as a topic seed produces noise, and that page has no guess panel.
+  const suggestEnabled = options?.suggest ?? true
   const { t } = useI18n()
   const firstEntry = ref(true)
   const availableConfs = shallowRef<string[]>([])
@@ -108,17 +112,24 @@ export function useHomeSearch() {
       // this, the "All venues" badge, match-total counter, and truncated-
       // warning all key off garbage numbers from the full-corpus fetch.
       //
-      // Prefer ``originalTopic`` (the user's pre-OR-merge seed), cleaning any
-      // residual syntax so a dirty URL-loaded topic still narrows something.
-      // Falls back to the cleaned raw query when ``originalTopic`` is empty
-      // (e.g. a brand-new direct text search that happens to use OR).
+      // Prefer ``originalTopic`` (the user's pre-OR-merge seed); collect the
+      // actual text terms from its AST rather than regex-cleaning the string
+      // — cleaning leaves field tags (``TS=``) in ``q`` and ANDs them into a
+      // guaranteed-zero substring filter (e.g. the builder's ``TS=a OR TS=b``
+      // became ``q="TS=a TS=b"``). ``collectTextTerms`` strips the tags and
+      // skips NOT / author / conf / year leaves. Falls back to the cleaned
+      // raw query when no text terms can be collected (e.g. a brand-new
+      // direct text search that happens to use OR).
       const clean = (s: string): string =>
         s
           .replace(/[()"]/g, ' ')
           .replace(/\s+OR\s+/gi, ' ')
           .replace(/\s+/g, ' ')
           .trim()
-      const seed = clean(originalTopic.value) || clean(rawQuery)
+      const seedText = originalTopic.value.trim() || rawQuery
+      const seedTerms: string[] = []
+      collectTextTerms(parseDsl(normalizeQueryInput(seedText)), seedTerms)
+      const seed = seedTerms.join(' ') || clean(seedText)
       if (seed) params.q = seed
     }
     const author = split.author ?? searchContent.sp_author
@@ -271,7 +282,7 @@ export function useHomeSearch() {
       (typeof baseParams.q === 'string' && baseParams.q.trim()
         ? baseParams.q.trim()
         : '')
-    if (suggestSeed) {
+    if (suggestEnabled && suggestSeed) {
       guessLoading.value = true
       guessList.value = []
       guessProviderLabel.value = ''

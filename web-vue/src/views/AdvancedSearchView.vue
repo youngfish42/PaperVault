@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MainNavBar from '@/components/MainNavBar.vue'
-import { listConfs, searchPapers } from '@/api/paper'
+import ConfsTree from '@/components/ConfsTree.vue'
+import SearchResultList from '@/components/SearchResultList.vue'
+import { searchPapers } from '@/api/paper'
 import {
   createSavedQuery,
   deleteSavedQuery,
@@ -13,6 +15,7 @@ import {
   type SavedQuery
 } from '@/api/savedQueries'
 import { useAuth } from '@/composables/useAuth'
+import { useHomeSearch } from '@/composables/useHomeSearch'
 import { copyText } from '@/utils/clipboard'
 import { useI18n } from '@/utils/i18n'
 import {
@@ -36,9 +39,33 @@ const { isLoggedIn, ensureFetched } = useAuth()
  *   - Each row is a (field, value) pair joined to the previous one by an
  *     AND/OR/NOT operator.
  *   - A year range row maps to PY=since-until.
- *   - "Search" composes the rows into a DSL string and navigates back to
- *     the home page with the expression pre-filled in the main search box.
+ *   - "Search" runs the composed DSL in place (sharing the home page's
+ *     ``useHomeSearch`` pipeline); the builder collapses into a summary bar
+ *     that keeps 收藏此检索式 next to the freshly returned results.
  */
+
+// Results reuse the home search pipeline; the AI keyword sidebar is disabled
+// because a DSL expression makes a poor LLM topic seed and this page has no
+// guess panel.
+const home = useHomeSearch({ suggest: false })
+// Destructure so templates auto-unwrap the refs.
+const {
+  firstEntry,
+  queryResult,
+  searchMeta,
+  activeAst,
+  searchContent,
+  originalTopic
+} = home
+const searchResultRef = shallowRef<InstanceType<
+  typeof SearchResultList
+> | null>(null)
+home.setSearchResultRef(searchResultRef)
+
+/** Snapshot of the expression that produced the on-screen results. */
+const executedDsl = ref('')
+/** After a search the builder folds into a one-line summary bar. */
+const builderCollapsed = ref(false)
 
 interface BuilderRow extends DslRow {
   id: number
@@ -68,7 +95,7 @@ const newRow = (
 
 const rows = reactive<BuilderRow[]>([newRow('topic', '')])
 
-const availableConfs = shallowRef<string[]>([])
+const availableConfs = home.availableConfs
 const yearRange = reactive({ from: '', to: '' })
 
 const addRow = (): void => {
@@ -111,6 +138,11 @@ const composedDsl = computed(() => {
   return buildDsl(compactRows)
 })
 
+/**
+ * Run the composed expression in place: commit any pending text edit, hand
+ * the DSL to the shared search pipeline, and fold the builder into the
+ * summary bar so the results (and the 收藏此检索式 entry) take the focus.
+ */
 const runSearch = (): void => {
   commitExpr()
   const expr = composedDsl.value.trim()
@@ -118,9 +150,32 @@ const runSearch = (): void => {
     ElMessage.warning(t('adv.warn.empty'))
     return
   }
-  // Hand the composed expression to HomeView via the router query string so
-  // a refresh / shareable URL behaves identically.
-  router.push({ path: '/', query: { q: expr } })
+  executedDsl.value = expr
+  searchContent.query = expr
+  originalTopic.value = expr
+  builderCollapsed.value = true
+  home.search()
+}
+
+/**
+ * Author click on a result row: instead of navigating away, add an author
+ * condition row and let the user re-run the search here.
+ */
+const handleSearchAuthor = (author: string): void => {
+  builderCollapsed.value = false
+  if (rows.some(r => r.field === 'author' && r.value.trim() === author)) {
+    return // row already exists — just reveal the builder
+  }
+  rows.push(newRow('author', author, 'AND'))
+  ElMessage.success(t('adv.results.authorAdded'))
+}
+
+const copyExecuted = async (): Promise<void> => {
+  const expr = executedDsl.value.trim()
+  if (!expr) return
+  const ok = await copyText(expr)
+  if (ok) ElMessage.success(t('adv.copyOk'))
+  else ElMessage.warning(t('adv.copyFail'))
 }
 
 /** ---------------------------------------------------------------------
@@ -476,15 +531,16 @@ const formatTime = (iso: string): string => {
  * param so a later refresh does not resurrect it over the user's edits.
  */
 const consumeRouteQuery = (): void => {
-  // Guard against the route change that happens when leaving this page
-  // (runSearch pushes `/?q=...`): while the component is still mounted the
-  // watcher below would otherwise consume the outgoing query and
-  // router.replace would strip it from the home navigation.
+  // Only react while actually on this page — the watcher below also fires on
+  // the way out, when consuming the param would be wrong.
   if (route.path !== '/advanced') return
   const q = route.query.q
   if (typeof q === 'string' && q.trim()) {
     applyDslToBuilder(q)
     exprText.value = composedDsl.value
+    // An incoming expression must be visible: expand the builder even when
+    // results from a previous search are on screen.
+    builderCollapsed.value = false
     router.replace({ query: {} })
   }
 }
@@ -493,12 +549,7 @@ watch(() => route.query.q, consumeRouteQuery)
 
 onMounted(async () => {
   ensureFetched()
-  try {
-    const res = await listConfs()
-    availableConfs.value = (res.items || []).map(c => c.name)
-  } catch (err) {
-    console.error('Failed to load confs', err)
-  }
+  await home.initConfs()
   consumeRouteQuery()
 })
 </script>
@@ -513,7 +564,41 @@ onMounted(async () => {
     />
 
     <section class="pv-container pv-adv-body">
-      <div class="pv-adv-grid">
+      <!-- 搜索后的摘要条：执行时的检索式快照 + 结果数 + 收藏/复制/修改入口 -->
+      <div v-if="!firstEntry && builderCollapsed" class="pv-adv-summary">
+        <div class="pv-adv-summary-main">
+          <span class="pv-adv-summary-label">{{
+            t('adv.executed.label')
+          }}</span>
+          <code class="pv-adv-summary-dsl" :title="executedDsl">{{
+            executedDsl
+          }}</code>
+          <el-tag size="small" type="info" effect="plain">
+            {{ t('fav.count', { n: searchMeta.total }) }}
+          </el-tag>
+        </div>
+        <div class="pv-adv-summary-actions">
+          <el-tooltip :content="t('fav.saveTip')" placement="top">
+            <el-button size="small" icon="Star" @click="openSaveDialog">
+              {{ t('fav.save') }}
+            </el-button>
+          </el-tooltip>
+          <el-button size="small" icon="CopyDocument" @click="copyExecuted">
+            {{ t('adv.copy') }}
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            icon="Edit"
+            @click="builderCollapsed = false"
+          >
+            {{ t('adv.results.modify') }}
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="firstEntry || !builderCollapsed" class="pv-adv-grid">
         <el-card shadow="never" class="pv-adv-card pv-adv-card--builder">
           <template #header>
             <div class="pv-adv-card-header">
@@ -678,6 +763,24 @@ onMounted(async () => {
             </div>
           </div>
         </el-card>
+      </div>
+
+      <!-- 原地检索结果：会议树 + 结果列表（复用首页管线，无 AI 侧栏） -->
+      <div v-if="!firstEntry" class="pv-adv-results">
+        <aside class="pv-adv-results-side">
+          <ConfsTree
+            :data="queryResult"
+            :meta="searchMeta"
+            @click="home.handleTreeClick"
+          />
+        </aside>
+        <div class="pv-adv-results-main">
+          <SearchResultList
+            ref="searchResultRef"
+            :ast="activeAst"
+            @search-author="handleSearchAuthor"
+          />
+        </div>
       </div>
     </section>
 
@@ -996,6 +1099,72 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+}
+
+/* ---------- 搜索后摘要条 ---------- */
+.pv-adv-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-left: 3px solid var(--el-color-primary, #6f5ed3);
+  border-radius: var(--pv-card-radius);
+}
+.pv-adv-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pv-adv-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-color-primary, #6f5ed3);
+  white-space: nowrap;
+}
+.pv-adv-summary-dsl {
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--el-text-color-primary, #303133);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.pv-adv-summary-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.pv-adv-summary-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+/* ---------- 原地检索结果区 ---------- */
+.pv-adv-results {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.pv-adv-results-side {
+  position: sticky;
+  top: var(--pv-sticky-top);
+}
+@media (max-width: 900px) {
+  .pv-adv-results {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pv-adv-results-side {
+    position: static;
+    display: none;
+  }
 }
 
 /* ---------- 右侧 cheatsheet ---------- */

@@ -236,6 +236,9 @@ const messages: Record<Lang, Record<string, string>> = {
     'adv.expr.empty': '请先输入或粘贴检索式',
     'adv.expr.unsupported':
       '该检索式包含嵌套分组 / NEAR 等高级结构，无法完整还原为交互行，已按原文导入（语义保持不变）',
+    'adv.executed.label': '当前检索式',
+    'adv.results.modify': '修改条件',
+    'adv.results.authorAdded': '已添加作者条件行，请重新搜索',
     'adv.clear': '清空',
     'adv.search': '搜索',
     'adv.warn.empty': '请先填写至少一行检索条件',
@@ -546,6 +549,9 @@ const messages: Record<Lang, Record<string, string>> = {
     'adv.expr.empty': 'Enter or paste an expression first',
     'adv.expr.unsupported':
       'This expression uses nested groups / NEAR and cannot be fully expanded into rows; imported as raw text (semantics preserved)',
+    'adv.executed.label': 'Active query',
+    'adv.results.modify': 'Edit conditions',
+    'adv.results.authorAdded': 'Author row added — search again',
     'adv.clear': 'Clear',
     'adv.search': 'Search',
     'adv.warn.empty': 'Please fill in at least one query row.',

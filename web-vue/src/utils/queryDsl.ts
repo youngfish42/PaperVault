@@ -957,7 +957,7 @@ export interface CoarseBackendParams {
  * venue acronyms, years) virtually never appear in title/abstract text, so
  * AND-ing them would zero out the count.
  */
-const collectTextTerms = (node: AstNode, acc: string[]): void => {
+export const collectTextTerms = (node: AstNode, acc: string[]): void => {
   switch (node.kind) {
     case 'term':
       if (
