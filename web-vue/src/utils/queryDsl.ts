@@ -515,7 +515,12 @@ export const splitForBackend = (
       continue
     }
     if (clause.kind === 'term' && clause.field === 'author') {
-      out.author = clause.value
+      // Hoist the FIRST author clause to the backend param; any further AU
+      // clauses go to the residual so ``AU=Y AND AU=X`` keeps both conditions
+      // (co-author narrowing) instead of silently dropping the earlier one —
+      // the backend ``author`` param can only carry a single value.
+      if (out.author === null) out.author = clause.value
+      else residual.push(clause)
       continue
     }
     if (clause.kind === 'term' && clause.field === 'conf') {

@@ -7,7 +7,7 @@ import { suggestKeywordsWithSettings } from '@/api/ai'
 import { loadAiSettings, loadApiKey, toApiPayload } from '@/utils/aiSettings'
 import { useI18n } from '@/utils/i18n'
 // prettier-ignore
-import { parseDsl, splitForBackend, normalizeQueryInput, collectTextTerms, type AstNode } from '@/utils/queryDsl'
+import { parseDsl, splitForBackend, normalizeQueryInput, collectTextTerms, dslToCountPlan, combineLegCounts, type AstNode, type CoarseBackendParams } from '@/utils/queryDsl'
 const MAX_FETCH = 5000
 const PAGE_SIZE = 200
 type SearchMeta = { total: number; fetched: number; truncated: boolean }
@@ -73,12 +73,12 @@ export function useHomeSearch(options?: { suggest?: boolean }) {
     return out
   }
 
-  const buildBaseQuery = () => {
+  const buildBaseQuery = (): CoarseBackendParams & { sort: string } => {
     // ``field`` is intentionally omitted: the backend defaults to a
     // multi-field topic search (title + author + abstract). The DSL splitter
     // hoists any explicit author / venue / year qualifiers from the user's
     // expression below, and the residual AST is re-applied client-side.
-    const params: Record<string, unknown> = { sort: '-year' }
+    const params: CoarseBackendParams & { sort: string } = { sort: '-year' }
     // Normalise CJK fullwidth punctuation only at submission time so the input
     // box itself stays untouched as the user types. This is the single choke
     // point through which every search request flows.
@@ -151,6 +151,44 @@ export function useHomeSearch(options?: { suggest?: boolean }) {
     return params
   }
 
+  /**
+   * One backend param set per top-level OR leg; a single set otherwise.
+   *
+   * The backend ``q`` is a substring AND filter, so squeezing an OR into one
+   * ``q`` would only return the intersection — papers matching a single leg
+   * would never be fetched, and the client-side residual cannot recover what
+   * the backend excluded. Instead each leg gets its own coarse query (the
+   * same per-leg split the count path uses via ``dslToCountPlan``), the
+   * results are merged + de-duplicated, and the residual AST of the whole
+   * expression re-applies the exact semantics over the union.
+   */
+  const buildBasePlans = (): (CoarseBackendParams & {
+    sort: string
+  })[] => {
+    const rawQuery = normalizeQueryInput(searchContent.query || '')
+    const plan = dslToCountPlan(rawQuery)
+    if (plan.kind !== 'or') return [buildBaseQuery()]
+    // Keep activeAst consistent with the single-plan path: for a top-level OR
+    // nothing hoists, so the residual is the whole expression.
+    activeAst.value = splitForBackend(parseDsl(rawQuery), 'any').residual
+    return plan.legs.map(leg => {
+      const params: CoarseBackendParams & { sort: string } = {
+        sort: '-year',
+        ...leg
+      }
+      if (!params.author && searchContent.sp_author)
+        params.author = searchContent.sp_author
+      if (
+        !params.conf &&
+        searchContent.confs.length > 0 &&
+        searchContent.confs.length < availableConfs.value.length
+      ) {
+        params.conf = [...searchContent.confs]
+      }
+      return params
+    })
+  }
+
   const handleTreeClick = (data: TreeSelection): void => {
     activeTreeSelection = data
     const r = externalRef?.value
@@ -201,62 +239,113 @@ export function useHomeSearch(options?: { suggest?: boolean }) {
     guessList.value = []
     guessLoading.value = false
     activeTreeSelection = { level: 1 }
-    const baseParams = buildBaseQuery()
+    const plans = buildBasePlans()
     // Fetch a real first page immediately (rather than probing with size=1),
     // render it as soon as it arrives, then extend the local facet/export set
     // in the background. Broad terms can match tens of thousands of papers;
     // waiting for all 5,000 candidates used to leave the full-screen loader
     // up for over a minute and made a healthy search look empty.
+    // A top-level OR yields one plan per leg; legs are fetched sequentially
+    // and merged with id-based dedupe so the union — not the intersection an
+    // AND-ed ``q`` would return — reaches the client-side residual filter.
+    // The MAX_FETCH budget is split across the legs that have not run yet, so
+    // a broad early leg cannot starve later legs of every result; whatever a
+    // small leg leaves unused flows back to the remaining legs.
     const runSearch = async (): Promise<void> => {
       try {
-        const first = await searchPapers(
-          { ...baseParams, page: 1, size: PAGE_SIZE },
-          controller.signal
-        )
-        if (!isActive()) return
+        const collected: PaperItem[] = []
+        const seen = new Set<string>()
+        const legTotals: (number | null)[] = []
+        let truncated = false
+        let rendered = false
+        let totalEstimate = 0
 
-        const total = first.meta?.total ?? 0
-        const target = Math.min(total, MAX_FETCH)
-        const truncated = total > MAX_FETCH
-        const collected = (first.items || []).slice(0, target)
-
-        queryResult.value = groupByConfYear(collected)
-        searchMeta.value = { total, fetched: collected.length, truncated }
-        // Mount the result view before invoking its exposed list updater.
-        firstEntry.value = false
-        await nextTick()
-        if (!isActive()) return
-        handleTreeClick({ level: 1 })
-        closeLoading()
-
-        if (collected.length >= target) {
-          if (truncated)
-            ElMessage.warning(
-              t('search.warn.truncated').replace('{n}', String(MAX_FETCH))
-            )
-          return
+        const render = (): void => {
+          collected.sort((a, b) => Number(b.year) - Number(a.year))
+          queryResult.value = groupByConfYear(collected)
+          searchMeta.value = {
+            // combineLegCounts max-es text legs (synonym overlap), which can
+            // dip below the actually merged row count for disjoint legs —
+            // the displayed total must never contradict the list itself.
+            total: Math.max(totalEstimate, collected.length),
+            fetched: collected.length,
+            truncated
+          }
         }
 
-        const pages = Math.ceil(target / PAGE_SIZE)
-        for (let page = 2; page <= pages; page += 1) {
-          const remaining = target - collected.length
-          const pageSize = Math.min(PAGE_SIZE, remaining)
-          const resp = await searchPapers(
-            { ...baseParams, page, size: pageSize },
+        for (let legIndex = 0; legIndex < plans.length; legIndex += 1) {
+          const legParams = plans[legIndex]
+          const legBudget = Math.max(
+            1,
+            Math.ceil(
+              (MAX_FETCH - collected.length) / (plans.length - legIndex)
+            )
+          )
+          const first = await searchPapers(
+            {
+              ...legParams,
+              page: 1,
+              size: Math.min(PAGE_SIZE, legBudget)
+            },
             controller.signal
           )
           if (!isActive()) return
-          const items = resp.items || []
-          collected.push(...items)
-          queryResult.value = groupByConfYear(collected)
-          searchMeta.value = { total, fetched: collected.length, truncated }
-          updateVisibleResult()
-          if (items.length < pageSize) break
+
+          const legTotal = first.meta?.total ?? 0
+          legTotals.push(legTotal)
+          totalEstimate =
+            plans.length === 1
+              ? legTotal
+              : combineLegCounts(plans, legTotals) ?? legTotal
+          const target = Math.min(legTotal, legBudget)
+          if (legTotal > target) truncated = true
+
+          const addItems = (items: PaperItem[]): number => {
+            let added = 0
+            for (const it of items) {
+              if (seen.has(it.id)) continue
+              seen.add(it.id)
+              collected.push(it)
+              added += 1
+            }
+            return added
+          }
+          let legFetched = addItems((first.items || []).slice(0, target))
+          render()
+          if (!rendered) {
+            rendered = true
+            // Mount the result view before invoking its exposed list updater.
+            firstEntry.value = false
+            await nextTick()
+            if (!isActive()) return
+            handleTreeClick({ level: 1 })
+            closeLoading()
+          } else {
+            updateVisibleResult()
+          }
+
+          const pages = Math.ceil(target / PAGE_SIZE)
+          for (let page = 2; page <= pages; page += 1) {
+            const pageSize = Math.min(PAGE_SIZE, target - legFetched)
+            if (pageSize <= 0) break
+            const resp = await searchPapers(
+              { ...legParams, page, size: pageSize },
+              controller.signal
+            )
+            if (!isActive()) return
+            const items = resp.items || []
+            legFetched += addItems(items)
+            render()
+            updateVisibleResult()
+            if (items.length < pageSize) break
+          }
         }
 
         if (isActive() && truncated)
           ElMessage.warning(
-            t('search.warn.truncated').replace('{n}', String(MAX_FETCH))
+            // Report the actually displayed count: with per-leg budgets a
+            // top-level OR shows fewer than MAX_FETCH rows in total.
+            t('search.warn.truncated').replace('{n}', String(collected.length))
           )
       } catch (err) {
         if (isActive()) console.error(err)
@@ -266,7 +355,7 @@ export function useHomeSearch(options?: { suggest?: boolean }) {
     }
     void runSearch()
     // Strip DSL syntax (field tags, quotes, year ranges, operators…) before
-    // asking the LLM for related keywords. ``baseParams.q`` is exactly the
+    // asking the LLM for related keywords. ``plans[0].q`` is exactly the
     // free-text topic the splitter already hoisted out of the user expression
     // (see ``buildBaseQuery`` above); falling back to the raw query mirrors
     // the same fallback we use for the backend ``q`` parameter so the
@@ -274,14 +363,13 @@ export function useHomeSearch(options?: { suggest?: boolean }) {
     // noise like ``AU="..."`` or ``PY=2023-2026``.
     //
     // Prefer ``originalTopic`` (captured in ``handleAiSearchPick`` and on
-    // direct text searches) over ``baseParams.q`` so that a query string
+    // direct text searches) over ``plans[0].q`` so that a query string
     // like ``time series agent OR (...)`` doesn't get fed back into the
     // LLM as the seed prompt — which used to return offline-RL drift.
+    const firstQ = plans[0]?.q
     const suggestSeed =
       (originalTopic.value && originalTopic.value.trim()) ||
-      (typeof baseParams.q === 'string' && baseParams.q.trim()
-        ? baseParams.q.trim()
-        : '')
+      (typeof firstQ === 'string' && firstQ.trim() ? firstQ.trim() : '')
     if (suggestEnabled && suggestSeed) {
       guessLoading.value = true
       guessList.value = []

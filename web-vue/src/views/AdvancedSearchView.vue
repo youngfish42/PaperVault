@@ -117,6 +117,22 @@ const clearAll = (): void => {
   // Clear the expression panel too — even a dirty edit should not survive
   // an explicit "clear everything".
   exprText.value = ''
+  // The on-screen results belong to the cleared query: hide them and drop
+  // the executed expression from the URL so a refresh starts clean.
+  firstEntry.value = true
+  executedDsl.value = ''
+  builderCollapsed.value = false
+  router.replace({ query: {} })
+}
+
+/** Split a flat row chain at OR boundaries (a row with op='OR' starts a new leg). */
+const splitOrLegs = <T extends DslRow>(list: T[]): T[][] => {
+  const legs: T[][] = []
+  for (const r of list) {
+    if (r.op === 'OR' || legs.length === 0) legs.push([])
+    legs[legs.length - 1].push(r)
+  }
+  return legs
 }
 
 const composedDsl = computed(() => {
@@ -124,15 +140,22 @@ const composedDsl = computed(() => {
     .filter(r => r.value.trim().length > 0)
     .map(r => ({ field: r.field, value: r.value.trim(), op: r.op }))
 
-  // Append the year range as a synthetic AND row so it always narrows.
+  // The year range is a hard AND over the whole expression. A flat chain
+  // parses AND tighter than OR, so a single trailing year row would only
+  // constrain the LAST leg — distribute it into every OR leg instead:
+  // (A OR B) AND py ≡ (A AND py) OR (B AND py).
   const from = yearRange.from.trim()
   const to = yearRange.to.trim()
-  if (from && to) {
-    compactRows.push({ field: 'year', value: `${from}-${to}`, op: 'AND' })
-  } else if (from) {
-    compactRows.push({ field: 'year', value: from, op: 'AND' })
-  } else if (to) {
-    compactRows.push({ field: 'year', value: to, op: 'AND' })
+  const yearValue = from && to ? `${from}-${to}` : from || to
+  if (yearValue) {
+    const yearRow: DslRow = { field: 'year', value: yearValue, op: 'AND' }
+    if (compactRows.some(r => r.op === 'OR')) {
+      const distributed: DslRow[] = []
+      for (const leg of splitOrLegs(compactRows))
+        distributed.push(...leg, yearRow)
+      return buildDsl(distributed)
+    }
+    compactRows.push(yearRow)
   }
 
   return buildDsl(compactRows)
@@ -154,19 +177,54 @@ const runSearch = (): void => {
   searchContent.query = expr
   originalTopic.value = expr
   builderCollapsed.value = true
+  // Keep the executed expression in the URL so a refresh / shared link
+  // reproduces this exact search (consumeRouteQuery skips our own replace
+  // via the executedDsl guard).
+  router.replace({ query: { q: expr, run: '1' } })
   home.search()
 }
 
 /**
- * Author click on a result row: instead of navigating away, add an author
- * condition row and let the user re-run the search here.
+ * Author click on a result row: instead of navigating away, constrain the
+ * current conditions by this author and let the user re-run the search here.
+ * The flat row chain parses AND tighter than OR, so appending a trailing
+ * AND row would only narrow the LAST OR leg. Since (A OR B) AND au is
+ * logically (A AND au) OR (B AND au), the author is distributed into every
+ * OR leg — that is the only flat-chain encoding of "narrow everything".
  */
 const handleSearchAuthor = (author: string): void => {
   builderCollapsed.value = false
-  if (rows.some(r => r.field === 'author' && r.value.trim() === author)) {
-    return // row already exists — just reveal the builder
+  const hasAuthor = (list: BuilderRow[]): boolean =>
+    list.some(r => r.field === 'author' && r.value.trim() === author)
+  const filled = rows.filter(r => r.value.trim().length > 0)
+  if (!filled.some(r => r.op === 'OR')) {
+    if (hasAuthor(rows)) return // row already exists — just reveal the builder
+    rows.push(newRow('author', author, 'AND'))
+  } else {
+    // Split the flat chain at OR boundaries and add the author to every leg
+    // that lacks it. A leg already carrying this author needs no change;
+    // only when EVERY leg has it is the click a no-op. (A global any-row
+    // dedupe would silently leave unconstrained legs like the TS=… branch
+    // of `AU="X" OR TS=llm`.)
+    const next: BuilderRow[] = []
+    let changed = false
+    for (const leg of splitOrLegs(filled)) {
+      for (const r of leg) next.push(newRow(r.field, r.value, r.op))
+      if (!hasAuthor(leg)) {
+        next.push(newRow('author', author, 'AND'))
+        changed = true
+      }
+    }
+    if (!changed) return
+    rows.splice(0, rows.length, ...next)
   }
-  rows.push(newRow('author', author, 'AND'))
+  // The builder now diverges from the executed query: hide the stale
+  // results and drop the executed expression from the URL (same contract
+  // as loadFavorite / clearAll) so a refresh cannot resurrect the old
+  // search over the just-added condition.
+  firstEntry.value = true
+  executedDsl.value = ''
+  router.replace({ query: {} })
   ElMessage.success(t('adv.results.authorAdded'))
 }
 
@@ -219,11 +277,13 @@ const onExprInput = (): void => {
 
 /**
  * Replace the builder rows / year range with whatever ``raw`` parses to.
- * Only the first AND-joined year row is folded into the dedicated year-range
- * inputs (which always re-join as a hard AND); NOT/OR year rows and any
- * further year rows stay as builder rows so their semantics survive.
- * Anything the row model cannot express (nested groups, NEAR, leading NOT)
- * degrades to a single topic row holding the original text, with a warning.
+ * AND-joined year rows fold into the dedicated year-range inputs; since
+ * ``composedDsl`` distributes the range into every OR leg, exact duplicates
+ * of the already-folded range are dropped so a compose → parse round trip
+ * is a fixed point. NOT/OR year rows and year rows with a DIFFERENT value
+ * stay as builder rows so their semantics survive. Anything the row model
+ * cannot express (nested groups, NEAR, leading NOT) degrades to a single
+ * topic row holding the original text, with a warning.
  */
 const applyDslToBuilder = (raw: string): void => {
   const { rows: parsed, supported } = parseDslToRows(raw)
@@ -233,18 +293,21 @@ const applyDslToBuilder = (raw: string): void => {
   const next: BuilderRow[] = []
   for (const r of parsed) {
     const joinOp = r.op ?? 'AND'
-    if (r.field === 'year' && joinOp === 'AND' && !yearFolded) {
+    if (r.field === 'year' && joinOp === 'AND') {
       const m = r.value.match(/^(\d{4})\s*-\s*(\d{4})$/)
-      if (m) {
-        yearRange.from = m[1]
-        yearRange.to = m[2]
-        yearFolded = true
-        continue
-      }
-      if (/^\d{4}$/.test(r.value)) {
-        yearRange.from = r.value
-        yearFolded = true
-        continue
+      const single = /^\d{4}$/.test(r.value)
+      if (m || single) {
+        const f = m ? m[1] : r.value
+        const t = m ? m[2] : ''
+        if (!yearFolded) {
+          yearRange.from = f
+          yearRange.to = t
+          yearFolded = true
+          continue
+        }
+        // An exact duplicate of the folded range is one of the distributed
+        // OR-leg copies — drop it instead of adding a redundant row.
+        if (yearRange.from === f && yearRange.to === t) continue
       }
     }
     next.push(newRow(r.field, r.value, joinOp))
@@ -259,6 +322,15 @@ const applyDslToBuilder = (raw: string): void => {
 const doApplyExpr = (): void => {
   applyDslToBuilder(exprText.value.trim())
   exprText.value = composedDsl.value
+  // The builder now diverges from the executed query: hide the stale
+  // results and drop the executed expression from the URL (same contract
+  // as loadFavorite / clearAll / handleSearchAuthor) so a refresh cannot
+  // resurrect the old search over the just-applied conditions. When this
+  // runs through commitExpr → runSearch, the search immediately
+  // re-establishes both.
+  firstEntry.value = true
+  executedDsl.value = ''
+  router.replace({ query: {} })
 }
 
 /**
@@ -441,6 +513,14 @@ const openFavorites = async (): Promise<void> => {
 const loadFavorite = (item: SavedQuery): void => {
   applyDslToBuilder(item.dsl)
   exprText.value = composedDsl.value
+  // The builder now holds a different query than the results on screen —
+  // hide the stale results (and their summary bar) until the user re-runs,
+  // and drop the executed query from the URL so a refresh does not
+  // resurrect it over the just-loaded conditions.
+  firstEntry.value = true
+  executedDsl.value = ''
+  builderCollapsed.value = false
+  router.replace({ query: {} })
   favDrawerVisible.value = false
   ElMessage.success(t('fav.loaded'))
 }
@@ -527,20 +607,30 @@ const formatTime = (iso: string): string => {
 
 /**
  * Query hand-off: HomeView and saved-query deep links arrive as
- * /#/advanced?q=... — pre-fill the builder from the text DSL, then clear the
- * param so a later refresh does not resurrect it over the user's edits.
+ * /#/advanced?q=... — pre-fill the builder from the text DSL. Links produced
+ * by an executed search additionally carry ``run=1``; those re-run the search
+ * so a refresh / shared URL reproduces the results. An edit-mode hand-off
+ * (no ``run``) clears the param so a later refresh does not resurrect it
+ * over the user's edits.
  */
 const consumeRouteQuery = (): void => {
   // Only react while actually on this page — the watcher below also fires on
   // the way out, when consuming the param would be wrong.
   if (route.path !== '/advanced') return
   const q = route.query.q
-  if (typeof q === 'string' && q.trim()) {
-    applyDslToBuilder(q)
-    exprText.value = composedDsl.value
-    // An incoming expression must be visible: expand the builder even when
-    // results from a previous search are on screen.
-    builderCollapsed.value = false
+  if (typeof q !== 'string' || !q.trim()) return
+  const text = q.trim()
+  // Skip our own runSearch URL replace: the results on screen already come
+  // from exactly this expression.
+  if (text === executedDsl.value) return
+  applyDslToBuilder(text)
+  exprText.value = composedDsl.value
+  // An incoming expression must be visible: expand the builder even when
+  // results from a previous search are on screen.
+  builderCollapsed.value = false
+  if (route.query.run === '1') {
+    runSearch()
+  } else {
     router.replace({ query: {} })
   }
 }
