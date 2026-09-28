@@ -168,7 +168,7 @@ PaperVault/
 │   │   │   └── useAuth.ts        # Shared module-level auth state (`GET /v1/auth/me`, cached once); consumed by MainNavBar and the favorites UI
 │   │   ├── views/
 │   │   │   ├── HomeView.vue              # Landing + Smart Search (DSL-aware single-box); also owns the AI search + rerank flow
-│   │   │   ├── AdvancedSearchView.vue    # Visual query builder ⇄ text DSL (copy / import via `parseDslToRows`); saved-query favorites drawer
+│   │   │   ├── AdvancedSearchView.vue    # Visual query builder ⇄ live editable expression panel (two-way sync via `parseDslToRows`); saved-query favorites drawer
 │   │   │   └── SettingsView.vue          # AI provider settings page (P2-C shell + P2-D `AiSuggestSection`)
 │   │   ├── components/
 │   │   │   ├── MainNavBar.vue            # Top navigation bar shared across Home / Advanced / Settings
