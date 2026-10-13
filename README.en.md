@@ -38,9 +38,9 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-10-03
-- 🆕 **New Papers This Update**: 1,415
-- 📊 **Database Scale**: 713,899 papers / 129 publication series / 624,023 with abstracts / 111,924 with code
+- 📅 **Last Updated**: 2026-10-13
+- 🆕 **New Papers This Update**: 752
+- 📊 **Database Scale**: 714,651 papers / 129 publication series / 624,863 with abstracts / 112,013 with code
 
 <!-- recent-update-end -->
 
