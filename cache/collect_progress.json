@@ -23986,6 +23986,42 @@
     "DBLP::https://dblp.org/db/conf/miccai/miccai2026-19.html": {
       "name": "MICCAI2026",
       "ts": "2026-10-13T10:43:39"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/nier2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:14:43"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/aiops2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:15:47"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/designing2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:16:52"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/nse2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:17:56"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/raise2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:19:00"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/seigs2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:20:04"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/seis2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:21:09"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/static2025.html": {
+      "name": "ICSE2025",
+      "ts": "2026-10-15T20:22:12"
+    },
+    "DBLP::https://dblp.org/db/conf/icse/seis2026.html": {
+      "name": "ICSE2026",
+      "ts": "2026-10-15T20:23:17"
     }
   }
 }
