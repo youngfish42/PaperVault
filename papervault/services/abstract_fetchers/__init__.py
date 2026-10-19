@@ -37,6 +37,9 @@ from .vldb import VLDB_FETCHER
 from .ceur import CEUR_FETCHER
 from .jmlr import JMLR_FETCHER
 from .isca import ISCA_FETCHER
+from .springer import SPRINGER_FETCHER
+from .usenix import USENIX_FETCHER
+from .ndss import NDSS_FETCHER
 
 __all__ = [
     "AbstractResult",
@@ -63,6 +66,9 @@ FETCHER_REGISTRY: dict = _register(
     CEUR_FETCHER,
     JMLR_FETCHER,
     ISCA_FETCHER,
+    SPRINGER_FETCHER,
+    USENIX_FETCHER,
+    NDSS_FETCHER,
 )
 
 

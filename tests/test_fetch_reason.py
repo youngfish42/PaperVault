@@ -56,6 +56,11 @@ def test_success_returns_empty_err_info(monkeypatch):
         return "This is a valid abstract that is well over five characters.", title, "crossref", last_time
 
     monkeypatch.setattr(fa, "_fetch_doi_sources_concurrent", _ok_doi)
+    # Redirect dispatch must not run when the DOI chain already succeeded.
+    monkeypatch.setattr(
+        fa, "_dispatch_via_doi_redirect",
+        lambda *_a, **_kw: pytest.fail("redirect dispatch not expected on DOI success"),
+    )
 
     paper = {
         "paper_url": "https://doi.org/10.1234/example",
@@ -114,6 +119,9 @@ def test_doi_empty_yields_empty_abstract(monkeypatch):
 
     monkeypatch.setattr(fa, "_fetch_doi_sources_concurrent", _empty)
     monkeypatch.setattr(fa, "fetch_arxiv_abstract", _arxiv_miss)
+    # Redirect dispatch runs for doi.org URLs but finds nothing here —
+    # the synthesised reason must be unaffected by it.
+    monkeypatch.setattr(fa, "_dispatch_via_doi_redirect", lambda _u: None)
 
     paper = {
         "paper_url": "https://doi.org/10.1234/example",
@@ -138,6 +146,7 @@ def test_arxiv_title_mismatch_flagged(monkeypatch):
 
     monkeypatch.setattr(fa, "_fetch_doi_sources_concurrent", _empty_doi)
     monkeypatch.setattr(fa, "fetch_arxiv_abstract", _arxiv_wrong_title)
+    monkeypatch.setattr(fa, "_dispatch_via_doi_redirect", lambda _u: None)
 
     paper = {
         "paper_url": "https://doi.org/10.1234/example",

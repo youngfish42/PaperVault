@@ -60,6 +60,10 @@ def test_registry_contains_all_expected_domains():
         "ceur-ws.org",
         "jmlr.org",
         "isca-archive.org",
+        "link.springer.com",
+        "www.usenix.org",
+        "usenix.org",
+        "ndss-symposium.org",
     }
 
 
@@ -94,6 +98,22 @@ def test_dispatch_strips_www_prefix():
         ("https://ijcai.org/proceedings/2023/456", "ijcai_paper.html", "ijcai"),
         ("https://www.jmlr.org/papers/v25/23-1044.html", "jmlr_paper.html", "jmlr"),
         ("https://www.isca-archive.org/interspeech_2023/gong23c_interspeech.html", "isca_paper.html", "isca"),
+        ("https://link.springer.com/chapter/10.1007/978-3-540-40899-4_1", "springer_chapter.html", "springer"),
+        (
+            "https://www.usenix.org/conference/nsdi12/technical-sessions/presentation/zaharia",
+            "usenix_legacy.html",
+            "usenix",
+        ),
+        (
+            "https://www.usenix.org/conference/nsdi24/presentation/zhang-zili-pipelining",
+            "usenix_modern.html",
+            "usenix",
+        ),
+        (
+            "https://www.ndss-symposium.org/ndss2000/first-step-towards-automated-detection-buffer-overrun-vulnerabilities-paper/",
+            "ndss_paper.html",
+            "ndss",
+        ),
     ],
 )
 def test_domain_fetchers_extract_abstract(url, fixture, expected_source):
@@ -445,3 +465,222 @@ def test_no_pdf_deps_leak():
             if name.startswith(prefix):
                 del sys.modules[name]
         sys.modules.update(saved)
+
+
+# ---------- Springer: layout guard, truncated-meta fallback -----------------
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://link.springer.com/journal/11263",
+        "https://link.springer.com/search?query=foo",
+        "https://link.springer.com/book/10.1007/978-3-540-40899-4",
+        "https://link.springer.com/",
+    ],
+)
+def test_springer_non_article_paths_short_circuit(url):
+    """Springer journal / search / book-TOC / home pages share the host with
+    chapter pages. They must be rejected *before* the network call with
+    reason=``no_abstract_available`` so we neither burn HTTP quota nor
+    pollute the ``empty_abstract`` diagnostic bucket."""
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.side_effect = AssertionError(
+            "Springer fetcher must NOT hit the network for non-article URLs"
+        )
+        res = af.dispatch(url)
+    assert res.ok is False
+    assert res.source == "springer"
+    assert res.reason == "no_abstract_available"
+
+
+def test_springer_truncated_meta_only_returns_empty_abstract():
+    """Springer ``<meta name="description">`` is auto-truncated with an
+    ellipsis (~260 chars). Accepting it as a full abstract would poison
+    the cache with a snippet, so the fallback must reject the truncation
+    marker and degrade to ``empty_abstract`` (mirrors the ISCA
+    meta-only regression)."""
+    html = (
+        '<html><head><meta name="description" content="We describe a '
+        "surgical planning environment that permits the determination of "
+        "the location of a therapeutic neurosurgical intervention using "
+        'information derived from an electrophysiologi..." /></head>'
+        "<body><p>no abstract section here</p></body></html>"
+    )
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://link.springer.com/chapter/10.1007/978-3-540-40899-4_1")
+    assert res.ok is False
+    assert res.source == "springer"
+    assert res.reason == "empty_abstract"
+
+
+def test_springer_meta_fallback_accepts_untruncated_description():
+    """When the Abs1 section is missing but the description meta is NOT
+    truncated, it is a legitimate fallback."""
+    abstract = (
+        "We describe a complete fallback abstract that is long enough to "
+        "clear the minimum length gate without any truncation marker."
+    )
+    html = (
+        f'<html><head><meta name="description" content="{abstract}" /></head>'
+        "<body><p>no abstract section here</p></body></html>"
+    )
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://link.springer.com/chapter/10.1007/example_1")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "springer"
+    assert res.abstract == abstract
+
+
+# ---------- USENIX: layout guard + dual templates ---------------------------
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.usenix.org/",
+        "https://www.usenix.org/conference/nsdi24",
+        "https://www.usenix.org/conference/nsdi24/technical-sessions",
+        "https://www.usenix.org/membership",
+        "https://www.usenix.org/legacy/events/nsdi11/tech/full_papers/Zaharia.pdf",
+    ],
+)
+def test_usenix_non_presentation_paths_short_circuit(url):
+    """Conference landing pages, the technical-sessions index, membership
+    pages and legacy PDF links share the host with presentation pages —
+    all must short-circuit before the network call."""
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.side_effect = AssertionError(
+            "USENIX fetcher must NOT hit the network for non-presentation URLs"
+        )
+        res = af.dispatch(url)
+    assert res.ok is False
+    assert res.source == "usenix"
+    assert res.reason == "no_abstract_available"
+
+
+def test_usenix_bare_host_routes_via_canonical_key():
+    """The dispatcher strips ``www.`` so a bare ``usenix.org`` URL hits the
+    same fetcher through the canonical registry key."""
+    html = _fixture_html("usenix_modern.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://usenix.org/conference/nsdi24/presentation/zhang-zili-pipelining")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "usenix"
+
+
+def test_usenix_modern_fixture_extracts_real_abstract():
+    """Pinned content check on the real NSDI'24 fixture (RUMMY paper):
+    both abstract paragraphs must be captured, the author byline must
+    not leak in."""
+    html = _fixture_html("usenix_modern.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://www.usenix.org/conference/nsdi24/presentation/zhang-zili-pipelining")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert "Vector query processing powers a wide range of AI applications" in res.abstract
+    assert "reordered pipelining" in res.abstract
+    assert "Zhang" not in res.abstract.split(".")[0]
+
+
+def test_usenix_empty_page_returns_empty_abstract():
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response("<html><body>no abstract here</body></html>")
+        res = af.dispatch("https://www.usenix.org/conference/nsdi24/presentation/nobody")
+    assert res.ok is False
+    assert res.source == "usenix"
+    assert res.reason == "empty_abstract"
+
+
+# ---------- NDSS: layout guard + byline / metadata-row exclusion -------------
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.ndss-symposium.org/",
+        "https://www.ndss-symposium.org/ndss2000/",
+        "https://www.ndss-symposium.org/ndss2024/",
+        "https://www.ndss-symposium.org/ndss-paper/",
+    ],
+)
+def test_ndss_index_pages_short_circuit(url):
+    """Bare edition index pages have no abstract and must short-circuit
+    before the network call."""
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.side_effect = AssertionError(
+            "NDSS fetcher must NOT hit the network for edition index pages"
+        )
+        res = af.dispatch(url)
+    assert res.ok is False
+    assert res.source == "ndss"
+    assert res.reason == "no_abstract_available"
+
+
+def test_ndss_fixture_excludes_byline_and_metadata_rows():
+    """Pinned content check on the real NDSS 2000 fixture: the abstract
+    prose is returned, while the strong-only author byline and the
+    ``Date:`` / ``Associated Event:`` metadata rows stay out."""
+    html = _fixture_html("ndss_paper.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch(
+            "https://www.ndss-symposium.org/ndss2000/first-step-towards-automated-detection-buffer-overrun-vulnerabilities-paper/"
+        )
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert "integer range analysis" in res.abstract
+    assert "David Wagner" not in res.abstract
+    assert "Date:" not in res.abstract
+    assert "Associated Event" not in res.abstract
+
+
+def test_ndss_meta_fallback_used_when_body_container_missing():
+    """NDSS (Yoast) description metas carry the full abstract — unlike
+    ISCA they are not truncated — so they are a safe final fallback."""
+    abstract = (
+        "This paper introduces the use of static analysis for finding "
+        "potential buffer overrun vulnerabilities in security-critical C "
+        "code before it is deployed, with enough prose to pass the gate."
+    )
+    html = (
+        f'<html><head><meta name="description" content="{abstract}" /></head>'
+        "<body><main><p>no paper container here</p></main></body></html>"
+    )
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://www.ndss-symposium.org/ndss2001/some-paper/")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "ndss"
+    assert res.abstract == abstract
+
+
+def test_ndss_empty_page_returns_empty_abstract():
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response("<html><body>nothing here</body></html>")
+        res = af.dispatch("https://www.ndss-symposium.org/ndss2001/some-paper/")
+    assert res.ok is False
+    assert res.source == "ndss"
+    assert res.reason == "empty_abstract"
+
+
+def test_ndss_modern_fixture_nested_paragraphs_not_duplicated():
+    """Verified against the real NDSS 2024 LMSanitator page (2026-10-19):
+    the modern template emits *nested* paragraphs
+    (``<p><strong><p>byline</p></strong></p>`` — invalid HTML that
+    html.parser keeps nested). A deep ``find_all("p")`` would return
+    every paragraph twice, duplicating the abstract; the fetcher must
+    only iterate top-level paragraphs and drop the strong-only byline.
+    """
+    html = _fixture_html("ndss_paper_modern.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch(
+            "https://www.ndss-symposium.org/ndss-paper/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors/"
+        )
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "ndss"
+    # Abstract prose appears exactly once (no nested-<p> duplication).
+    assert res.abstract.count("has emerged as an attractive paradigm") == 1
+    # Author byline must not leak into the abstract.
+    assert "Chengkun Wei" not in res.abstract
+    assert "Zhejiang University" not in res.abstract

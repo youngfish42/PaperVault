@@ -16,16 +16,20 @@ from collector.http import HEADERS, SESSION
 from .base import AbstractResult
 
 
-def http_get(url: str, timeout: float = 20.0) -> Tuple[Optional[requests.Response], Optional[AbstractResult]]:
+def http_get(url: str, timeout: float = 20.0, headers: Optional[dict] = None) -> Tuple[Optional[requests.Response], Optional[AbstractResult]]:
     """Perform a GET and translate any exception into a fetcher-shaped ``AbstractResult``.
 
     Returns ``(response, None)`` on 2xx, otherwise ``(None, AbstractResult(ok=False, ...))``.
     The 4xx/5xx bodies are still surfaced via :attr:`AbstractResult.http_status`
     so downstream code (progress record + analyse script) can distinguish
     ``rate_limited`` (429) from generic ``network``.
+
+    ``headers`` overrides the shared default headers — needed by hosts
+    behind bot-defence layers that JS-challenge browser-like User-Agents
+    (e.g. SpringerLink / F5) but serve full HTML to non-browser UAs.
     """
     try:
-        resp = SESSION.get(url, headers=HEADERS, timeout=timeout)
+        resp = SESSION.get(url, headers=headers or HEADERS, timeout=timeout)
     except requests.exceptions.Timeout:
         return None, AbstractResult(ok=False, url=url, reason="timeout")
     except requests.exceptions.RequestException:

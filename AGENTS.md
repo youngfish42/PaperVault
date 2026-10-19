@@ -92,7 +92,10 @@ PaperVault/
 │           ├── aaai.py           # `ojs.aaai.org` + legacy `aaai.org` (path-segment guarded; strips both `<h2>` and `<strong>` Abstract labels)
 │           ├── ijcai.py          # `ijcai.org`
 │           ├── vldb.py           # `vldb.org`
-│           └── ceur.py           # `ceur-ws.org`
+│           ├── ceur.py           # `ceur-ws.org`
+│           ├── springer.py       # `link.springer.com` (`/chapter/` `/article/` `/referenceworkentry/` guarded; `<section aria-labelledby="Abs1">` + truncated-meta guard; sends a bot UA because F5 bot defence JS-challenges browser UAs)
+│           ├── usenix.py         # `usenix.org` (`/conference/.../presentation/` + non-PDF `/legacy/events/` guarded; `field-name-field-paper-description` covers both legacy and Drupal layouts)
+│           └── ndss.py           # `ndss-symposium.org` (edition-index pages guarded; byline / `Date:` metadata rows excluded, top-level `<p>` only; Yoast meta-description fallback is NOT truncated)
 ├── tests/                        # Backend pytest suite (runs offline against fixture cache via `PAPERVAULT_OFFLINE=1`)
 │   ├── __init__.py
 │   ├── conftest.py               # `client_with_sample` fixture and sample-cache factories
@@ -109,7 +112,9 @@ PaperVault/
 │   ├── test_suggest_api.py       # `POST /v1/suggest` + `GET /v1/ai/providers`
 │   ├── test_suggest_dispatch.py  # Provider / protocol resolution in `services.suggest`
 │   ├── test_suggest_topic_anchor.py  # Topic-anchor prompt shaping for `suggest_keywords`
-│   └── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
+│   ├── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
+│   ├── test_doi_redirect_dispatch.py  # DOI redirect dispatch: doi.org → final-URL re-dispatch to the fetcher registry, failure degrade, `--no-doi-redirect`
+│   └── test_s2_backfill.py       # `--s2-batch` / `--s2-title-match` S2 backfill passes: batch mapping (null entries), title/year gates, excluded hosts, dry-run
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -379,7 +384,7 @@ Other frontend scripts:
 | `python maintain.py` | Update README conference list & stats from config files |
 | `python maintain.py collect` | Incrementally collect papers for new conferences and update README. Supports `--soft-timeout N` for graceful timeout handling |
 | `python maintain.py force` | Force full cache rebuild and README update |
-| `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
+| `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). On DOI-chain failure for `doi.org` URLs it follows the redirect once and re-dispatches the final landing page to the domain-fetcher registry (e.g. Springer LNCS / ISCA DOIs; disable with `--no-doi-redirect`). Two mutually-exclusive dedicated passes retry previously-failed records: `--s2-batch` (failed `doi.org` URLs via S2 `/paper/batch`, ≤500 DOIs/request) and `--s2-title-match` (failed non-DOI long-tail hosts via S2 `/paper/search/match` with ≥0.85 title + ±1 year gates; both honour `--max-papers` / `--soft-timeout` / `--chunk-size` / `--dry-run` / `--no-sync` / `--offline` and the optional `S2_API_KEY` env var). Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
 | `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
 | `python scripts/fetch_cvf_abstracts.py` | CVF Open Access-targeted abstract backfill (scrapes `openaccess.thecvf.com/.../*_paper.html`). Independent of DOI-based sources |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
@@ -468,6 +473,9 @@ chain takes over. Currently registered hosts:
 - [IJCAI](https://ijcai.org/) (`ijcai.org`)
 - [VLDB](https://vldb.org/) (`vldb.org`)
 - [CEUR-WS](https://ceur-ws.org/) (`ceur-ws.org`)
+- [SpringerLink](https://link.springer.com/) (`link.springer.com` — LNCS / MICCAI chapters and journal articles; reached both directly and via the DOI redirect dispatch. Sends a self-identifying bot UA: the site's F5 bot defence serves a JS challenge to browser-like UAs but full HTML to non-browser ones)
+- [USENIX](https://www.usenix.org/) (`usenix.org` — both the pre-2020 layout and the modern Drupal layout share the `field-name-field-paper-description` container)
+- [NDSS Symposium](https://www.ndss-symposium.org/) (`ndss-symposium.org` — legacy `/ndss20xx/<slug>-paper/` and modern `/ndss-paper/<slug>/` pages)
 
 Code links are enriched from [MLNLP-World/Top-AI-Conferences-Paper-with-Code](https://github.com/MLNLP-World/Top-AI-Conferences-Paper-with-Code) and via regex extraction from abstracts (`scripts/fetch_code_links.py`).
 
