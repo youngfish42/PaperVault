@@ -3,6 +3,29 @@
 > 生成时间：2026-05-24
 > 总计：137 个会议/年份待处理，63,410 条论文缺 abstract
 
+## 2026-10-20/21 新一轮回填（fetcher 扩展 + DOI 重定向 + S2 补漏）
+
+分支 `feat/abstract-backfill-enhance`（commit `875b9cb`、`d0652c3`）。新增 link.springer.com / usenix.org / ndss-symposium.org 三个 domain fetcher（usenix 含 `/events/<conf><yy>/tech/*.html` 与 `/publications/library/proceedings/*.html` 老版式）、DOI 链失败后的 doi.org 重定向再分派（`--no-doi-redirect` 可关）、以及 `--s2-batch` / `--s2-title-match` 两个 Semantic Scholar 补漏模式。
+
+本轮结果（覆盖率 87.0% → 89.29%，缺摘要 84,317 → 76,561；期间 CI 新采集使总库 650,459 → 714,769）：
+
+| 来源 | 命中 | 说明 |
+| --- | ---: | --- |
+| isca | 4,022 | INTERSPEECH（10.21437 DOI 经重定向命中 ISCA 页面） |
+| aaai | 2,617 | AAAI 2020-2022（ojs.aaai.org） |
+| springer | 2,237 | MICCAI 2000-2003+（LNCS 章节页；S2 对 Springer 摘要 elided，抓页面是唯一可靠途径） |
+| usenix | 1,913 | NSDI/ATC/USS/OSDI/FAST（新老四种版式） |
+| ijcai | 1,763 | IJCAI 2013/2015/2016/2024 |
+| semanticscholar_batch | 617 | doi.org 失败记录批量补漏 |
+| ndss | 5 | NDSS 2010 年代页面本身无摘要（仅元数据+PDF 链接），低产属正常 |
+
+教训与备注：
+
+- **串联多个回填段时必须全部 `--offline`（或每段都同步）**：`ensure_cache_local/ensure_progress_local(refresh=True)` 启动时会无条件用 HF 远端覆盖本地文件；本轮曾因段间 `--no-sync` 但非 `--offline`，被下一段启动拉取洗掉约 970 条 springer 成果（后重跑补回）。
+- HF 上传曾在 97% 处连接停滞 77 分钟（无超时）；串联脚本里的手动 sync 建议包 `timeout`。
+- `--s2-title-match`（`/paper/search/match`）匿名共享配额在本机出口 IP 上持续 429、1.5h 零产出，已放弃；剩余长尾（dl.acm.org / vldb.org / web.archive.org 等约 1.1 万条）需要 S2 API key 或改日再试。
+- 详细分源/分原因诊断见 `docs/abstract_backfill_report.md`（`scripts/analyze_backfill.py` 生成）。
+
 ## 执行策略
 
 按单个 conf（会议+年份）为最小单元，优先处理 DOI 比例高的会议。
