@@ -543,6 +543,14 @@ def test_springer_meta_fallback_accepts_untruncated_description():
         "https://www.usenix.org/conference/nsdi24/technical-sessions",
         "https://www.usenix.org/membership",
         "https://www.usenix.org/legacy/events/nsdi11/tech/full_papers/Zaharia.pdf",
+        # Boundaries of the newly-allowed old-layout areas: media files,
+        # bare edition landings, and the multi-abstract index page.
+        "https://www.usenix.org/events/usenix07/",
+        "https://www.usenix.org/events/osdi04/tech/techAbstracts.html",
+        "https://www.usenix.org/events/osdi04/tech/swift.html.mp3",
+        "https://www.usenix.org/events/osdi04/tech/slides/swift.ppt",
+        "https://www.usenix.org/publications/library/proceedings/sec01/dean.ps",
+        "https://www.usenix.org/publications/library/proceedings/sec01/dean.pdf",
     ],
 )
 def test_usenix_non_presentation_paths_short_circuit(url):
@@ -591,6 +599,49 @@ def test_usenix_empty_page_returns_empty_abstract():
     assert res.ok is False
     assert res.source == "usenix"
     assert res.reason == "empty_abstract"
+
+
+def test_usenix_events_layout_extracts_abstract_without_footer_leak():
+    """Verified against the real OSDI '04 page (2026-10-20,
+    ``/events/osdi04/tech/swift.html``): the abstract follows
+    ``<H3>Abstract</H3>`` as raw text nodes with bare ``<P>``
+    separators. html.parser nests the trailing content inside the
+    first ``<P>``, so the walk must use ``next_elements`` and stop
+    at the "View the full text" ``<UL>`` — title, author byline and
+    footer must stay out."""
+    html = _fixture_html("usenix_events_osdi04.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("http://www.usenix.org/events/osdi04/tech/swift.html")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "usenix"
+    assert "shadow driver" in res.abstract
+    assert res.abstract.startswith("This paper presents a new mechanism")
+    # No title / author / footer leakage.
+    assert "Recovering Device Drivers" not in res.abstract
+    assert "Michael M. Swift" not in res.abstract
+    assert "View the full text" not in res.abstract
+    assert "Membership Information" not in res.abstract
+    assert res.abstract.rstrip().endswith("device drivers.")
+
+
+def test_usenix_proceedings_layout_extracts_abstract():
+    """Verified against the real Security '01 page (2026-10-20,
+    ``/publications/library/proceedings/sec01/dean.html``): abstract
+    prose follows ``<H3>Abstract</H3>`` and stops before the
+    full-text ``<UL>`` list."""
+    html = _fixture_html("usenix_proceedings_sec01.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch(
+            "http://www.usenix.org/publications/library/proceedings/sec01/dean.html"
+        )
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.source == "usenix"
+    assert res.abstract.startswith("Client puzzles are commonly proposed")
+    assert "denial-of-service attacks" in res.abstract
+    assert "Drew Dean" not in res.abstract
+    assert "View the full text" not in res.abstract
 
 
 # ---------- NDSS: layout guard + byline / metadata-row exclusion -------------

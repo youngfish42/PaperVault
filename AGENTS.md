@@ -94,7 +94,7 @@ PaperVault/
 │           ├── vldb.py           # `vldb.org`
 │           ├── ceur.py           # `ceur-ws.org`
 │           ├── springer.py       # `link.springer.com` (`/chapter/` `/article/` `/referenceworkentry/` guarded; `<section aria-labelledby="Abs1">` + truncated-meta guard; sends a bot UA because F5 bot defence JS-challenges browser UAs)
-│           ├── usenix.py         # `usenix.org` (`/conference/.../presentation/` + non-PDF `/legacy/events/` guarded; `field-name-field-paper-description` covers both legacy and Drupal layouts)
+│           ├── usenix.py         # `usenix.org` (`/conference/.../presentation/` + non-media `/legacy/events/` + `/events/<slug>/tech/*.html` + `/publications/library/proceedings/**.html` guarded; `field-name-field-paper-description` covers legacy+Drupal layouts, oldest `<H3>Abstract</H3>` pages use a `next_elements` walk that stops at the full-text `<UL>`; media files / bare `/events/<slug>/` landings / `techAbstracts.html` index short-circuit)
 │           └── ndss.py           # `ndss-symposium.org` (edition-index pages guarded; byline / `Date:` metadata rows excluded, top-level `<p>` only; Yoast meta-description fallback is NOT truncated)
 ├── tests/                        # Backend pytest suite (runs offline against fixture cache via `PAPERVAULT_OFFLINE=1`)
 │   ├── __init__.py
