@@ -114,6 +114,36 @@ def test_pdf_extract_caps_at_max_chars():
     assert len(abstract) <= PDF_ABSTRACT_MAX_CHARS
 
 
+def test_pdf_extract_stops_at_pvldb_reference_format():
+    """PVLDB layout: the "PVLDB Reference Format:" block follows the abstract
+    immediately (before "1. Introduction") and must not leak in.
+    Regression from validation run 2026-10-21 (vol14 p521-farias ratio 0.60)."""
+    pdf = _make_pdf(
+        ["Some PVLDB Paper", "", "Abstract"]
+        + ABSTRACT_LINES
+        + ["", "PVLDB Reference Format:", "Alice Fixture. Some PVLDB Paper. PVLDB, 14(4): 521-533, 2021."]
+        + ["", "1. Introduction", "Body text."]
+    )
+    abstract = extract_abstract_from_pdf_bytes(pdf)
+    assert abstract.startswith("This paper presents a synthetic mechanism")
+    assert "Reference Format" not in abstract
+    assert "PVLDB, 14(4)" not in abstract
+
+
+def test_pdf_extract_rejects_word_jammed_text_layer():
+    """Broken text layer with no space glyphs (some CEUR workshop exports)
+    yields "ABSTRACTAnnotatingvideos..." — a long block with almost no
+    spaces is unusable and must be rejected.
+    Regression from validation run 2026-10-21 (Vol-1141 paper_10)."""
+    jammed = [
+        "ThispaperpresentsasyntheticmechanismusedtoverifyPDFabstractextraction",
+        "withoutanyspaceglyphsinthelayertheresultisunusablegarbagetextthatmust",
+        "berejectedbythespaceratiodetectorinsteadofenteringthecache",
+    ]
+    pdf = _make_pdf(["Some Paper", "", "Abstract"] + jammed + ["", "1. Introduction", "x"])
+    assert extract_abstract_from_pdf_bytes(pdf) == ""
+
+
 def test_pdf_extract_garbage_bytes():
     assert extract_abstract_from_pdf_bytes(b"not a pdf at all") == ""
     assert extract_abstract_from_pdf_bytes(b"") == ""
@@ -158,6 +188,26 @@ def test_fetch_pdf_abstract_non_pdf_final_url_rejected(monkeypatch):
     abstract, reason = fa._fetch_pdf_abstract(url)
     assert abstract is None
     assert reason == "empty_abstract"
+
+
+def test_fetch_pdf_abstract_oversize_content_length_skips_download(monkeypatch):
+    """Declared Content-Length above the cap → skip without consuming the
+    body (a truncated download would fail pdfminer's xref parse anyway)."""
+    url = "https://www.vldb.org/pvldb/vol17/p3644-dayan.pdf"
+    resp = _pdf_response(url, GOOD_PDF)
+    resp.headers = {"Content-Type": "application/pdf", "Content-Length": str(fa.PDF_FALLBACK_MAX_BYTES + 1)}
+    iter_called = {"n": 0}
+
+    def _iter(chunk_size=65536):
+        iter_called["n"] += 1
+        return []
+
+    resp.iter_content = _iter
+    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", MagicMock(return_value=resp))
+    abstract, reason = fa._fetch_pdf_abstract(url)
+    assert abstract is None
+    assert reason == "empty_abstract"
+    assert iter_called["n"] == 0
 
 
 def test_fetch_pdf_abstract_http_error(monkeypatch):

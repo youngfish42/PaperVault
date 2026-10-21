@@ -34,12 +34,20 @@ _HEADING_RE = re.compile(r"^\s*abstract\s*[.—\-:]*\s*$", re.IGNORECASE | re.MU
 _INLINE_RE = re.compile(r"^\s*abstract\s*[—\-.:]\s*", re.IGNORECASE | re.MULTILINE)
 # Section markers that terminate the abstract block.
 _END_RE = re.compile(
-    r"^\s*(?:1\.?\s+introduction|i\.?\s+introduction|keywords?|index terms|key words)\b",
+    r"^\s*(?:1\.?\s+introduction|i\.?\s+introduction|keywords?|index terms|key words"
+    r"|(?:p?vldb\s+)?reference format)\b",
     re.IGNORECASE | re.MULTILINE,
 )
 # ACM-style copyright boilerplate sometimes lands right after the
 # "Abstract" keyword; a block starting with it is scraping junk.
 _COPYRIGHT_RE = re.compile(r"^\s*permission to make digital", re.IGNORECASE)
+
+# Some PDFs carry a broken text layer with no space glyphs at all (words
+# jammed together, e.g. certain CEUR workshop exports) — pdfminer then
+# returns "ABSTRACTAnnotatingvideosintheabsence...". Normal English prose
+# is ~15-18% spaces; a long block with almost none is unusable garbage.
+_MIN_SPACE_RATIO = 0.03
+_MIN_SPACE_CHECK_LEN = 100
 
 
 def extract_abstract_from_pdf_bytes(data: bytes) -> str:
@@ -79,5 +87,7 @@ def extract_abstract_from_pdf_bytes(data: bytes) -> str:
     block = block[:PDF_ABSTRACT_MAX_CHARS]
     abstract = clean_text(block)
     if _COPYRIGHT_RE.match(abstract):
+        return ""
+    if len(abstract) >= _MIN_SPACE_CHECK_LEN and abstract.count(" ") / len(abstract) < _MIN_SPACE_RATIO:
         return ""
     return abstract

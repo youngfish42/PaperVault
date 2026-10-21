@@ -603,16 +603,13 @@ def _dispatch_via_doi_redirect(url: str):
 PDF_FALLBACK_MAX_BYTES = 8 * 1024 * 1024  # 流式下载截断上限
 
 
-def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
-    """下载 PDF（流式，≤8MB）并抽取 Abstract 节。返回 (abstract, "") 或 (None, reason)。
+def _download_pdf_bytes(url: str) -> Tuple[Optional[bytes], str]:
+    """流式下载 PDF（≤PDF_FALLBACK_MAX_BYTES），返回 (bytes, "") 或 (None, reason)。
 
-    reason 只用 REASON_ENUM 现有成员：网络层 ``timeout`` / ``network``，
-    内容层（非 PDF、解析失败、无 Abstract 节、版权块）一律 ``empty_abstract``。
+    确认重定向后的最终响应确实是 PDF（最终 URL 仍以 .pdf 结尾或
+    Content-Type 是 application/pdf）。reason 只用 REASON_ENUM 现有成员。
+    ``scripts/validate_pdf_extract.py`` 复用此 helper 取原始字节做验证。
     """
-    from papervault.services.abstract_fetchers.pdf_extract import (
-        extract_abstract_from_pdf_bytes,
-    )
-
     try:
         resp = _COLLECTOR_SESSION.get(
             url, headers=HEADERS, timeout=30, stream=True, allow_redirects=True
@@ -624,11 +621,17 @@ def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
     try:
         if resp.status_code != 200:
             return None, _s2_status_reason(resp.status_code)
-        # 触发条件是原 URL 以 .pdf 结尾；这里再确认重定向后的最终响应
-        # 确实是 PDF（最终 URL 仍以 .pdf 结尾或 Content-Type 是 pdf）。
         final_path = (urlparse(getattr(resp, "url", "") or "").path or "").lower()
         ctype = (resp.headers.get("Content-Type") or "").lower()
         if not (final_path.endswith(".pdf") or "application/pdf" in ctype):
+            return None, "empty_abstract"
+        # 超大 PDF（图片多的论文，如 PVLDB vol17 个别 9MB+ 文件）直接跳过：
+        # 截断下载会让 pdfminer 因 xref 缺失而解析失败，白烧带宽。
+        try:
+            declared = int(resp.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            declared = 0
+        if declared > PDF_FALLBACK_MAX_BYTES:
             return None, "empty_abstract"
         buf = bytearray()
         for chunk in resp.iter_content(chunk_size=65536):
@@ -637,8 +640,24 @@ def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
                 break
     finally:
         resp.close()
+    return bytes(buf), ""
+
+
+def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
+    """下载 PDF（流式，≤8MB）并抽取 Abstract 节。返回 (abstract, "") 或 (None, reason)。
+
+    reason 只用 REASON_ENUM 现有成员：网络层 ``timeout`` / ``network``，
+    内容层（非 PDF、解析失败、无 Abstract 节、版权块）一律 ``empty_abstract``。
+    """
+    from papervault.services.abstract_fetchers.pdf_extract import (
+        extract_abstract_from_pdf_bytes,
+    )
+
+    data, err = _download_pdf_bytes(url)
+    if data is None:
+        return None, err
     try:
-        abstract = extract_abstract_from_pdf_bytes(bytes(buf))
+        abstract = extract_abstract_from_pdf_bytes(data)
     except Exception:
         return None, "empty_abstract"
     if not abstract:

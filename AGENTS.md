@@ -143,6 +143,7 @@ PaperVault/
 │   ├── cvf_abstract.py               # Side-effect-free CVF scraping helpers, shared by `collector` and `fetch_cvf_abstracts.py`
 │   ├── fetch_code_links.py           # Extract GitHub code links from abstracts
 │   ├── fetch_pwc_backfill.py         # Offline one-shot backfill of empty abstracts/code links from the archived PwC HF snapshots (exact-key matching only; never overwrites non-empty fields)
+│   ├── validate_pdf_extract.py       # Validation harness for the PDF abstract fallback: stratified sampling of .pdf records, OpenAlex/S2 reference abstracts, PASS/REVIEW/FAIL report → docs/pdf_extract_validation.md
 │   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
 │   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
 │   ├── sync_hf_readme.py             # Render `docs/HF_README.md` and push it as the Hugging Face dataset repo root README
