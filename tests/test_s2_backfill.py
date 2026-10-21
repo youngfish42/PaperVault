@@ -137,7 +137,7 @@ def test_s2_title_targets_skip_empty_title_and_non_failed():
     ],
 )
 def test_s2_title_gate(api_title, local_title, expected):
-    assert fa._s2_title_gate(api_title, local_title) is expected
+    assert fa._title_gate(api_title, local_title) is expected
 
 
 @pytest.mark.parametrize(
@@ -153,7 +153,7 @@ def test_s2_title_gate(api_title, local_title, expected):
     ],
 )
 def test_s2_year_gate(conf, s2_year, expected):
-    assert fa._s2_year_gate(conf, s2_year) is expected
+    assert fa._year_gate(conf, s2_year) is expected
 
 
 # ---------- Batch endpoint mapping --------------------------------------------
@@ -393,3 +393,120 @@ def test_s2_request_network_exhaustion_returns_reason(monkeypatch):
     assert err == "network"
     assert err in fa.REASON_ENUM
     assert session.get.call_count == 2
+
+
+# ---------- OpenAlex title-match mode (--openalex-title) ---------------------
+
+
+def _inverted_index(text: str) -> dict:
+    """Build a tiny OpenAlex-style abstract_inverted_index from plain text."""
+    idx: dict = {}
+    for pos, word in enumerate(text.split()):
+        idx.setdefault(word, []).append(pos)
+    return idx
+
+
+def test_openalex_title_fetch_unwraps_results(monkeypatch):
+    """OpenAlex returns ``{"results": [work, ...]}`` — the fetcher must take
+    the first candidate; empty results mean "no candidate" (empty_abstract)."""
+    work = {"title": "Paper Hit", "abstract_inverted_index": _inverted_index(LONG_ABSTRACT), "publication_year": 2022}
+    monkeypatch.setattr(fa, "_s2_request", MagicMock(return_value=(_s2_response({"results": [work]}), "")))
+    data, err = fa._openalex_title_match_fetch("Paper Hit")
+    assert err == ""
+    assert data == work
+    # 3 rps 保守限速 + 独立 rate_state + 不带 S2 key 的 headers。
+    call = fa._s2_request.call_args
+    assert call.kwargs["min_interval"] == fa.OPENALEX_MIN_INTERVAL
+    assert call.kwargs["rate_state"] is fa._openalex_rate_state
+    assert call.kwargs["headers"] is fa.HEADERS
+    assert call.kwargs["params"]["per-page"] == 3
+
+    monkeypatch.setattr(fa, "_s2_request", MagicMock(return_value=(_s2_response({"results": []}), "")))
+    data, err = fa._openalex_title_match_fetch("nothing matches")
+    assert data is None
+    assert err == "empty_abstract"
+
+
+def test_openalex_evaluate_gates():
+    paper = _paper("https://dl.acm.org/doi/10.1145/x", title="Paper Hit", conf="BMVC2022")
+    work = {
+        "title": "Paper Hit",
+        "abstract_inverted_index": _inverted_index(LONG_ABSTRACT),
+        "publication_year": 2023,
+    }
+    abstract, reason = fa._evaluate_openalex_title_item(work, paper)
+    assert abstract == LONG_ABSTRACT  # inverted-index 重建 + 年份差 1 放行
+    assert reason == ""
+
+    # 标题不一致
+    bad_title = dict(work, title="Completely Unrelated Work")
+    assert fa._evaluate_openalex_title_item(bad_title, paper)[1] == "title_mismatch"
+    # 年份差 3
+    bad_year = dict(work, publication_year=2019)
+    assert fa._evaluate_openalex_title_item(bad_year, paper)[1] == "title_mismatch"
+    # 无 inverted index → empty_abstract
+    no_abs = dict(work, abstract_inverted_index=None)
+    assert fa._evaluate_openalex_title_item(no_abs, paper)[1] == "empty_abstract"
+
+
+def test_openalex_excluded_hosts_drop_ndss():
+    """ndss-symposium.org 页面本身无摘要，OpenAlex 模式不排除它。"""
+    assert "ndss-symposium.org" in fa.S2_TITLE_EXCLUDED_HOSTS
+    assert "ndss-symposium.org" not in fa.OPENALEX_TITLE_EXCLUDED_HOSTS
+    ndss_url = "https://www.ndss-symposium.org/ndss2000/some-paper/"
+    papers = [_paper(ndss_url)]
+    progress = _failed_progress(ndss_url)
+    s2_targets = fa._collect_s2_title_targets(papers, progress)
+    oa_targets = fa._collect_s2_title_targets(
+        papers, progress, excluded_hosts=fa.OPENALEX_TITLE_EXCLUDED_HOSTS
+    )
+    assert s2_targets == []
+    assert [p["paper_url"] for p in oa_targets] == [ndss_url]
+
+
+def test_openalex_title_pass_success_and_dry_run(monkeypatch):
+    p_ok = _paper("https://www.ndss-symposium.org/ndss2000/some-paper/", title="Paper Hit", conf="NDSS2000")
+    p_miss = _paper("https://dl.acm.org/doi/10.1145/miss", title="A Missing Paper", conf="WWW2013")
+    papers = [p_ok, p_miss]
+    progress = _failed_progress(*(p["paper_url"] for p in papers))
+    work = {
+        "title": "Paper Hit",
+        "abstract_inverted_index": _inverted_index(LONG_ABSTRACT),
+        "publication_year": 2000,
+    }
+
+    def _fake_fetch(title):
+        if title == "Paper Hit":
+            return work, ""
+        return None, "empty_abstract"
+
+    monkeypatch.setattr(fa, "_openalex_title_match_fetch", MagicMock(side_effect=_fake_fetch))
+    writes = _stub_no_disk(monkeypatch)
+
+    success, failed, _ = fa._run_openalex_title_pass(
+        papers, progress,
+        chunk_size=500, max_papers=None, soft_timeout=None,
+        start_time=__import__("time").time(), dry_run=False,
+    )
+    assert (success, failed) == (1, 1)
+    assert progress[p_ok["paper_url"]]["status"] == "success"
+    assert progress[p_ok["paper_url"]]["source"] == "openalex_title"
+    assert progress[p_miss["paper_url"]]["reason"] == "empty_abstract"
+    assert p_ok["paper_abstract"] == LONG_ABSTRACT
+    assert writes["save"] >= 1 and writes["cache"] >= 1
+
+    # dry-run：命中照算但不落盘
+    p2 = _paper("https://www.ndss-symposium.org/ndss2000/some-paper/", title="Paper Hit", conf="NDSS2000")
+    progress2 = _failed_progress(p2["paper_url"])
+    snapshot = {u: dict(m) for u, m in progress2.items()}
+    monkeypatch.setattr(fa, "_openalex_title_match_fetch", MagicMock(return_value=(work, "")))
+    writes2 = _stub_no_disk(monkeypatch)
+    success, failed, _ = fa._run_openalex_title_pass(
+        [p2], progress2,
+        chunk_size=500, max_papers=None, soft_timeout=None,
+        start_time=__import__("time").time(), dry_run=True,
+    )
+    assert (success, failed) == (1, 0)
+    assert p2["paper_abstract"] == ""
+    assert progress2 == snapshot
+    assert writes2 == {"save": 0, "cache": 0}

@@ -16,7 +16,7 @@ This project was originally forked from [MLNLP-World/AI-Paper-Collector](https:/
 | **Frontend** | Vue 3.5 (Composition API + `<script setup>`), TypeScript 5.9, Vite 8, Vue Router 4 (hash mode), in-house **i18n** layer (`src/utils/i18n.ts`), WoS-style **query DSL** parser/evaluator (`src/utils/queryDsl.ts` + `src/utils/fields.ts`) powering both Smart Search and the dedicated Advanced Search view |
 | **UI Framework** | Element Plus 2.14 (auto-imported via `unplugin-vue-components`), `@vueuse/core` |
 | **HTTP Client** | Axios 1.x |
-| **Data Collection** | BeautifulSoup4, Requests, PyYAML, tqdm, thefuzz / python-Levenshtein |
+| **Data Collection** | BeautifulSoup4, Requests, PyYAML, tqdm, thefuzz / python-Levenshtein, pdfminer.six (last-resort PDF abstract extraction, lazily imported) |
 | **Data Artifacts** | huggingface_hub (dataset upload with `parent_commit` optimistic locking) |
 | **AI Features** | Multi-provider LLM catalog (OpenAI, DeepSeek, Anthropic Claude, Qwen/DashScope, GLM, StepFun, custom) for keyword suggestion (`POST /api/v1/suggest`) and LLM-driven result re-ranking (`POST /api/v1/ai/rerank`). Wire formats: `openai-compatible` (via `openai` SDK) and `anthropic` (via `anthropic` SDK). Presets exposed through `GET /api/v1/ai/providers`; per-request overrides for provider / base_url / model / api_key. `tiktoken` for token counting |
 | **Stats / Visualization** | numpy, matplotlib, wordcloud |
@@ -93,6 +93,7 @@ PaperVault/
 │           ├── ijcai.py          # `ijcai.org`
 │           ├── vldb.py           # `vldb.org`
 │           ├── ceur.py           # `ceur-ws.org`
+│           ├── pdf_extract.py    # Last-resort PDF Abstract-section extraction (`extract_abstract_from_pdf_bytes`; pdfminer imported lazily inside the function)
 │           ├── springer.py       # `link.springer.com` (`/chapter/` `/article/` `/referenceworkentry/` guarded; `<section aria-labelledby="Abs1">` + truncated-meta guard; sends a bot UA because F5 bot defence JS-challenges browser UAs)
 │           ├── usenix.py         # `usenix.org` (`/conference/.../presentation/` + non-media `/legacy/events/` + `/events/<slug>/tech/*.html` + `/publications/library/proceedings/**.html` guarded; `field-name-field-paper-description` covers legacy+Drupal layouts, oldest `<H3>Abstract</H3>` pages use a `next_elements` walk that stops at the full-text `<UL>`; media files / bare `/events/<slug>/` landings / `techAbstracts.html` index short-circuit)
 │           └── ndss.py           # `ndss-symposium.org` (edition-index pages guarded; byline / `Date:` metadata rows excluded, top-level `<p>` only; Yoast meta-description fallback is NOT truncated)
@@ -114,7 +115,8 @@ PaperVault/
 │   ├── test_suggest_topic_anchor.py  # Topic-anchor prompt shaping for `suggest_keywords`
 │   ├── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
 │   ├── test_doi_redirect_dispatch.py  # DOI redirect dispatch: doi.org → final-URL re-dispatch to the fetcher registry, failure degrade, `--no-doi-redirect`
-│   └── test_s2_backfill.py       # `--s2-batch` / `--s2-title-match` S2 backfill passes: batch mapping (null entries), title/year gates, excluded hosts, dry-run
+│   ├── test_s2_backfill.py       # `--s2-batch` / `--s2-title-match` / `--openalex-title` backfill passes: batch mapping (null entries), title/year gates, excluded hosts (incl. NDSS inclusion for OpenAlex), dry-run
+│   └── test_pdf_fallback.py      # PDF abstract fallback: `extract_abstract_from_pdf_bytes` on in-process minimal PDFs (inline prefix / no-section / copyright rejection / 2000-char cap) + `_fetch_pdf_abstract` HTTP stubs + `source="pdf"` integration
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -385,7 +387,7 @@ Other frontend scripts:
 | `python maintain.py` | Update README conference list & stats from config files |
 | `python maintain.py collect` | Incrementally collect papers for new conferences and update README. Supports `--soft-timeout N` for graceful timeout handling |
 | `python maintain.py force` | Force full cache rebuild and README update |
-| `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). On DOI-chain failure for `doi.org` URLs it follows the redirect once and re-dispatches the final landing page to the domain-fetcher registry (e.g. Springer LNCS / ISCA DOIs; disable with `--no-doi-redirect`). Two mutually-exclusive dedicated passes retry previously-failed records: `--s2-batch` (failed `doi.org` URLs via S2 `/paper/batch`, ≤500 DOIs/request) and `--s2-title-match` (failed non-DOI long-tail hosts via S2 `/paper/search/match` with ≥0.85 title + ±1 year gates; both honour `--max-papers` / `--soft-timeout` / `--chunk-size` / `--dry-run` / `--no-sync` / `--offline` and the optional `S2_API_KEY` env var). Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
+| `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). On DOI-chain failure for `doi.org` URLs it follows the redirect once and re-dispatches the final landing page to the domain-fetcher registry (e.g. Springer LNCS / ISCA DOIs; disable with `--no-doi-redirect`). Last resort: direct `.pdf` URLs are downloaded (≤8MB, first 3 pages) and their Abstract section extracted with pdfminer (disable with `--no-pdf-fallback`). Three mutually-exclusive dedicated passes retry previously-failed records: `--s2-batch` (failed `doi.org` URLs via S2 `/paper/batch`, ≤500 DOIs/request), `--s2-title-match` (failed non-DOI long-tail hosts via S2 `/paper/search/match` with ≥0.85 title + ±1 year gates) and `--openalex-title` (same gates via OpenAlex `/works?search=` at 3 rps, inverted-index abstract rebuild; the excluded-host set drops `ndss-symposium.org` whose pages carry no abstract). All three honour `--max-papers` / `--soft-timeout` / `--chunk-size` / `--dry-run` / `--no-sync` / `--offline` and the optional `S2_API_KEY` env var. Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
 | `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
 | `python scripts/fetch_cvf_abstracts.py` | CVF Open Access-targeted abstract backfill (scrapes `openaccess.thecvf.com/.../*_paper.html`). Independent of DOI-based sources |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |

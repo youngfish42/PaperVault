@@ -430,7 +430,12 @@ def test_ijcai_heading_fallback_stops_at_next_heading():
 # ---------- Guard: no PDF / OCR dependency leak ----------------------------
 
 def test_no_pdf_deps_leak():
-    """spec AC-4 Non-Goals: this iteration must not import PDF/OCR libs.
+    """Import-time guard: the abstract_fetchers *package* must not pull
+    PDF/OCR libs into sys.modules at import time.
+
+    pdfminer.six is now an intentional dependency (last-resort PDF
+    fallback), but ``pdf_extract.py`` imports it lazily inside the
+    function, so the invariant below must still hold.
 
     ``pdfminer.six`` is the PyPI *distribution* name, not an importable
     module name (the top-level package it installs is just ``pdfminer``),
@@ -452,8 +457,16 @@ def test_no_pdf_deps_leak():
     }
     prefix = "papervault.services.abstract_fetchers"
     saved = {name: sys.modules[name] for name in list(sys.modules) if name.startswith(prefix)}
+    # pdfminer is an intentional dependency now (lazy inside
+    # pdf_extract.py) and other test modules may have already imported
+    # it — drop any pre-loaded forbidden modules too, otherwise their
+    # mere presence in sys.modules (not a fresh import by the package)
+    # would trip the assertion. They are restored in ``finally``.
+    saved_forbidden = {name: sys.modules[name] for name in forbidden if name in sys.modules}
     try:
         for name in saved:
+            del sys.modules[name]
+        for name in saved_forbidden:
             del sys.modules[name]
         import papervault.services.abstract_fetchers  # noqa: F401
         leaked = forbidden.intersection(sys.modules.keys())
@@ -462,9 +475,10 @@ def test_no_pdf_deps_leak():
         # Drop any freshly-imported copy and restore the originals so
         # downstream tests keep patching the same module objects.
         for name in list(sys.modules):
-            if name.startswith(prefix):
+            if name.startswith(prefix) or name in forbidden:
                 del sys.modules[name]
         sys.modules.update(saved)
+        sys.modules.update(saved_forbidden)
 
 
 # ---------- Springer: layout guard, truncated-meta fallback -----------------

@@ -592,10 +592,65 @@ def _dispatch_via_doi_redirect(url: str):
         return None
 
 
+# ---------- PDF 摘要兜底（--no-pdf-fallback 可关） ----------
+#
+# 全库约 9.3k 条缺摘要记录是 .pdf 直链（vldb.org / ceur-ws.org /
+# web.archive.org 快照 …）：HTML 源与 DOI 链对它们都无能为力，最后一招是
+# 下载 PDF 前 3 页用 pdfminer 抽出 "Abstract" 节。解析逻辑在
+# ``papervault/services/abstract_fetchers/pdf_extract.py``（纯函数），
+# 这里只做 HTTP。
+
+PDF_FALLBACK_MAX_BYTES = 8 * 1024 * 1024  # 流式下载截断上限
+
+
+def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
+    """下载 PDF（流式，≤8MB）并抽取 Abstract 节。返回 (abstract, "") 或 (None, reason)。
+
+    reason 只用 REASON_ENUM 现有成员：网络层 ``timeout`` / ``network``，
+    内容层（非 PDF、解析失败、无 Abstract 节、版权块）一律 ``empty_abstract``。
+    """
+    from papervault.services.abstract_fetchers.pdf_extract import (
+        extract_abstract_from_pdf_bytes,
+    )
+
+    try:
+        resp = _COLLECTOR_SESSION.get(
+            url, headers=HEADERS, timeout=30, stream=True, allow_redirects=True
+        )
+    except requests.exceptions.Timeout:
+        return None, "timeout"
+    except requests.exceptions.RequestException:
+        return None, "network"
+    try:
+        if resp.status_code != 200:
+            return None, _s2_status_reason(resp.status_code)
+        # 触发条件是原 URL 以 .pdf 结尾；这里再确认重定向后的最终响应
+        # 确实是 PDF（最终 URL 仍以 .pdf 结尾或 Content-Type 是 pdf）。
+        final_path = (urlparse(getattr(resp, "url", "") or "").path or "").lower()
+        ctype = (resp.headers.get("Content-Type") or "").lower()
+        if not (final_path.endswith(".pdf") or "application/pdf" in ctype):
+            return None, "empty_abstract"
+        buf = bytearray()
+        for chunk in resp.iter_content(chunk_size=65536):
+            buf.extend(chunk)
+            if len(buf) >= PDF_FALLBACK_MAX_BYTES:
+                break
+    finally:
+        resp.close()
+    try:
+        abstract = extract_abstract_from_pdf_bytes(bytes(buf))
+    except Exception:
+        return None, "empty_abstract"
+    if not abstract:
+        return None, "empty_abstract"
+    return abstract, ""
+
+
 def fetch_abstract_for_paper(
     paper: dict, last_time: dict, sleep_sec: float = 1.5, max_retries: int = 3,
     query_doi_by_title_enabled: bool = False,
     doi_redirect_enabled: bool = True,
+    pdf_fallback_enabled: bool = True,
 ) -> Tuple[Optional[str], dict, str, dict]:
     """Fetch an abstract for ``paper`` via the multi-source fallback chain.
 
@@ -753,6 +808,16 @@ def fetch_abstract_for_paper(
             abstract = arxiv_abs
             source = "arxiv"
 
+    # ---- PDF fallback (last resort) --------------------------------------
+    # 仅当原 URL path 以 .pdf 结尾时触发（下载后还会确认最终响应确为 PDF）。
+    # 失败静默：不写 err_info，沿用后续合成逻辑。
+    if not abstract and pdf_fallback_enabled and url:
+        if (urlparse(url).path or "").lower().endswith(".pdf"):
+            pdf_abs, _pdf_reason = _fetch_pdf_abstract(url)
+            if pdf_abs:
+                abstract = pdf_abs
+                source = "pdf"
+
     if abstract:
         return abstract, last_time, source, {}
 
@@ -795,17 +860,20 @@ def fetch_abstract_for_paper(
     return None, last_time, source, err_info
 
 
-# ---------- Semantic Scholar 补漏模式（--s2-batch / --s2-title-match） ----------
+# ---------- Semantic Scholar / OpenAlex 补漏模式（--s2-batch / --s2-title-match / --openalex-title） ----------
 #
-# 两个互斥的专用 pass，针对主链 (fetch_abstract_for_paper) 跑完后仍失败的记录：
+# 三个互斥的专用 pass，针对主链 (fetch_abstract_for_paper) 跑完后仍失败的记录：
 #
 # * ``--s2-batch``：doi.org URL 的失败记录 → S2 ``/paper/batch`` 批量按 DOI 查询。
 #   主链对 S2 的调用是逐 DOI 的 GET；批量端点一次最多 500 条，吞吐高几个数量级。
 # * ``--s2-title-match``：无 DOI 的长尾失败记录（dl.acm.org / vldb.org /
 #   web.archive.org / auai.org / ceur-ws.org / ieeexplore.ieee.org …）→
 #   S2 ``/paper/search/match`` 按标题精确匹配。
+# * ``--openalex-title``：同上但走 OpenAlex ``/works?search=``（匿名配额更宽松，
+#   3 rps 保守限速），摘要从 ``abstract_inverted_index`` 重建；排除集去掉了
+#   ndss-symposium.org（该站页面本身无摘要，只能靠外部索引）。
 #
-# 两者复用本脚本的缓存加载 / v4 进度文件 / HF 同步机制，不改动主链。
+# 三者复用本脚本的缓存加载 / v4 进度文件 / HF 同步机制，不改动主链。
 
 S2_BATCH_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/batch"
 S2_MATCH_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search/match"
@@ -869,39 +937,47 @@ def _s2_request(
     max_retries: int = 5,
     min_interval: float = S2_MIN_INTERVAL,
     timeout: int = 60,
+    headers: Optional[dict] = None,
+    rate_state: Optional[dict] = None,
     **kwargs,
 ) -> Tuple[Optional[requests.Response], str]:
-    """限速 + 指数退避的 S2 请求。
+    """限速 + 指数退避的请求（S2 与 OpenAlex 标题匹配共用的底层 helper）。
 
     返回 ``(response, "")`` 当拿到 *任何* HTTP 响应（含最终失败的 4xx/5xx，
     由调用方用 ``_s2_status_reason`` 归类）；``(None, reason)`` 仅当网络层
     异常（timeout / connection error）且重试耗尽。429 / 5xx 指数退避并尊重
     ``Retry-After`` 响应头。
+
+    ``headers`` 默认 S2 请求头（带可选 ``x-api-key``）；OpenAlex 调用传入
+    普通 ``HEADERS`` 以免把 S2 key 泄漏给第三方。``rate_state`` 默认 S2 的
+    限速状态；不同端点的限速预算应传入各自的状态字典。
     """
     session = _get_session()
+    state = _s2_rate_state if rate_state is None else rate_state
+    req_headers = _s2_headers() if headers is None else headers
     last_reason = "network"
     for attempt in range(1, max_retries + 1):
-        wait = max(0.0, min_interval - (time.time() - _s2_rate_state["last_time"]))
+        wait = max(0.0, min_interval - (time.time() - state["last_time"]))
         if wait > 0:
             time.sleep(wait)
         try:
             if method.lower() == "post":
-                resp = session.post(url, headers=_s2_headers(), timeout=timeout, **kwargs)
+                resp = session.post(url, headers=req_headers, timeout=timeout, **kwargs)
             else:
-                resp = session.get(url, headers=_s2_headers(), timeout=timeout, **kwargs)
+                resp = session.get(url, headers=req_headers, timeout=timeout, **kwargs)
         except requests.exceptions.Timeout:
-            _s2_rate_state["last_time"] = time.time()
+            state["last_time"] = time.time()
             last_reason = "timeout"
             if attempt < max_retries:
                 time.sleep(min(60, 2 ** attempt))
             continue
         except requests.exceptions.RequestException:
-            _s2_rate_state["last_time"] = time.time()
+            state["last_time"] = time.time()
             last_reason = "network"
             if attempt < max_retries:
                 time.sleep(min(60, 2 ** attempt))
             continue
-        _s2_rate_state["last_time"] = time.time()
+        state["last_time"] = time.time()
         if resp.status_code == 429 or 500 <= resp.status_code < 600:
             retry_after = resp.headers.get("Retry-After")
             try:
@@ -976,9 +1052,9 @@ def _s2_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
     return first, ""
 
 
-def _s2_title_gate(api_title: str, local_title: str) -> bool:
-    """--s2-title-match 的标题门控（比主链严格）：归一化相等 / 互相包含，
-    或 SequenceMatcher ratio >= 0.85。"""
+def _title_gate(api_title: str, local_title: str) -> bool:
+    """标题门控（比主链 is_title_match 的 0.70 严格）：归一化相等 / 互相包含，
+    或 SequenceMatcher ratio >= 0.85。S2 / OpenAlex 标题匹配 pass 共用。"""
     norm = lambda t: re.sub(r"[^\w]+", "", (t or "").strip().lower(), flags=re.UNICODE)
     a, b = norm(api_title), norm(local_title)
     if not a or not b:
@@ -988,16 +1064,16 @@ def _s2_title_gate(api_title: str, local_title: str) -> bool:
     return difflib.SequenceMatcher(None, a, b).ratio() >= S2_TITLE_RATIO_THRESHOLD
 
 
-def _s2_year_gate(conf: str, s2_year) -> bool:
-    """年份守卫：从本地 ``conf`` 提取 4 位年份，与 S2 ``year`` 相差须 ≤1。
-    S2 year 缺失（或 conf 无年份）时放行，仅靠标题门控。"""
-    if not s2_year:
+def _year_gate(conf: str, api_year) -> bool:
+    """年份守卫：从本地 ``conf`` 提取 4 位年份，与上游年份相差须 ≤1。
+    上游年份缺失（或 conf 无年份）时放行，仅靠标题门控。"""
+    if not api_year:
         return True
     m = re.search(r"(\d{4})", conf or "")
     if not m:
         return True
     try:
-        return abs(int(s2_year) - int(m.group(1))) <= 1
+        return abs(int(api_year) - int(m.group(1))) <= 1
     except (TypeError, ValueError):
         return True
 
@@ -1032,9 +1108,16 @@ def _collect_s2_batch_targets(
 
 
 def _collect_s2_title_targets(
-    all_papers: List[dict], progress: Dict[str, dict]
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    excluded_hosts: Optional[frozenset] = None,
 ) -> List[dict]:
-    """--s2-title-match 目标集合：failed、摘要为空、非 doi.org、不在排除 host 集合。"""
+    """标题匹配 pass 目标集合：failed、摘要为空、非 doi.org、不在排除 host 集合。
+
+    ``excluded_hosts`` 默认 :data:`S2_TITLE_EXCLUDED_HOSTS`；OpenAlex pass
+    传入不含 ndss-symposium.org 的变体（该站页面本身无摘要，只能靠外部索引）。
+    """
+    excluded = S2_TITLE_EXCLUDED_HOSTS if excluded_hosts is None else excluded_hosts
     targets: List[dict] = []
     for p in all_papers:
         url = p.get("paper_url", "")
@@ -1045,7 +1128,7 @@ def _collect_s2_title_targets(
             continue
         if extract_doi(url):
             continue
-        if _canonical_host_of(url) in S2_TITLE_EXCLUDED_HOSTS:
+        if _canonical_host_of(url) in excluded:
             continue
         if not (p.get("paper_name") or "").strip():
             continue
@@ -1067,6 +1150,79 @@ def _evaluate_s2_batch_item(item: Optional[dict], paper: dict) -> Tuple[Optional
     return abstract, ""
 
 
+# ---------- OpenAlex 标题匹配（--openalex-title） ----------
+#
+# S2 的 search/match 端点匿名配额极紧（本机持续 429）；OpenAlex 的
+# ``/works?search=`` 对标题匹配的召回相当（ACL Anthology 老年份收录尤其全），
+# 且 polite pool（mailto）允许 10 rps。结构完全仿照 --s2-title-match。
+
+OPENALEX_SEARCH_ENDPOINT = "https://api.openalex.org/works"
+# OpenAlex polite pool 允许 10 rps；用 3 rps 保守值。
+OPENALEX_MIN_INTERVAL = 1.0 / 3
+# NDSS 页面本身不含摘要（正文只有短描述），无法靠 fetcher 重试补——
+# OpenAlex 模式把它从排除集中拿掉，允许标题匹配兜底。
+OPENALEX_TITLE_EXCLUDED_HOSTS = S2_TITLE_EXCLUDED_HOSTS - {"ndss-symposium.org"}
+
+_openalex_rate_state = {"last_time": 0.0}
+
+
+def _openalex_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
+    """GET /works?search=<title>，返回 (首个候选 work dict, error_reason)。
+
+    无候选（空 results）归类为 ``empty_abstract``，与 S2 match 404 的语义一致。
+    """
+    params = {
+        "search": title,
+        "per-page": 3,
+        "select": "title,abstract_inverted_index,publication_year,doi",
+    }
+    if CONTACT_EMAIL:
+        params["mailto"] = CONTACT_EMAIL
+    resp, err = _s2_request(
+        "get",
+        OPENALEX_SEARCH_ENDPOINT,
+        params=params,
+        timeout=30,
+        min_interval=OPENALEX_MIN_INTERVAL,
+        headers=HEADERS,  # 不带 S2 的 x-api-key
+        rate_state=_openalex_rate_state,
+    )
+    if err or resp is None:
+        return None, err or "network"
+    if resp.status_code != 200:
+        return None, _s2_status_reason(resp.status_code)
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, "network"
+    results = data.get("results") if isinstance(data, dict) else None
+    if not results:
+        return None, "empty_abstract"
+    first = results[0]
+    if not isinstance(first, dict):
+        return None, "empty_abstract"
+    return first, ""
+
+
+def _evaluate_openalex_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
+    """单条 OpenAlex work 的回填门控（标题 + 年份守卫 + inverted-index 摘要
+    重建 + 长度），返回 (abstract, "") 或 (None, reason)。"""
+    if not data:
+        return None, "empty_abstract"
+    api_title = (data.get("title") or "").strip()
+    local_title = (paper.get("paper_name") or "").strip()
+    if not _title_gate(api_title, local_title):
+        return None, "title_mismatch"
+    if not _year_gate(paper.get("conf", ""), data.get("publication_year")):
+        return None, "title_mismatch"
+    abstract = clean_abstract(
+        _reconstruct_openalex_abstract(data.get("abstract_inverted_index") or {}) or ""
+    )
+    if len(abstract) < S2_MIN_ABSTRACT_CHARS:
+        return None, "empty_abstract"
+    return abstract, ""
+
+
 def _evaluate_s2_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
     """单条 search/match 响应的回填门控（标题 + 年份守卫 + 长度），
     返回 (abstract, "") 或 (None, reason)。"""
@@ -1074,9 +1230,9 @@ def _evaluate_s2_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional
         return None, "empty_abstract"
     api_title = (data.get("title") or "").strip()
     local_title = (paper.get("paper_name") or "").strip()
-    if not _s2_title_gate(api_title, local_title):
+    if not _title_gate(api_title, local_title):
         return None, "title_mismatch"
-    if not _s2_year_gate(paper.get("conf", ""), data.get("year")):
+    if not _year_gate(paper.get("conf", ""), data.get("year")):
         return None, "title_mismatch"
     abstract = clean_abstract(data.get("abstract") or "")
     if len(abstract) < S2_MIN_ABSTRACT_CHARS:
@@ -1187,7 +1343,7 @@ def _run_s2_batch_pass(
     return success, failed, timed_out
 
 
-def _run_s2_title_pass(
+def _run_title_match_pass(
     all_papers: List[dict],
     progress: Dict[str, dict],
     *,
@@ -1196,11 +1352,18 @@ def _run_s2_title_pass(
     soft_timeout: Optional[float],
     start_time: float,
     dry_run: bool,
+    collect_fn,
+    fetch_fn,
+    evaluate_fn,
+    source: str,
+    label: str,
 ) -> Tuple[int, int, bool]:
-    targets = _collect_s2_title_targets(all_papers, progress)
+    """S2 / OpenAlex 标题匹配 pass 共用的执行骨架；端点相关部分通过
+    ``collect_fn`` / ``fetch_fn`` / ``evaluate_fn`` / ``source`` 注入。"""
+    targets = collect_fn(all_papers, progress)
     if max_papers is not None:
         targets = targets[:max_papers]
-    print(f"[*] S2 title-match targets (failed non-DOI long-tail papers): {len(targets)}")
+    print(f"[*] {label} targets (failed non-DOI long-tail papers): {len(targets)}")
     if not targets:
         return 0, 0, False
 
@@ -1213,24 +1376,24 @@ def _run_s2_title_pass(
             timed_out = True
             break
         title = (paper.get("paper_name") or "").strip()
-        data, err = _s2_title_match_fetch(title)
+        data, err = fetch_fn(title)
         if data is None:
             reason = err or "network"
             if not dry_run:
-                _s2_record_failure(progress, paper, reason, "semanticscholar_title")
+                _s2_record_failure(progress, paper, reason, source)
             failed += 1
         else:
-            abstract, reason = _evaluate_s2_title_item(data, paper)
+            abstract, reason = evaluate_fn(data, paper)
             if abstract:
                 if dry_run:
                     print(f"  [dry-run] HIT [{paper.get('conf')}] {title[:60]} ({len(abstract)} chars)")
                 else:
-                    _s2_record_success(progress, paper, abstract, "semanticscholar_title")
+                    _s2_record_success(progress, paper, abstract, source)
                     cache_dirty = True
                 success += 1
             else:
                 if not dry_run:
-                    _s2_record_failure(progress, paper, reason, "semanticscholar_title")
+                    _s2_record_failure(progress, paper, reason, source)
                 failed += 1
         processed += 1
         if processed % chunk_size == 0 or processed == len(targets):
@@ -1252,6 +1415,52 @@ def _run_s2_title_pass(
     return success, failed, timed_out
 
 
+def _run_s2_title_pass(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    *,
+    chunk_size: int,
+    max_papers: Optional[int],
+    soft_timeout: Optional[float],
+    start_time: float,
+    dry_run: bool,
+) -> Tuple[int, int, bool]:
+    return _run_title_match_pass(
+        all_papers, progress,
+        chunk_size=chunk_size, max_papers=max_papers,
+        soft_timeout=soft_timeout, start_time=start_time, dry_run=dry_run,
+        collect_fn=_collect_s2_title_targets,
+        fetch_fn=_s2_title_match_fetch,
+        evaluate_fn=_evaluate_s2_title_item,
+        source="semanticscholar_title",
+        label="S2 title-match",
+    )
+
+
+def _run_openalex_title_pass(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    *,
+    chunk_size: int,
+    max_papers: Optional[int],
+    soft_timeout: Optional[float],
+    start_time: float,
+    dry_run: bool,
+) -> Tuple[int, int, bool]:
+    return _run_title_match_pass(
+        all_papers, progress,
+        chunk_size=chunk_size, max_papers=max_papers,
+        soft_timeout=soft_timeout, start_time=start_time, dry_run=dry_run,
+        collect_fn=lambda ps, pr: _collect_s2_title_targets(
+            ps, pr, excluded_hosts=OPENALEX_TITLE_EXCLUDED_HOSTS
+        ),
+        fetch_fn=_openalex_title_match_fetch,
+        evaluate_fn=_evaluate_openalex_title_item,
+        source="openalex_title",
+        label="OpenAlex title-match",
+    )
+
+
 def run_s2(
     mode: str,
     *,
@@ -1262,7 +1471,7 @@ def run_s2(
     offline: bool = False,
     dry_run: bool = False,
 ) -> None:
-    """``--s2-batch`` / ``--s2-title-match`` 专用 pass 的入口。
+    """``--s2-batch`` / ``--s2-title-match`` / ``--openalex-title`` 专用 pass 的入口。
 
     与主流程同一约定：开始前 ensure_cache_local / ensure_progress_local
     （--offline 跳过），结束后 sync_cache_artifacts（--no-sync / --offline /
@@ -1292,6 +1501,12 @@ def run_s2(
 
     if mode == "batch":
         success, failed, timed_out = _run_s2_batch_pass(
+            all_papers, progress,
+            chunk_size=chunk_size, max_papers=max_papers,
+            soft_timeout=soft_timeout, start_time=global_start, dry_run=dry_run,
+        )
+    elif mode == "openalex":
+        success, failed, timed_out = _run_openalex_title_pass(
             all_papers, progress,
             chunk_size=chunk_size, max_papers=max_papers,
             soft_timeout=soft_timeout, start_time=global_start, dry_run=dry_run,
@@ -1813,6 +2028,7 @@ def _process_targets(
     include_legacy: bool = True,
     force: bool = False,
     doi_redirect_enabled: bool = True,
+    pdf_fallback_enabled: bool = True,
 ) -> Tuple[int, int, bool]:
     """处理一组目标论文，返回 (success_count, failed_count, timed_out)。
 
@@ -1915,6 +2131,7 @@ def _process_targets(
         abstract, last_time, source, err_info = fetch_abstract_for_paper(
             paper, last_time, query_doi_by_title_enabled=query_doi_by_title,
             doi_redirect_enabled=doi_redirect_enabled,
+            pdf_fallback_enabled=pdf_fallback_enabled,
         )
 
         if abstract and len(abstract.strip()) >= 5:
@@ -1989,6 +2206,7 @@ def run(
     offline: bool = False,
     force: bool = False,
     doi_redirect_enabled: bool = True,
+    pdf_fallback_enabled: bool = True,
 ) -> None:
     global_start = time.time()
     # Pull the latest cache from Hugging Face before reading/writing anything.
@@ -2121,6 +2339,7 @@ def run(
             include_legacy=include_legacy,
             force=force,
             doi_redirect_enabled=doi_redirect_enabled,
+            pdf_fallback_enabled=pdf_fallback_enabled,
         )
         if success > 0:
             if no_sync or offline:
@@ -2167,6 +2386,7 @@ def run(
             start_time=global_start, soft_timeout=soft_timeout, max_failed_attempts=max_failed_attempts,
             progress=progress, reason_in=reason_in, include_legacy=include_legacy,
             force=force, doi_redirect_enabled=doi_redirect_enabled,
+            pdf_fallback_enabled=pdf_fallback_enabled,
         )
         attempted = success + failed
         processed_total += attempted
@@ -2303,7 +2523,20 @@ if __name__ == "__main__":
             "Dedicated pass: re-try failed non-DOI long-tail records (dl.acm.org, "
             "vldb.org, web.archive.org, ...) via the Semantic Scholar "
             "/paper/search/match endpoint with strict title (>=0.85) and year (±1) "
-            "gates. Mutually exclusive with --s2-batch; bypasses the --phase flow."
+            "gates. Mutually exclusive with --s2-batch/--openalex-title; bypasses "
+            "the --phase flow."
+        ),
+    )
+    s2_group.add_argument(
+        "--openalex-title",
+        dest="openalex_title",
+        action="store_true",
+        help=(
+            "Dedicated pass: like --s2-title-match but via OpenAlex "
+            "/works?search=<title> (3 rps, inverted-index abstract rebuild). "
+            "The excluded-host set drops ndss-symposium.org (its pages carry no "
+            "abstract, so an external index is the only source). Mutually "
+            "exclusive with --s2-batch/--s2-title-match; bypasses the --phase flow."
         ),
     )
     parser.add_argument(
@@ -2311,14 +2544,26 @@ if __name__ == "__main__":
         dest="dry_run",
         action="store_true",
         help=(
-            "S2 modes only: call the API and log what would be backfilled, but "
-            "do not write cache/progress and do not sync to Hugging Face."
+            "S2/OpenAlex dedicated modes only: call the API and log what would "
+            "be backfilled, but do not write cache/progress and do not sync to "
+            "Hugging Face."
+        ),
+    )
+    parser.add_argument(
+        "--no-pdf-fallback",
+        dest="pdf_fallback_enabled",
+        action="store_false",
+        help=(
+            "Disable the last-resort PDF abstract extraction (enabled by "
+            "default): when every metadata source fails and the paper URL is a "
+            "direct .pdf link, download it (<=8MB, first 3 pages) and extract "
+            "the Abstract section with pdfminer."
         ),
     )
     args = parser.parse_args()
-    if args.s2_batch or args.s2_title_match:
+    if args.s2_batch or args.s2_title_match or args.openalex_title:
         run_s2(
-            "batch" if args.s2_batch else "title",
+            "batch" if args.s2_batch else ("openalex" if args.openalex_title else "title"),
             chunk_size=args.chunk_size,
             max_papers=args.max_papers,
             soft_timeout=args.soft_timeout,
@@ -2349,4 +2594,5 @@ if __name__ == "__main__":
         offline=args.offline,
         force=args.force,
         doi_redirect_enabled=args.doi_redirect_enabled,
+        pdf_fallback_enabled=args.pdf_fallback_enabled,
     )
