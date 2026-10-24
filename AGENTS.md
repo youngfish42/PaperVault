@@ -38,7 +38,8 @@ PaperVault/
 │   ├── __main__.py               # `python -m collector` entrypoint (equivalent to the legacy `python collector.py`)
 │   ├── anubis.py                 # Anubis PoW challenge solver (DBLP has been behind Anubis since 2026-09); `get_with_anubis` solves once per session and raises `AnubisUnsolvableError` on failure
 │   ├── http.py                   # Shared requests.Session singleton + HEADERS (User-Agent) + urllib3 Retry policy; re-exports the Anubis helpers; also suppresses BS4 XMLParsedAsHTMLWarning
-│   ├── merge.py                  # Field-level record merge helpers (_better_str/_list/_code, _merge_paper_record, _merge_with_cache)
+│   ├── merge.py                  # Field-level record merge helpers (_better_str/_list/_code, _merge_paper_record, _merge_with_cache); new records are screened for front-matter before entering the cache (see frontmatter.py)
+│   ├── frontmatter.py            # Single source of truth for front-matter detection: shared title regex; cleanup-side predicate `is_frontmatter_record` vs collection-side `should_drop_on_collect` (title match AND (venue-index URL OR empty/editorial authors)) — fresh records never have abstracts yet, so the collection legs are tightened deliberately
 │   ├── progress.py               # COLLECT_PROGRESS_FILE / COLLECT_FAILURES_FILE constants + load/save_collect_progress
 │   ├── io.py                     # cache/cache.jsonl.gz reader/writer (load_cache, save_cache, _to_gz_path)
 │   ├── code_links.py             # GitHub link extraction from abstracts (_GITHUB_RE, extract_github_link, add_code_links)
@@ -106,6 +107,7 @@ PaperVault/
 │   ├── test_per_token_search.py  # Per-token DSL evaluation on the backend side
 │   ├── test_load_dedup.py        # In-memory dedupe when loading `cache.jsonl.gz`
 │   ├── test_collector_dedupe.py  # `_merge_with_cache` per-`(conf, paper_url)` dedupe
+│   ├── test_collector_frontmatter.py  # Collection-side front-matter filter: predicate legs (venue-index | empty/editorial authors), `_merge_with_cache` integration, cache-side records never deleted
 │   ├── test_cleanup_cache_dedupe.py  # One-shot `scripts/cleanup_cache_dedupe.py` regression
 │   ├── test_cleanup_frontmatter.py   # `scripts/cleanup_cache_frontmatter.py`: front-matter predicate (title regex × venue-index/empty-field evidence), dry-run no-write, atomic write + backup, idempotency
 │   ├── test_ai_providers.py      # `ProviderPreset` catalog shape + `get_preset` fallback
@@ -500,10 +502,18 @@ A further offline enrichment source is the archived Papers with Code snapshot on
 | `ci.yml` | Push / PR on application, frontend, dependency, and container-build files / Manual | Three parallel jobs: **backend** runs `pytest -q` with `PAPERVAULT_OFFLINE=1`; **frontend** runs `npm run type-check` + `npm run lint:check` on Node 20.19.0; **docker** builds the production image. The only quality gate that fails PRs |
 | `discover_and_update.yml` | Daily schedule / Manual | Auto-discovers new conference configs and creates PR |
 | `collect_papers.yml` | Weekly (Tue 16:00 UTC) / Manual / Push on `conf/**` | Incrementally collects papers with per-URL progress tracking and soft-timeout graceful save; creates PR to `auto-collect-papers` branch |
-| `backfill_abstracts.yml` | Every 6 hours / Manual | Backfills missing abstracts (timeout-aware, ~5h budget) and then re-scans GitHub code links from the freshly backfilled abstracts (`scripts/fetch_code_links.py --year all --retry-failed`), pushes to `auto-backfill-abstracts` branch |
+| `backfill_abstracts.yml` | Every 6 hours / Manual | Backfills missing abstracts (timeout-aware, ~5h budget) and then re-scans GitHub code links from the freshly backfilled abstracts (`scripts/fetch_code_links.py --year all --retry-failed`), pushes to `auto-backfill-abstracts` branch. Manual dispatch with `run_wayback_repair=true` instead runs the `wayback-repair` job (the regular backfill is skipped): `wayback_repair_dry_run=true` (default) prints a report into the step summary and changes nothing; `false` runs `repair_wayback_urls.py --write --no-sync`, opens a PR carrying `cache/wayback_repair_log.jsonl`, then pushes the cache to HF |
 | `update_readme.yml` | Manual (`workflow_dispatch`) | Force rebuilds cache and updates README via PR |
 
 There are five GitHub Actions workflows in total: one **quality-gate** workflow (`ci.yml`) plus four **data-mutation / maintenance** workflows. All Python jobs use **Python 3.10**. The collected `cache/cache.jsonl.gz` is **always** synced to the Hugging Face dataset repo named by `PAPERVAULT_HF_REPO_ID` (HF is now the authoritative store; Git no longer ships this file). The three cache-mutating workflows (`collect_papers.yml`, `backfill_abstracts.yml`, `update_readme.yml`) share the `papervault-cache` concurrency group so they run strictly serially, and each upload uses `parent_commit` optimistic locking so concurrent local runs cannot silently overwrite each other.
+
+### Wayback repair rollback plan
+
+The `wayback-repair` job rewrites `paper_url`s in the authoritative HF cache. Rollback options, safest first:
+
+1. **HF dataset is a plain git repo** — the repair push is an ordinary commit. Clone it (`git clone https://<user>:<HF_TOKEN>@huggingface.co/datasets/<repo_id>`), then `git revert <commit>` (preferred; keeps history) or `git reset --hard <previous-commit>` + force-push, then pull the cache locally again via `ensure_cache_local(refresh=True)`.
+2. **Precise per-record undo** — `cache/wayback_repair_log.jsonl` (committed into the auto PR) records every `{old_url, new_url, action, abstract_filled}` mapping; a reverse script can restore each `paper_url` exactly.
+3. **Idempotency** — already-repaired records no longer match the wayback regex, so re-running after an interruption never double-processes; an interrupted run is safe to simply re-run.
 
 ## License
 
