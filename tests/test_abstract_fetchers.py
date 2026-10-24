@@ -61,7 +61,6 @@ def test_registry_contains_all_expected_domains():
         "jmlr.org",
         "isca-archive.org",
         "link.springer.com",
-        "www.usenix.org",
         "usenix.org",
         "ndss-symposium.org",
     }
@@ -667,6 +666,11 @@ def test_usenix_proceedings_layout_extracts_abstract():
         "https://www.ndss-symposium.org/ndss2000/",
         "https://www.ndss-symposium.org/ndss2024/",
         "https://www.ndss-symposium.org/ndss-paper/",
+        # Media links under /wp-content/uploads/ pass the >=2-segment
+        # test but are not paper pages.
+        "https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_02B-3_Becker_paper.pdf",
+        "https://www.ndss-symposium.org/wp-content/uploads/2018/02/slides.pptx",
+        "https://www.ndss-symposium.org/wp-content/uploads/2018/02/code.zip",
     ],
 )
 def test_ndss_index_pages_short_circuit(url):
@@ -716,6 +720,62 @@ def test_ndss_meta_fallback_used_when_body_container_missing():
         res = af.dispatch("https://www.ndss-symposium.org/ndss2001/some-paper/")
     assert res.ok is True, f"expected success, got reason={res.reason!r}"
     assert res.source == "ndss"
+    assert res.abstract == abstract
+
+
+def test_springer_short_section_residue_falls_back_to_meta():
+    """The Abs1 section matched but carries only a stub ("TBD" / menu
+    residue) — the (untruncated) meta description must still be tried
+    instead of giving up at the first non-empty string."""
+    abstract = (
+        "A complete fallback abstract that only exists in the meta tag "
+        "because the Abs1 section carried a two-letter stub."
+    )
+    html = (
+        '<html><head><meta name="description" content="' + abstract + '" /></head>'
+        '<body><section aria-labelledby="Abs1"><h2 id="Abs1">Abstract</h2>'
+        '<div id="Abs1-content"><p>n/a</p></div></section></body></html>'
+    )
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://link.springer.com/chapter/10.1007/stub_1")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.abstract == abstract
+
+
+def test_usenix_short_container_residue_falls_back_to_heading_walk():
+    """field-name-field-paper-description matched but is a stub — the
+    heading walk must still run."""
+    abstract = (
+        "This heading-walk abstract lives after an H3 label because the "
+        "Drupal description container carried only a placeholder stub."
+    )
+    html = (
+        '<html><body><div class="field-name-field-paper-description"><p>n/a</p></div>'
+        '<h3>Abstract</h3><p>' + abstract + '</p></body></html>'
+    )
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://www.usenix.org/conference/nsdi24/presentation/stub")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
+    assert res.abstract == abstract
+
+
+def test_ndss_short_container_residue_falls_back_to_meta():
+    """paper-data container matched but is a stub — the (non-truncated)
+    Yoast meta description must still be tried."""
+    abstract = (
+        "This NDSS fallback abstract only exists in the meta description "
+        "because the paper-data container carried a placeholder stub."
+    )
+    html = (
+        '<html><head><meta name="description" content="' + abstract + '" /></head>'
+        '<body><main><div class="paper-data"><p>n/a</p></div></main></body></html>'
+    )
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://www.ndss-symposium.org/ndss2001/stub-paper/")
+    assert res.ok is True, f"expected success, got reason={res.reason!r}"
     assert res.abstract == abstract
 
 

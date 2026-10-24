@@ -119,3 +119,27 @@ def test_delegated_shortcut_precedes_dispatcher(monkeypatch):
     paper = {"paper_url": "https://openreview.net/forum?id=abc", "paper_name": "T"}
     _abs, _lt, _src, err = fa.fetch_abstract_for_paper(paper, _empty_last_time())
     assert err["reason"] == "delegated_to_specialised_fetcher"
+
+
+def test_dispatcher_exception_falls_through_to_doi_chain(monkeypatch):
+    """Review M1: a fetcher raising an exception must not break the main
+    chain — degrade exactly like an ``ok=False`` dispatch."""
+    monkeypatch.setattr(
+        fa, "_dispatch_domain_fetcher",
+        MagicMock(side_effect=RuntimeError("fetcher blew up")),
+    )
+
+    def _doi(_doi, title, last_time, **_kw):
+        return "DOI-based abstract text long enough for the caller gate.", title, "crossref", last_time
+
+    monkeypatch.setattr(fa, "_fetch_doi_sources_concurrent", _doi)
+    monkeypatch.setattr(fa, "extract_doi", lambda _u: "10.1234/example")
+
+    paper = {
+        "paper_url": "https://aclanthology.org/2023.acl-long.1/",
+        "paper_name": "Real title",
+    }
+    abstract, _lt, source, err = fa.fetch_abstract_for_paper(paper, _empty_last_time())
+    assert source == "crossref"
+    assert abstract is not None
+    assert err == {}

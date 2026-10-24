@@ -301,9 +301,11 @@ tracked via Git LFS). The new format:
 
 - First line is a metadata header (`{"_meta": true, "schema": "abstract_backfill_progress/v4", ...}`).
   Schema v4 (introduced 2026-Q2) adds a standardised `reason` enum on
-  failed records (e.g. `timeout`, `http_429`, `http_5xx`, `parse_error`,
-  `empty_abstract`, `no_abstract_available`) so the diagnostic
-  dashboards can bucket failures by root cause instead of by raw
+  failed records (`REASON_ENUM` in `scripts/fetch_abstracts.py` is the
+  single source of truth: `no_doi`, `doi_not_found`, `empty_abstract`,
+  `rate_limited`, `timeout`, `network`, `title_mismatch`, `venue_index`,
+  `delegated_to_specialised_fetcher`, `no_abstract_available`) so the
+  diagnostic dashboards can bucket failures by root cause instead of by raw
   exception text. Legacy v3 records (`reason=null`) are still readable
   and treated as pre-schema-v3 legacy data by the analysers.
 - Each subsequent line is one record: `{"url": ..., "status": ..., "source": ..., "chars": ..., "attempts": ..., "ts": ..., "reason": ...}`.

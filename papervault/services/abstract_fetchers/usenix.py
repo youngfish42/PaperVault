@@ -35,9 +35,9 @@ Media files (``.pdf`` ``.mp3`` ``.mp4`` ``.ppt`` ``.ps`` ``.zip``
 ``.wav`` ...) always short-circuit before the network call.
 
 Registry note: the dispatcher canonicalises hosts by stripping a
-leading ``www.``, so the ``usenix.org`` key is the one that actually
-matches; ``www.usenix.org`` is listed in ``allowed_hosts`` for
-documentation parity with how the venue appears in the cache.
+leading ``www.``, so only the bare ``usenix.org`` key can ever match
+(listing ``www.usenix.org`` in ``allowed_hosts`` would be a dead
+registry key).
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ def _extract_heading_walk(soup) -> str:
 
 
 class _UsenixFetcher(Fetcher):
-    allowed_hosts = ("www.usenix.org", "usenix.org")
+    allowed_hosts = ("usenix.org",)
     source = "usenix"
 
     def fetch(self, url: str) -> AbstractResult:
@@ -145,7 +145,9 @@ class _UsenixFetcher(Fetcher):
         if node is not None:
             strip_abstract_label(node)
             text = clean_text(node.get_text(" "))
-        if not text:
+        # Container residue too short to be an abstract → still try the
+        # heading-walk fallback before giving up.
+        if len(text) < MIN_ABSTRACT_CHARS:
             text = _extract_heading_walk(soup)
 
         if not text or len(text) < MIN_ABSTRACT_CHARS:

@@ -37,7 +37,6 @@ sys.path.insert(0, str(ROOT))
 
 from data_artifacts import sync_cache_artifacts, ensure_cache_local, ensure_progress_local
 from collector.url_types import classify_paper_url
-from collector.http import SESSION as _COLLECTOR_SESSION
 from papervault.services.abstract_fetchers import dispatch as _dispatch_domain_fetcher
 from papervault.services.abstract_fetchers.base import MIN_ABSTRACT_CHARS
 
@@ -260,6 +259,30 @@ def _get_api_session() -> requests.Session:
             ),
         )
     return _thread_local.api_session
+
+
+def _get_scrape_session() -> requests.Session:
+    """Session for one-shot scrape GETs (DOI redirect resolution, PDF
+    download): NO urllib3 status retries, for the same reason as
+    :func:`_get_api_session`.
+
+    ``collector.http.SESSION`` mounts ``Retry(total=5, backoff_factor=1,
+    status_forcelist=[500,502,503,504])`` *without* disabling
+    ``respect_retry_after_header`` — a 503 with ``Retry-After: 300``
+    would sleep five minutes inside ``send()`` before our own error
+    handling ever sees the response. Here every non-2xx surfaces
+    immediately; the callers translate it into their REASON_ENUM
+    degrade path themselves.
+    """
+    if not hasattr(_thread_local, "scrape_session"):
+        _thread_local.scrape_session = requests.Session()
+        _thread_local.scrape_session.trust_env = False
+        adapter = HTTPAdapter(
+            max_retries=Retry(total=0, respect_retry_after_header=False)
+        )
+        _thread_local.scrape_session.mount("https://", adapter)
+        _thread_local.scrape_session.mount("http://", adapter)
+    return _thread_local.scrape_session
 
 
 def _rate_limited_request(
@@ -601,7 +624,7 @@ def _dispatch_via_doi_redirect(url: str):
         # to browser-like User-Agents, which would break both the final
         # URL capture here and the fetcher's own GET. See the verification
         # note in ``abstract_fetchers/springer.py``.
-        resp = _COLLECTOR_SESSION.get(
+        resp = _get_scrape_session().get(
             url, headers=_DOI_REDIRECT_HEADERS, timeout=20, allow_redirects=True
         )
     except requests.exceptions.RequestException:
@@ -637,7 +660,7 @@ def _download_pdf_bytes(url: str) -> Tuple[Optional[bytes], str]:
     ``scripts/validate_pdf_extract.py`` 复用此 helper 取原始字节做验证。
     """
     try:
-        resp = _COLLECTOR_SESSION.get(
+        resp = _get_scrape_session().get(
             url, headers=HEADERS, timeout=30, stream=True, allow_redirects=True
         )
     except requests.exceptions.Timeout:
@@ -686,7 +709,9 @@ def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
         abstract = extract_abstract_from_pdf_bytes(data)
     except Exception:
         return None, "empty_abstract"
-    if not abstract:
+    # A sub-threshold block (menu residue, stray heading) must degrade to
+    # empty_abstract, never enter the cache as a fake abstract.
+    if not abstract or len(abstract) < MIN_ABSTRACT_CHARS:
         return None, "empty_abstract"
     return abstract, ""
 
@@ -783,14 +808,24 @@ def fetch_abstract_for_paper(
     domain_reason = ""
     domain_source = ""
     if url:
-        dispatched = _dispatch_domain_fetcher(url)
-        if dispatched.ok and dispatched.abstract:
+        # A fetcher raising must never break the main chain — degrade to
+        # the DOI/title chain exactly like an ``ok=False`` dispatch
+        # (same treatment as ``_dispatch_via_doi_redirect``).
+        try:
+            dispatched = _dispatch_domain_fetcher(url)
+        except Exception:
+            dispatched = None
+        if dispatched is not None and dispatched.ok and dispatched.abstract:
             return dispatched.abstract, last_time, dispatched.source, {}
         # On dispatcher failure we fall through to the legacy DOI/title
         # chain. We do *not* return early because e.g. an older ACL page
         # without a ``.acl-abstract`` block can still be recovered via
         # CrossRef.
-        if dispatched.reason and _matched_registered_fetcher(url):
+        if (
+            dispatched is not None
+            and dispatched.reason
+            and _matched_registered_fetcher(url)
+        ):
             domain_reason = dispatched.reason
             domain_source = dispatched.source or ""
 
@@ -1143,8 +1178,11 @@ def _collect_s2_batch_targets(
     """--s2-batch 目标集合：progress=failed、cache 摘要仍为空、doi.org URL。
 
     DOI 一律小写归一（S2 的 DOI 标识大小写不敏感，小写保证回映射一致）。
+    同一 paper_url 可能随多个 conf 重复出现（同 DOI 被收录进不同会议条目），
+    按提取出的 DOI 去重，避免同一批请求里出现重复 id。
     """
     targets: List[Tuple[dict, str]] = []
+    seen_dois = set()
     for p in all_papers:
         url = p.get("paper_url", "")
         if (p.get("paper_abstract") or "").strip():
@@ -1155,7 +1193,11 @@ def _collect_s2_batch_targets(
         doi = extract_doi(url)
         if not doi:
             continue
-        targets.append((p, doi.lower()))
+        doi = doi.lower()
+        if doi in seen_dois:
+            continue
+        seen_dois.add(doi)
+        targets.append((p, doi))
     return targets
 
 
@@ -1303,12 +1345,21 @@ def _s2_record_success(progress: Dict[str, dict], paper: dict, abstract: str, so
     }
 
 
-def _s2_record_failure(progress: Dict[str, dict], paper: dict, reason: str, last_source: str) -> None:
+def _s2_record_failure(
+    progress: Dict[str, dict],
+    paper: dict,
+    reason: str,
+    last_source: str,
+    count_attempt: bool = True,
+) -> None:
+    """记录条目级失败。``count_attempt=False`` 用于整批请求级失败
+    （瞬时 429/网络故障）——不递增 ``attempts``，避免把整批 500 篇推向
+    ``max_failed_attempts`` 永久跳过阈值。"""
     url = paper.get("paper_url", "")
     old_attempts = progress.get(url, {}).get("attempts", 0)
     progress[url] = {
         "status": "failed",
-        "attempts": old_attempts + 1,
+        "attempts": old_attempts + (1 if count_attempt else 0),
         "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "reason": normalize_reason(reason),
         "last_source": last_source,
@@ -1359,7 +1410,12 @@ def _run_s2_batch_pass(
                 print(f"  [!] batch request failed ({reason}); marking {len(sub)} papers failed")
                 for paper, _doi in sub:
                     if not dry_run:
-                        _s2_record_failure(progress, paper, reason, "semanticscholar_batch")
+                        # 请求级失败（瞬时 429/网络）不递增 attempts——
+                        # 条目本身没有被评估过，不应消耗重试配额。
+                        _s2_record_failure(
+                            progress, paper, reason, "semanticscholar_batch",
+                            count_attempt=False,
+                        )
                     failed += 1
                     processed += 1
                 continue

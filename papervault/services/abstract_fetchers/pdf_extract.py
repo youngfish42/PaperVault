@@ -32,9 +32,11 @@ PDF_EXTRACT_PAGES = 3
 _HEADING_RE = re.compile(r"^\s*abstract\s*[.—\-:]*\s*$", re.IGNORECASE | re.MULTILINE)
 # Inline prefix: "Abstract—The prose starts on the same line ...".
 _INLINE_RE = re.compile(r"^\s*abstract\s*[—\-.:]\s*", re.IGNORECASE | re.MULTILINE)
-# Section markers that terminate the abstract block.
+# Section markers that terminate the abstract block. Real PDFs often
+# typeset the section number without a space ("1.Introduction"), hence
+# ``\s*`` rather than ``\s+``.
 _END_RE = re.compile(
-    r"^\s*(?:1\.?\s+introduction|i\.?\s+introduction|keywords?|index terms|key words"
+    r"^\s*(?:1\.?\s*introduction|i\.?\s*introduction|keywords?|index terms|key words"
     r"|(?:p?vldb\s+)?reference format)\b",
     re.IGNORECASE | re.MULTILINE,
 )

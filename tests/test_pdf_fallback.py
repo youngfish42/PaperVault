@@ -151,6 +151,15 @@ def test_pdf_extract_garbage_bytes():
 
 # ---------- _fetch_pdf_abstract (HTTP stubbed) --------------------------------
 
+def _patch_scrape_get(monkeypatch, get_mock):
+    """``_download_pdf_bytes`` fetches through the thread-local scrape
+    session (``_get_scrape_session``) — patch that factory so the mocked
+    ``get`` is what the helper calls."""
+    session = MagicMock()
+    session.get = get_mock
+    monkeypatch.setattr(fa, "_get_scrape_session", lambda: session)
+
+
 def _pdf_response(url: str, payload: bytes, status: int = 200, ctype: str = "application/pdf") -> MagicMock:
     resp = MagicMock()
     resp.status_code = status
@@ -162,10 +171,7 @@ def _pdf_response(url: str, payload: bytes, status: int = 200, ctype: str = "app
 
 def test_fetch_pdf_abstract_success(monkeypatch):
     url = "https://www.vldb.org/pvldb/vol13/p1234-doe.pdf"
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_pdf_response(url, GOOD_PDF)),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_pdf_response(url, GOOD_PDF)),)
     abstract, reason = fa._fetch_pdf_abstract(url)
     assert reason == ""
     assert abstract.startswith("This paper presents a synthetic mechanism")
@@ -175,7 +181,7 @@ def test_fetch_pdf_abstract_truncates_oversize(monkeypatch):
     """The stream is capped at PDF_FALLBACK_MAX_BYTES regardless of content length."""
     url = "https://ceur-ws.org/Vol-3456/paper42.pdf"
     resp = _pdf_response(url, GOOD_PDF + b"junk" * 100)
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", MagicMock(return_value=resp))
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=resp))
     abstract, reason = fa._fetch_pdf_abstract(url)
     assert reason == ""
     assert abstract  # the tiny PDF sits within the first bytes
@@ -184,7 +190,7 @@ def test_fetch_pdf_abstract_truncates_oversize(monkeypatch):
 def test_fetch_pdf_abstract_non_pdf_final_url_rejected(monkeypatch):
     url = "https://example.org/paper.pdf"
     resp = _pdf_response("https://example.org/landing.html", b"<html>no</html>", ctype="text/html")
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", MagicMock(return_value=resp))
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=resp))
     abstract, reason = fa._fetch_pdf_abstract(url)
     assert abstract is None
     assert reason == "empty_abstract"
@@ -203,7 +209,7 @@ def test_fetch_pdf_abstract_oversize_content_length_skips_download(monkeypatch):
         return []
 
     resp.iter_content = _iter
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", MagicMock(return_value=resp))
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=resp))
     abstract, reason = fa._fetch_pdf_abstract(url)
     assert abstract is None
     assert reason == "empty_abstract"
@@ -212,10 +218,7 @@ def test_fetch_pdf_abstract_oversize_content_length_skips_download(monkeypatch):
 
 def test_fetch_pdf_abstract_http_error(monkeypatch):
     url = "https://example.org/paper.pdf"
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_pdf_response(url, b"", status=500)),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_pdf_response(url, b"", status=500)),)
     abstract, reason = fa._fetch_pdf_abstract(url)
     assert abstract is None
     assert reason == "network"
@@ -244,10 +247,7 @@ def test_pdf_url_falls_back_to_pdf_source(monkeypatch):
     and arxiv miss, PDF fallback delivers with ``source == "pdf"``."""
     _stub_chain_empty(monkeypatch)
     url = "https://www.vldb.org/pvldb/vol13/p1234-doe.pdf"
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_pdf_response(url, GOOD_PDF)),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_pdf_response(url, GOOD_PDF)),)
     paper = {"paper_url": url, "paper_name": "Some VLDB Paper"}
     abstract, _lt, source, err = fa.fetch_abstract_for_paper(paper, _empty_last_time())
     assert source == "pdf"
@@ -259,7 +259,7 @@ def test_pdf_fallback_disabled_skips_download(monkeypatch):
     _stub_chain_empty(monkeypatch)
     url = "https://www.vldb.org/pvldb/vol13/p1234-doe.pdf"
     get_mock = MagicMock(side_effect=AssertionError("PDF download must not run when disabled"))
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", get_mock)
+    _patch_scrape_get(monkeypatch, get_mock)
     paper = {"paper_url": url, "paper_name": "Some VLDB Paper"}
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(
         paper, _empty_last_time(), pdf_fallback_enabled=False
@@ -273,7 +273,7 @@ def test_pdf_fallback_disabled_skips_download(monkeypatch):
 def test_non_pdf_url_does_not_trigger_pdf_fallback(monkeypatch):
     _stub_chain_empty(monkeypatch)
     get_mock = MagicMock(side_effect=AssertionError("no PDF download for non-.pdf URLs"))
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", get_mock)
+    _patch_scrape_get(monkeypatch, get_mock)
     paper = {"paper_url": "https://example.org/paper/1", "paper_name": "Some Paper"}
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(paper, _empty_last_time())
     assert abstract is None
@@ -287,12 +287,29 @@ def test_pdf_fallback_failure_reasons_do_not_break_err_synthesis(monkeypatch):
     _stub_chain_empty(monkeypatch)
     url = "https://www.vldb.org/pvldb/vol13/p1234-doe.pdf"
     bad_pdf = _make_pdf(["Some Paper", "", "1. Introduction", "No abstract."])
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_pdf_response(url, bad_pdf)),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_pdf_response(url, bad_pdf)),)
     paper = {"paper_url": url, "paper_name": "Some VLDB Paper"}
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(paper, _empty_last_time())
     assert abstract is None
     assert err["reason"] == "no_abstract_available"
     assert err["reason"] in fa.REASON_ENUM
+
+
+def test_pdf_extract_stops_at_introduction_without_space():
+    """Review m5: real PDFs often typeset "1.Introduction" with no space
+    after the dot — the end marker must still cut there."""
+    pdf = _make_pdf(["T", "", "Abstract"] + ABSTRACT_LINES + ["", "1.Introduction", "Body text."])
+    abstract = extract_abstract_from_pdf_bytes(pdf)
+    assert abstract.startswith("This paper presents a synthetic mechanism")
+    assert "Body text." not in abstract
+
+
+def test_fetch_pdf_abstract_rejects_sub_threshold_block(monkeypatch):
+    """Review m4: a stub Abstract section (< MIN_ABSTRACT_CHARS) must
+    degrade to empty_abstract, never enter the cache."""
+    short_pdf = _make_pdf(["Some Paper", "", "Abstract", "Too short.", "", "1. Introduction", "x"])
+    url = "https://example.org/paper.pdf"
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_pdf_response(url, short_pdf)))
+    abstract, reason = fa._fetch_pdf_abstract(url)
+    assert abstract is None
+    assert reason == "empty_abstract"

@@ -42,8 +42,12 @@ from ._http import clean_text, http_get, strip_abstract_label
 
 
 def _looks_like_paper_page(url: str) -> bool:
-    """Return False for bare edition index pages (``/``, ``/ndss2000/``)."""
+    """Return False for bare edition index pages (``/``, ``/ndss2000/``)
+    and for direct media links (``/wp-content/uploads/.../paper.pdf``
+    passes the ≥2-segment test but is not a paper page)."""
     path = (urlparse(url).path or "").lower()
+    if path.endswith((".pdf", ".ppt", ".pptx", ".zip", ".ps", ".doc", ".docx")):
+        return False
     segments = [seg for seg in path.split("/") if seg]
     return len(segments) >= 2
 
@@ -100,7 +104,9 @@ class _NdssFetcher(Fetcher):
                     parts.append(part)
             text = clean_text(" ".join(parts))
 
-        if not text:
+        # Container residue too short to be an abstract → still try the
+        # (full, non-truncated on this site) meta description fallback.
+        if len(text) < MIN_ABSTRACT_CHARS:
             meta = soup.find("meta", attrs={"name": "description"})
             if meta is not None:
                 text = clean_text(meta.get("content"))

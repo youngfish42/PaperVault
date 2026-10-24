@@ -82,12 +82,16 @@ class _SpringerFetcher(Fetcher):
         text = ""
         section = soup.find("section", attrs={"aria-labelledby": "Abs1"})
         if section is None:
-            section = soup.find("section", id="Abs1")
+            # Actual page anatomy: the Abs1 id lives on the inner
+            # ``<h2 id="Abs1">`` title and on the wrapper
+            # ``<div class="c-article-section" id="Abs1-section">``
+            # (a bare ``section#Abs1`` never occurs on real pages).
+            section = soup.find("div", id="Abs1-section")
         if section is not None:
             strip_abstract_label(section)
             text = clean_text(section.get_text(" "))
 
-        if not text:
+        if len(text) < MIN_ABSTRACT_CHARS:
             meta = soup.find("meta", attrs={"name": "description"})
             if meta is not None:
                 candidate = clean_text(meta.get("content"))

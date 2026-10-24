@@ -545,3 +545,45 @@ def test_openalex_title_pass_success_and_dry_run(monkeypatch):
     assert p2["paper_abstract"] == ""
     assert progress2 == snapshot
     assert writes2 == {"save": 0, "cache": 0}
+
+
+def test_s2_batch_targets_dedupe_by_doi():
+    """Review m8: the same DOI harvested under two confs must produce one
+    target (a duplicate id in a batch request would waste quota and the
+    aligned mapping would double-count)."""
+    url = "https://doi.org/10.1007/ABC-DEF_1"
+    url_ci = "https://doi.org/10.1007/abc-def_1"
+    p1 = _paper(url, conf="KDD2020")
+    p2 = _paper(url, conf="CIKM2020")
+    p3 = _paper(url_ci)
+    targets = fa._collect_s2_batch_targets([p1, p2], _failed_progress(url))
+    assert len(targets) == 1
+    assert targets[0][1] == "10.1007/abc-def_1"
+    targets = fa._collect_s2_batch_targets([p1, p3], _failed_progress(url, url_ci))
+    assert len(targets) == 1  # case-insensitive dedupe
+
+
+def test_s2_batch_request_failure_does_not_increment_attempts(monkeypatch):
+    """Review m9: a request-level failure (transient 429/network) marks the
+    sub-batch failed but must NOT consume per-paper retry attempts — only
+    entry-level failures (null/mismatch/empty) increment ``attempts``."""
+    p = _paper("https://doi.org/10.1/x1")
+    progress = {p["paper_url"]: {"status": "failed", "attempts": 1, "ts": "2026-01-01T00:00:00"}}
+    monkeypatch.setattr(fa, "_s2_batch_fetch", MagicMock(return_value=(None, "rate_limited")))
+    _stub_no_disk(monkeypatch)
+    fa._run_s2_batch_pass(
+        [p], progress,
+        chunk_size=500, max_papers=None, soft_timeout=None,
+        start_time=__import__("time").time(), dry_run=False,
+    )
+    assert progress[p["paper_url"]]["attempts"] == 1  # unchanged
+
+    # Entry-level failure still increments.
+    monkeypatch.setattr(fa, "_s2_batch_fetch", MagicMock(return_value=([None], "")))
+    fa._run_s2_batch_pass(
+        [p], progress,
+        chunk_size=500, max_papers=None, soft_timeout=None,
+        start_time=__import__("time").time(), dry_run=False,
+    )
+    assert progress[p["paper_url"]]["attempts"] == 2
+    assert progress[p["paper_url"]]["reason"] == "doi_not_found"

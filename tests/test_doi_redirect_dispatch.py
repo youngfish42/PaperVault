@@ -36,6 +36,15 @@ SPRINGER_ABSTRACT = (
 )
 
 
+def _patch_scrape_get(monkeypatch, get_mock):
+    """``_dispatch_via_doi_redirect`` fetches through the thread-local
+    scrape session (``_get_scrape_session``) — patch that factory so the
+    mocked ``get`` is what the helper calls."""
+    session = MagicMock()
+    session.get = get_mock
+    monkeypatch.setattr(fa, "_get_scrape_session", lambda: session)
+
+
 def _empty_last_time() -> dict:
     return {"crossref": 0.0, "semanticscholar": 0.0, "arxiv": 0.0, "openalex": 0.0}
 
@@ -88,7 +97,7 @@ def test_doi_chain_failure_redirects_to_springer_fetcher(monkeypatch):
     dispatch_mock = MagicMock(side_effect=_dispatch_by_url)
     monkeypatch.setattr(fa, "_dispatch_domain_fetcher", dispatch_mock)
     get_mock = MagicMock(return_value=_redirect_response(SPRINGER_URL))
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", get_mock)
+    _patch_scrape_get(monkeypatch, get_mock)
 
     abstract, _lt, source, err = fa.fetch_abstract_for_paper(_paper(), _empty_last_time())
 
@@ -112,10 +121,7 @@ def test_redirect_to_unregistered_host_falls_through_to_arxiv(monkeypatch):
 
     monkeypatch.setattr(fa, "fetch_arxiv_abstract", _arxiv)
     monkeypatch.setattr(fa, "_dispatch_domain_fetcher", MagicMock(side_effect=_dispatch_by_url))
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_redirect_response("https://some-unregistered-host.example/paper/1")),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_redirect_response("https://some-unregistered-host.example/paper/1")),)
 
     abstract, _lt, source, err = fa.fetch_abstract_for_paper(_paper(), _empty_last_time())
 
@@ -136,10 +142,7 @@ def test_redirect_fetcher_failure_does_not_pollute_err_info(monkeypatch):
         return AbstractResult(ok=False, url=url, reason="empty_abstract", source="springer")
 
     monkeypatch.setattr(fa, "_dispatch_domain_fetcher", MagicMock(side_effect=_dispatch_fail))
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_redirect_response(SPRINGER_URL)),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_redirect_response(SPRINGER_URL)),)
 
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(_paper(), _empty_last_time())
 
@@ -154,10 +157,7 @@ def test_redirect_network_error_degrades_silently(monkeypatch):
     _stub_doi_chain_empty(monkeypatch)
     _stub_arxiv_miss(monkeypatch)
     monkeypatch.setattr(fa, "_dispatch_domain_fetcher", MagicMock(side_effect=_dispatch_by_url))
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(side_effect=requests.exceptions.ConnectionError("boom")),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(side_effect=requests.exceptions.ConnectionError("boom")),)
 
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(_paper(), _empty_last_time())
 
@@ -172,7 +172,7 @@ def test_redirect_disabled_skips_redirect_get(monkeypatch):
     _stub_arxiv_miss(monkeypatch)
     monkeypatch.setattr(fa, "_dispatch_domain_fetcher", MagicMock(side_effect=_dispatch_by_url))
     get_mock = MagicMock(side_effect=AssertionError("redirect GET must not run when disabled"))
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", get_mock)
+    _patch_scrape_get(monkeypatch, get_mock)
 
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(
         _paper(), _empty_last_time(), doi_redirect_enabled=False
@@ -194,7 +194,7 @@ def test_redirect_step_skipped_for_non_doi_urls(monkeypatch):
     _stub_doi_chain_empty(monkeypatch)
     _stub_arxiv_miss(monkeypatch)
     get_mock = MagicMock(side_effect=AssertionError("no redirect GET for non-doi.org URLs"))
-    monkeypatch.setattr(fa._COLLECTOR_SESSION, "get", get_mock)
+    _patch_scrape_get(monkeypatch, get_mock)
 
     paper = {"paper_url": "https://aclanthology.org/2023.acl-long.1/", "paper_name": "Real title"}
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(paper, _empty_last_time())
@@ -212,10 +212,7 @@ def test_redirect_to_same_host_is_ignored(monkeypatch):
     _stub_arxiv_miss(monkeypatch)
     dispatch_mock = MagicMock(side_effect=_dispatch_by_url)
     monkeypatch.setattr(fa, "_dispatch_domain_fetcher", dispatch_mock)
-    monkeypatch.setattr(
-        fa._COLLECTOR_SESSION, "get",
-        MagicMock(return_value=_redirect_response(DOI_URL)),
-    )
+    _patch_scrape_get(monkeypatch, MagicMock(return_value=_redirect_response(DOI_URL)),)
 
     abstract, _lt, _source, err = fa.fetch_abstract_for_paper(_paper(), _empty_last_time())
 
@@ -223,3 +220,22 @@ def test_redirect_to_same_host_is_ignored(monkeypatch):
     dispatched_urls = [c.args[0] for c in dispatch_mock.call_args_list]
     assert dispatched_urls == [DOI_URL]  # only the initial dispatch
     assert err["reason"] == "empty_abstract"
+
+
+def test_scrape_session_disables_urllib3_status_retries():
+    """Review M2: the scrape session (DOI redirect resolution + PDF
+    download) must mount ``Retry(total=0, respect_retry_after_header=False)``
+    so 429/503 surface immediately instead of sleeping inside urllib3
+    (the failure mode that stalled --openalex-title for 84 minutes)."""
+    if hasattr(fa._thread_local, "scrape_session"):
+        del fa._thread_local.scrape_session
+    try:
+        session = fa._get_scrape_session()
+        for scheme in ("https", "http"):
+            retries = session.get_adapter(f"{scheme}://example.org").max_retries
+            assert retries.total == 0
+            assert retries.respect_retry_after_header is False
+    finally:
+        # Do not leak the real session into tests that patch the factory.
+        if hasattr(fa._thread_local, "scrape_session"):
+            del fa._thread_local.scrape_session
