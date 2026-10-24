@@ -16,7 +16,7 @@ This project was originally forked from [MLNLP-World/AI-Paper-Collector](https:/
 | **Frontend** | Vue 3.5 (Composition API + `<script setup>`), TypeScript 5.9, Vite 8, Vue Router 4 (hash mode), in-house **i18n** layer (`src/utils/i18n.ts`), WoS-style **query DSL** parser/evaluator (`src/utils/queryDsl.ts` + `src/utils/fields.ts`) powering both Smart Search and the dedicated Advanced Search view |
 | **UI Framework** | Element Plus 2.14 (auto-imported via `unplugin-vue-components`), `@vueuse/core` |
 | **HTTP Client** | Axios 1.x |
-| **Data Collection** | BeautifulSoup4, Requests, PyYAML, tqdm, thefuzz / python-Levenshtein |
+| **Data Collection** | BeautifulSoup4, Requests, PyYAML, tqdm, thefuzz / python-Levenshtein, pdfminer.six (last-resort PDF abstract extraction, lazily imported) |
 | **Data Artifacts** | huggingface_hub (dataset upload with `parent_commit` optimistic locking) |
 | **AI Features** | Multi-provider LLM catalog (OpenAI, DeepSeek, Anthropic Claude, Qwen/DashScope, GLM, StepFun, custom) for keyword suggestion (`POST /api/v1/suggest`) and LLM-driven result re-ranking (`POST /api/v1/ai/rerank`). Wire formats: `openai-compatible` (via `openai` SDK) and `anthropic` (via `anthropic` SDK). Presets exposed through `GET /api/v1/ai/providers`; per-request overrides for provider / base_url / model / api_key. `tiktoken` for token counting |
 | **Stats / Visualization** | numpy, matplotlib, wordcloud |
@@ -38,7 +38,8 @@ PaperVault/
 │   ├── __main__.py               # `python -m collector` entrypoint (equivalent to the legacy `python collector.py`)
 │   ├── anubis.py                 # Anubis PoW challenge solver (DBLP has been behind Anubis since 2026-09); `get_with_anubis` solves once per session and raises `AnubisUnsolvableError` on failure
 │   ├── http.py                   # Shared requests.Session singleton + HEADERS (User-Agent) + urllib3 Retry policy; re-exports the Anubis helpers; also suppresses BS4 XMLParsedAsHTMLWarning
-│   ├── merge.py                  # Field-level record merge helpers (_better_str/_list/_code, _merge_paper_record, _merge_with_cache)
+│   ├── merge.py                  # Field-level record merge helpers (_better_str/_list/_code, _merge_paper_record, _merge_with_cache); new records are screened for front-matter before entering the cache (see frontmatter.py)
+│   ├── frontmatter.py            # Single source of truth for front-matter detection: shared title regex; cleanup-side predicate `is_frontmatter_record` vs collection-side `should_drop_on_collect` (title match AND (venue-index URL OR empty/editorial authors)) — fresh records never have abstracts yet, so the collection legs are tightened deliberately
 │   ├── progress.py               # COLLECT_PROGRESS_FILE / COLLECT_FAILURES_FILE constants + load/save_collect_progress
 │   ├── io.py                     # cache/cache.jsonl.gz reader/writer (load_cache, save_cache, _to_gz_path)
 │   ├── code_links.py             # GitHub link extraction from abstracts (_GITHUB_RE, extract_github_link, add_code_links)
@@ -92,7 +93,11 @@ PaperVault/
 │           ├── aaai.py           # `ojs.aaai.org` + legacy `aaai.org` (path-segment guarded; strips both `<h2>` and `<strong>` Abstract labels)
 │           ├── ijcai.py          # `ijcai.org`
 │           ├── vldb.py           # `vldb.org`
-│           └── ceur.py           # `ceur-ws.org`
+│           ├── ceur.py           # `ceur-ws.org`
+│           ├── pdf_extract.py    # Last-resort PDF Abstract-section extraction (`extract_abstract_from_pdf_bytes`; pdfminer imported lazily inside the function)
+│           ├── springer.py       # `link.springer.com` (`/chapter/` `/article/` `/referenceworkentry/` guarded; `<section aria-labelledby="Abs1">` + truncated-meta guard; sends a bot UA because F5 bot defence JS-challenges browser UAs)
+│           ├── usenix.py         # `usenix.org` (`/conference/.../presentation/` + non-media `/legacy/events/` + `/events/<slug>/tech/*.html` + `/publications/library/proceedings/**.html` guarded; `field-name-field-paper-description` covers legacy+Drupal layouts, oldest `<H3>Abstract</H3>` pages use a `next_elements` walk that stops at the full-text `<UL>`; media files / bare `/events/<slug>/` landings / `techAbstracts.html` index short-circuit)
+│           └── ndss.py           # `ndss-symposium.org` (edition-index pages guarded; byline / `Date:` metadata rows excluded, top-level `<p>` only; Yoast meta-description fallback is NOT truncated)
 ├── tests/                        # Backend pytest suite (runs offline against fixture cache via `PAPERVAULT_OFFLINE=1`)
 │   ├── __init__.py
 │   ├── conftest.py               # `client_with_sample` fixture and sample-cache factories
@@ -102,14 +107,20 @@ PaperVault/
 │   ├── test_per_token_search.py  # Per-token DSL evaluation on the backend side
 │   ├── test_load_dedup.py        # In-memory dedupe when loading `cache.jsonl.gz`
 │   ├── test_collector_dedupe.py  # `_merge_with_cache` per-`(conf, paper_url)` dedupe
+│   ├── test_collector_frontmatter.py  # Collection-side front-matter filter: predicate legs (venue-index | empty/editorial authors), `_merge_with_cache` integration, cache-side records never deleted
 │   ├── test_cleanup_cache_dedupe.py  # One-shot `scripts/cleanup_cache_dedupe.py` regression
+│   ├── test_cleanup_frontmatter.py   # `scripts/cleanup_cache_frontmatter.py`: front-matter predicate (title regex × venue-index/empty-field evidence), dry-run no-write, atomic write + backup, idempotency
 │   ├── test_ai_providers.py      # `ProviderPreset` catalog shape + `get_preset` fallback
 │   ├── test_ai_clients.py        # `call_openai_compatible` / `call_anthropic` dispatch (mocked SDKs)
 │   ├── test_ai_rerank.py         # `POST /v1/ai/rerank` end-to-end (mocked LLM)
 │   ├── test_suggest_api.py       # `POST /v1/suggest` + `GET /v1/ai/providers`
 │   ├── test_suggest_dispatch.py  # Provider / protocol resolution in `services.suggest`
 │   ├── test_suggest_topic_anchor.py  # Topic-anchor prompt shaping for `suggest_keywords`
-│   └── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
+│   ├── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
+│   ├── test_doi_redirect_dispatch.py  # DOI redirect dispatch: doi.org → final-URL re-dispatch to the fetcher registry, failure degrade, `--no-doi-redirect`
+│   ├── test_s2_backfill.py       # `--s2-batch` / `--s2-title-match` / `--openalex-title` backfill passes: batch mapping (null entries), title/year gates, excluded hosts (incl. NDSS inclusion for OpenAlex), dry-run
+│   ├── test_pdf_fallback.py      # PDF abstract fallback: `extract_abstract_from_pdf_bytes` on in-process minimal PDFs (inline prefix / no-section / copyright rejection / 2000-char cap) + `_fetch_pdf_abstract` HTTP stubs + `source="pdf"` integration
+│   └── test_repair_wayback.py    # `repair_wayback_urls.py`: wayback unwrap regex, new-URL priority (doi.org > landing page), title/year gates, conflict merge, dry-run no-write
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -136,7 +147,10 @@ PaperVault/
 │   ├── cvf_abstract.py               # Side-effect-free CVF scraping helpers, shared by `collector` and `fetch_cvf_abstracts.py`
 │   ├── fetch_code_links.py           # Extract GitHub code links from abstracts
 │   ├── fetch_pwc_backfill.py         # Offline one-shot backfill of empty abstracts/code links from the archived PwC HF snapshots (exact-key matching only; never overwrites non-empty fields)
+│   ├── validate_pdf_extract.py       # Validation harness for the PDF abstract fallback: stratified sampling of .pdf records, OpenAlex/S2 reference abstracts, PASS/REVIEW/FAIL report → docs/pdf_extract_validation.md
+│   ├── repair_wayback_urls.py        # Repair web.archive.org-wrapped dead paper URLs (~4.4k, AAAI/UAI 2000-2014) via OpenAlex title lookup; migration trail goes to cache/wayback_repair_log.jsonl (REASON_ENUM has no `migrated`)
 │   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
+│   ├── cleanup_cache_frontmatter.py  # One-shot removal of front-matter records (proceedings covers / venue indexes; conservative title-regex + (venue-index | no-abstract & no-code) double condition; `--review` prints the full deletion list)
 │   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
 │   ├── sync_hf_readme.py             # Render `docs/HF_README.md` and push it as the Hugging Face dataset repo root README
 │   └── capture_screenshot.py         # Playwright-driven README hero screenshot regenerator (1280x540 @ 2x; assumes backend :5001 + Vite :8080)
@@ -283,6 +297,7 @@ How synchronisation works:
 2. `data_artifacts.upload_to_huggingface()` performs an atomic upload using that `parent_commit`. If another workflow pushed in between, HF rejects with HTTP 412 / "stale parent_commit"; we then re-fetch the new head, rebase locally, and retry up to `PAPERVAULT_HF_UPLOAD_MAX_ATTEMPTS` times (with exponential `PAPERVAULT_HF_UPLOAD_RETRY_BACKOFF`). `sync_cache_artifacts()` now bundles both `cache.jsonl.gz` and the progress file in a single batch so they advance together.
 3. All cache-mutating GitHub Actions workflows (`collect_papers.yml`, `backfill_abstracts.yml`, `update_readme.yml`) share a single concurrency group `papervault-cache` so they run strictly serially. `cancel-in-progress: false` ensures an in-flight job is allowed to finish its HF push.
 4. PRs created by these workflows **exclude** `cache/cache.jsonl.gz` and `cache/abstract_backfill_progress.jsonl.gz` (`AUTO_*_FILES` / `add-paths`) and only commit small progress / metadata files (`cache/collect_progress.json`, `cache/readme_meta.json`, `docs/...`, `pics/...`, `README.md`, `README.en.md`). `cache/readme_meta.json` in particular must stay committed: it is the source of the README "recent update" brief (`last_update` / `new_papers` / `new_conferences`), so a readme-only run of `python maintain.py` re-renders from whatever snapshot git holds — if it goes stale, the brief regresses to an old date and an inflated new-paper count.
+5. **Chaining multiple backfill passes locally**: `ensure_cache_local` / `ensure_progress_local` with `refresh=True` (the default for every `scripts/fetch_*` entry point) **overwrite the local file with the HF remote copy at startup**. Therefore, when running several backfill segments back-to-back with `--no-sync`, every segment after the first MUST also pass `--offline` (or each segment must sync before the next starts) — otherwise the next segment's startup refresh silently discards the previous segment's unsynced local results. (Incident 2026-10-20: ~970 springer-filled abstracts were wiped this way and had to be re-fetched.) Long-running manual `sync_cache_artifacts()` calls should also be wrapped in `timeout` — an HF upload has been observed stalling mid-transfer with no error.
 
 ### Abstract backfill progress (JSONL.gz, append-friendly)
 
@@ -292,9 +307,11 @@ tracked via Git LFS). The new format:
 
 - First line is a metadata header (`{"_meta": true, "schema": "abstract_backfill_progress/v4", ...}`).
   Schema v4 (introduced 2026-Q2) adds a standardised `reason` enum on
-  failed records (e.g. `timeout`, `http_429`, `http_5xx`, `parse_error`,
-  `empty_abstract`, `no_abstract_available`) so the diagnostic
-  dashboards can bucket failures by root cause instead of by raw
+  failed records (`REASON_ENUM` in `scripts/fetch_abstracts.py` is the
+  single source of truth: `no_doi`, `doi_not_found`, `empty_abstract`,
+  `rate_limited`, `timeout`, `network`, `title_mismatch`, `venue_index`,
+  `delegated_to_specialised_fetcher`, `no_abstract_available`) so the
+  diagnostic dashboards can bucket failures by root cause instead of by raw
   exception text. Legacy v3 records (`reason=null`) are still readable
   and treated as pre-schema-v3 legacy data by the analysers.
 - Each subsequent line is one record: `{"url": ..., "status": ..., "source": ..., "chars": ..., "attempts": ..., "ts": ..., "reason": ...}`.
@@ -379,14 +396,16 @@ Other frontend scripts:
 | `python maintain.py` | Update README conference list & stats from config files |
 | `python maintain.py collect` | Incrementally collect papers for new conferences and update README. Supports `--soft-timeout N` for graceful timeout handling |
 | `python maintain.py force` | Force full cache rebuild and README update |
-| `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
+| `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (Crossref → Semantic Scholar → arXiv → OpenAlex). On DOI-chain failure for `doi.org` URLs it follows the redirect once and re-dispatches the final landing page to the domain-fetcher registry (e.g. Springer LNCS / ISCA DOIs; disable with `--no-doi-redirect`). Last resort: direct `.pdf` URLs are downloaded (≤8MB, first 3 pages) and their Abstract section extracted with pdfminer (disable with `--no-pdf-fallback`). Three mutually-exclusive dedicated passes retry previously-failed records: `--s2-batch` (failed `doi.org` URLs via S2 `/paper/batch`, ≤500 DOIs/request), `--s2-title-match` (failed non-DOI long-tail hosts via S2 `/paper/search/match` with ≥0.85 title + ±1 year gates) and `--openalex-title` (same gates via OpenAlex `/works?search=` at 3 rps, inverted-index abstract rebuild; the excluded-host set drops `ndss-symposium.org` whose pages carry no abstract). All three honour `--max-papers` / `--soft-timeout` / `--chunk-size` / `--dry-run` / `--no-sync` / `--offline` and the optional `S2_API_KEY` env var. Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
 | `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
 | `python scripts/fetch_cvf_abstracts.py` | CVF Open Access-targeted abstract backfill (scrapes `openaccess.thecvf.com/.../*_paper.html`). Independent of DOI-based sources |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
 | `python scripts/fetch_pwc_backfill.py` | Offline backfill of empty abstracts/code links from `pwc-archive/papers-with-abstracts` + `pwc-archive/links-between-paper-and-code` (2025-07 snapshots). Conservative exact-key matching (arXiv ID → OpenReview ID → normalized URL → unique normalized title with year guard). Supports `--dry-run`, `--report`, `--conf`, `--no-upload` |
 | `python scripts/cleanup_cache_dedupe.py` | One-shot cache dedupe by `(conf, paper_url)` — reuses `collector._merge_paper_record` so semantics stay in lockstep with the collector |
+| `python scripts/cleanup_cache_frontmatter.py` | One-shot removal of front-matter records (proceedings covers / venue-index pages): conservative double condition (title regex AND (venue-index OR no-abstract & no-code-link)). Dry-run by default (`--write` applies, atomic `.tmp`+`os.replace` with `.bak`); `--review` prints the full deletion list; progress ledger untouched. Supports `--no-sync` / `--offline` |
 | `python scripts/migrate_progress_to_jsonl.py` | Migrate legacy `abstract_backfill_progress.json` to the JSONL.gz format (`--dry-run` to preview) |
 | `python scripts/sync_hf_readme.py` | Render `docs/HF_README.md` + push it as the Hugging Face dataset repo root README |
+| `python scripts/repair_wayback_urls.py` | Repair `web.archive.org`-wrapped dead paper URLs via OpenAlex title lookup (title ≥0.85 + year ±1 gates; new URL = `doi.org/<doi>` > landing page; conflict merge via `collector._merge_paper_record`; may side-fill abstracts with `source=openalex_title`). Dry-run by default; `--write` to apply. Supports `--max-papers`, `--no-sync`, `--offline`; honours optional `OPENALEX_API_KEY` |
 | `python scripts/capture_screenshot.py` | Regenerate `pics/screenshot/web.jpg` via Playwright (requires backend on :5001 and Vite dev server on :8080). Supports `--url`, `--output`, `--width`, `--height`, `--scale`, `--quality` |
 | `python -m discovery.generate_conf` | Generate / merge discovered conference configs |
 | `cd web-vue && npm run dev` | Start frontend dev server (Vite, :8080, proxies `/api` to the backend) |
@@ -468,6 +487,9 @@ chain takes over. Currently registered hosts:
 - [IJCAI](https://ijcai.org/) (`ijcai.org`)
 - [VLDB](https://vldb.org/) (`vldb.org`)
 - [CEUR-WS](https://ceur-ws.org/) (`ceur-ws.org`)
+- [SpringerLink](https://link.springer.com/) (`link.springer.com` — LNCS / MICCAI chapters and journal articles; reached both directly and via the DOI redirect dispatch. Sends a self-identifying bot UA: the site's F5 bot defence serves a JS challenge to browser-like UAs but full HTML to non-browser ones)
+- [USENIX](https://www.usenix.org/) (`usenix.org` — both the pre-2020 layout and the modern Drupal layout share the `field-name-field-paper-description` container)
+- [NDSS Symposium](https://www.ndss-symposium.org/) (`ndss-symposium.org` — legacy `/ndss20xx/<slug>-paper/` and modern `/ndss-paper/<slug>/` pages)
 
 Code links are enriched from [MLNLP-World/Top-AI-Conferences-Paper-with-Code](https://github.com/MLNLP-World/Top-AI-Conferences-Paper-with-Code) and via regex extraction from abstracts (`scripts/fetch_code_links.py`).
 
@@ -480,10 +502,18 @@ A further offline enrichment source is the archived Papers with Code snapshot on
 | `ci.yml` | Push / PR on application, frontend, dependency, and container-build files / Manual | Three parallel jobs: **backend** runs `pytest -q` with `PAPERVAULT_OFFLINE=1`; **frontend** runs `npm run type-check` + `npm run lint:check` on Node 20.19.0; **docker** builds the production image. The only quality gate that fails PRs |
 | `discover_and_update.yml` | Daily schedule / Manual | Auto-discovers new conference configs and creates PR |
 | `collect_papers.yml` | Weekly (Tue 16:00 UTC) / Manual / Push on `conf/**` | Incrementally collects papers with per-URL progress tracking and soft-timeout graceful save; creates PR to `auto-collect-papers` branch |
-| `backfill_abstracts.yml` | Every 6 hours / Manual | Backfills missing abstracts (timeout-aware, ~5h budget) and then re-scans GitHub code links from the freshly backfilled abstracts (`scripts/fetch_code_links.py --year all --retry-failed`), pushes to `auto-backfill-abstracts` branch |
+| `backfill_abstracts.yml` | Every 6 hours / Manual | Backfills missing abstracts (timeout-aware, ~5h budget) and then re-scans GitHub code links from the freshly backfilled abstracts (`scripts/fetch_code_links.py --year all --retry-failed`), pushes to `auto-backfill-abstracts` branch. Manual dispatch with `run_wayback_repair=true` instead runs the `wayback-repair` job (the regular backfill is skipped): `wayback_repair_dry_run=true` (default) prints a report into the step summary and changes nothing; `false` runs `repair_wayback_urls.py --write --no-sync`, opens a PR carrying `cache/wayback_repair_log.jsonl`, then pushes the cache to HF |
 | `update_readme.yml` | Manual (`workflow_dispatch`) | Force rebuilds cache and updates README via PR |
 
 There are five GitHub Actions workflows in total: one **quality-gate** workflow (`ci.yml`) plus four **data-mutation / maintenance** workflows. All Python jobs use **Python 3.10**. The collected `cache/cache.jsonl.gz` is **always** synced to the Hugging Face dataset repo named by `PAPERVAULT_HF_REPO_ID` (HF is now the authoritative store; Git no longer ships this file). The three cache-mutating workflows (`collect_papers.yml`, `backfill_abstracts.yml`, `update_readme.yml`) share the `papervault-cache` concurrency group so they run strictly serially, and each upload uses `parent_commit` optimistic locking so concurrent local runs cannot silently overwrite each other.
+
+### Wayback repair rollback plan
+
+The `wayback-repair` job rewrites `paper_url`s in the authoritative HF cache. Rollback options, safest first:
+
+1. **HF dataset is a plain git repo** — the repair push is an ordinary commit. Clone it (`git clone https://<user>:<HF_TOKEN>@huggingface.co/datasets/<repo_id>`), then `git revert <commit>` (preferred; keeps history) or `git reset --hard <previous-commit>` + force-push, then pull the cache locally again via `ensure_cache_local(refresh=True)`.
+2. **Precise per-record undo** — `cache/wayback_repair_log.jsonl` (committed into the auto PR) records every `{old_url, new_url, action, abstract_filled}` mapping; a reverse script can restore each `paper_url` exactly.
+3. **Idempotency** — already-repaired records no longer match the wayback regex, so re-running after an interruption never double-processes; an interrupted run is safe to simply re-run.
 
 ## License
 

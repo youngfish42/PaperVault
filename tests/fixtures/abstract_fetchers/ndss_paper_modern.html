@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.1/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind:wght@300;400;500;600;700&family=Roboto+Slab:wght@100..900&display=swap" rel="stylesheet">
+  <meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+
+	<!-- This site is optimized with the Yoast SEO plugin v28.6 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<title>LMSanitator: Defending Prompt-Tuning Against Task-Agnostic Backdoors - NDSS Symposium</title>
+	<link rel="canonical" href="https://www.ndss-symposium.org/ndss-paper/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content="LMSanitator: Defending Prompt-Tuning Against Task-Agnostic Backdoors - NDSS Symposium" />
+	<meta property="og:url" content="https://www.ndss-symposium.org/ndss-paper/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors/" />
+	<meta property="og:site_name" content="NDSS Symposium" />
+	<meta property="article:publisher" content="https://www.facebook.com/NDSSSymposium/" />
+	<meta property="article:modified_time" content="2024-10-15T14:39:58+00:00" />
+	<meta property="og:image" content="https://www.ndss-symposium.org/wp-content/uploads/NDSS_Logo_RGB.jpg" />
+	<meta property="og:image:width" content="815" />
+	<meta property="og:image:height" content="345" />
+	<meta property="og:image:type" content="image/jpeg" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@NDSSSymposium" />
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https:\/\/schema.org","@graph":[{"@type":"WebPage","@id":"https:\/\/www.ndss-symposium.org\/ndss-paper\/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors\/","url":"https:\/\/www.ndss-symposium.org\/ndss-paper\/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors\/","name":"LMSanitator: Defending Prompt-Tuning Against Task-Agnostic Backdoors - NDSS Symposium","isPartOf":{"@id":"https:\/\/www.ndss-symposium.org\/#website"},"datePublished":"2024-02-06T13:15:22+00:00","dateModified":"2024-10-15T14:39:58+00:00","breadcrumb":{"@id":"https:\/\/www.ndss-symposium.org\/ndss-paper\/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors\/#breadcrumb"},"inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https:\/\/www.ndss-symposium.org\/ndss-paper\/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors\/"]}]},{"@type":"BreadcrumbList","@id":"https:\/\/www.ndss-symposium.org\/ndss-paper\/lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors\/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https:\/\/www.ndss-symposium.org\/"},{"@type":"ListItem","position":2,"name":"NDSS Papers","item":"https:\/\/www.ndss-symposium.org\/ndss-paper\/"},{"@type":"ListItem","position":3,"name":"LMSanitator: Defending Prompt-Tuning Against Task-Agnostic Backdoors"}]},{"@type":"WebSite","@id":"https:\/\/www.ndss-symposium.org\/#website","url":"https:\/\/www.ndss-symposium.org\/","name":"NDSS Symposium","description":"The Network and Distributed System Security (NDSS) Symposium","publisher":{"@id":"https:\/\/www.ndss-symposium.org\/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https:\/\/www.ndss-symposium.org\/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-US"},{"@type":"Organization","@id":"https:\/\/www.ndss-symposium.org\/#organization","name":"NDSS Symposium","url":"https:\/\/www.ndss-symposium.org\/","logo":{"@type":"ImageObject","inLanguage":"en-US","@id":"https:\/\/www.ndss-symposium.org\/#\/schema\/logo\/image\/","url":"https:\/\/www.ndss-symposium.org\/wp-content\/uploads\/NDSS_Logo_RGB.jpg","contentUrl":"https:\/\/www.ndss-symposium.org\/wp-content\/uploads\/NDSS_Logo_RGB.jpg","width":815,"height":345,"caption":"NDSS Symposium"},"image":{"@id":"https:\/\/www.ndss-symposium.org\/#\/schema\/logo\/image\/"},"sameAs":["https:\/\/www.facebook.com\/NDSSSymposium\/","https:\/\/x.com\/NDSSSymposium","https:\/\/www.linkedin.com\/company\/network-and-distributed-system-symposium-ndss-\/","https:\/\/www.youtube.com\/ndsssymposium"]}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel='dns-prefetch' href='//fonts.googleapis.com' />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.ndss-symposium.org/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.ndss-symposium.org%2Fndss-paper%2Flmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.ndss-symposium.org/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.ndss-symposium.org%2Fndss-paper%2Flmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors%2F&#038;format=xml" />
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<link rel='stylesheet' id='pt-cv-public-style-css' href='https://www.ndss-symposium.org/wp-content/plugins/content-views-query-and-display-post-page/public/assets/css/cv.css?ver=4.5.1.2' media='all' />
+<link rel='stylesheet' id='pt-cv-public-pro-style-css' href='https://www.ndss-symposium.org/wp-content/plugins/pt-content-views-pro/public/assets/css/cvpro.min.css?ver=7.4.1' media='all' />
+<link rel='stylesheet' id='jquery.prettyphoto-css' href='https://www.ndss-symposium.org/wp-content/plugins/wp-video-lightbox/css/prettyPhoto.css?ver=7.1.3' media='all' />
+<link rel='stylesheet' id='video-lightbox-css' href='https://www.ndss-symposium.org/wp-content/plugins/wp-video-lightbox/wp-video-lightbox.css?ver=7.1.3' media='all' />
+<style id="wp-block-library-inline-css">
+:root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient-background{background:linear-gradient(135deg,#fafae1,#67a671)}:root .has-atomic-cream-gradient-background{background:linear-gradient(135deg,#fdd79a,#004a59)}:root .has-nightshade-gradient-background{background:linear-gradient(135deg,#330968,#31cdcf)}:root .has-midnight-gradient-background{background:linear-gradient(135deg,#020381,#2874fc)}:root{--wp--preset--font-size--normal:16px;--wp--preset--font-size--huge:42px}.has-regular-font-size{font-size:1em}.has-larger-font-size{font-size:2.625em}.has-normal-font-size{font-size:var(--wp--preset--font-size--normal)}.has-huge-font-size{font-size:var(--wp--preset--font-size--huge)}:root .has-text-align-center{text-align:center}:root .has-text-align-left{text-align:left}:root .has-text-align-right{text-align:right}.has-fit-text{white-space:nowrap!important}#end-resizable-editor-section{display:none}.aligncenter{clear:both}.items-justified-left{justify-content:flex-start}.items-justified-center{justify-content:center}.items-justified-right{justify-content:flex-end}.items-justified-space-between{justify-content:space-between}.screen-reader-text{word-wrap:normal!important;border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;word-break:normal!important}.screen-reader-text:focus{background-color:#ddd;clip-path:none;color:#444;display:block;font-size:1em;height:auto;left:5px;line-height:normal;padding:15px 23px 14px;text-decoration:none;top:5px;width:auto;z-index:100000}html :where(.has-border-color){border-style:solid}html :where([style^=border-color],[style*=";border-color"],[style*="; border-color"]){border-style:solid}html :where([style^=border-top-color],[style*=";border-top-color"],[style*="; border-top-color"]){border-top-style:solid}html :where([style^=border-right-color],[style*=";border-right-color"],[style*="; border-right-color"]){border-right-style:solid}html :where([style^=border-bottom-color],[style*=";border-bottom-color"],[style*="; border-bottom-color"]){border-bottom-style:solid}html :where([style^=border-left-color],[style*=";border-left-color"],[style*="; border-left-color"]){border-left-style:solid}html :where([style^=border-width],[style*=";border-width"],[style*="; border-width"]){border-style:solid}html :where([style^=border-top-width],[style*=";border-top-width"],[style*="; border-top-width"]){border-top-style:solid}html :where([style^=border-right-width],[style*=";border-right-width"],[style*="; border-right-width"]){border-right-style:solid}html :where([style^=border-bottom-width],[style*=";border-bottom-width"],[style*="; border-bottom-width"]){border-bottom-style:solid}html :where([style^=border-left-width],[style*=";border-left-width"],[style*="; border-left-width"]){border-left-style:solid}html :where(img[class*=wp-image-]){height:auto;max-width:100%}:where(figure){margin:0 0 1em}html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:var(--wp-admin--admin-bar--height,0px)}@media screen and (max-width:600px){html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:0px}}
+/*# sourceURL=/wp-includes/css/dist/block-library/common.min.css */
+</style>
+<style id="wp-block-styles-placeholder-inline-css">
+:root { --wp-internal-comment: "Placeholder for wp_hoist_late_printed_styles() to replace with the block styles printed at wp_footer." }
+/*# sourceURL=wp-block-styles-placeholder-inline-css */
+</style>
+<style id="wp-global-styles-placeholder-inline-css">
+:root { --wp-internal-comment: "Placeholder for wp_hoist_late_printed_styles() to replace with the global-styles printed at wp_footer." }
+/*# sourceURL=wp-global-styles-placeholder-inline-css */
+</style>
+<link rel='stylesheet' id='ivory-search-styles-css' href='https://www.ndss-symposium.org/wp-content/plugins/add-search-to-menu/public/css/ivory-search.min.css?ver=5.5.19' media='all' />
+<link rel='stylesheet' id='sage/main.css-css' href='https://www.ndss-symposium.org/wp-content/themes/ndss2/dist/styles/main_e8b4062a.css' media='all' />
+<link rel='stylesheet' id='google-fonts-css' href='https://fonts.googleapis.com/css?family=Yantramanav&#038;ver=7.1.3' media='all' />
+<script id="jquery-core-js" src="https://www.ndss-symposium.org/wp-includes/js/jquery/jquery.min.js?ver=3.7.1"></script>
+<script id="jquery-migrate-js" src="https://www.ndss-symposium.org/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1"></script>
+<script id="jquery.prettyphoto-js" src="https://www.ndss-symposium.org/wp-content/plugins/wp-video-lightbox/js/jquery.prettyPhoto.js?ver=3.1.6"></script>
+<script id="video-lightbox-js-extra">
+var vlpp_vars = {"prettyPhoto_rel":"wp-video-lightbox","animation_speed":"fast","slideshow":"5000","autoplay_slideshow":"false","opacity":"0.8","show_title":"true","allow_resize":"true","allow_expand":"true","default_width":"640","default_height":"480","counter_separator_label":"/","theme":"pp_default","horizontal_padding":"20","hideflash":"false","wmode":"opaque","autoplay":"true","modal":"false","deeplinking":"false","overlay_gallery":"true","overlay_gallery_max":"30","keyboard_shortcuts":"true","ie6_fallback":"true"};
+//# sourceURL=video-lightbox-js-extra
+</script>
+<script id="video-lightbox-js" src="https://www.ndss-symposium.org/wp-content/plugins/wp-video-lightbox/js/video-lightbox.js?ver=3.1.6"></script>
+<link rel="https://api.w.org/" href="https://www.ndss-symposium.org/wp-json/" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.ndss-symposium.org/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 7.1.3" />
+<link rel='shortlink' href='https://www.ndss-symposium.org/?p=16847' />
+<script>
+            WP_VIDEO_LIGHTBOX_VERSION="1.9.12";
+            WP_VID_LIGHTBOX_URL="https://www.ndss-symposium.org/wp-content/plugins/wp-video-lightbox";
+                        function wpvl_paramReplace(name, string, value) {
+                // Find the param with regex
+                // Grab the first character in the returned string (should be ? or &)
+                // Replace our href string with our new value, passing on the name and delimeter
+
+                var re = new RegExp("[\?&]" + name + "=([^&#]*)");
+                var matches = re.exec(string);
+                var newString;
+
+                if (matches === null) {
+                    // if there are no params, append the parameter
+                    newString = string + '?' + name + '=' + value;
+                } else {
+                    var delimeter = matches[0].charAt(0);
+                    newString = string.replace(re, delimeter + name + "=" + value);
+                }
+                return newString;
+            }
+            </script><script async src="https://www.googletagmanager.com/gtag/js?id=G-VM78LT63H3"></script> 
+<script> 
+    window.dataLayer = window.dataLayer || []; 
+    function gtag(){dataLayer.push(arguments);} 
+    gtag('js', new Date()); 
+    gtag('config', 'G-VM78LT63H3');
+</script>
+    <script id="cookieyes" type="text/javascript" src="https://cdn-cookieyes.com/client_data/5fb6ea5c94ccb440b20c9bed/script.js"></script>
+<style>.recentcomments a{display:inline !important;padding:0 !important;margin:0 !important;}</style><style type="text/css">.blue-message, .is-style-blue-message {
+    background-color: #3399ff;
+    color: #ffffff;
+    text-shadow: none;
+    font-size: 16px;
+    line-height: 24px;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}.green-message, .is-style-green-message {
+    background-color: #8cc14c;
+    color: #ffffff;
+    text-shadow: none;
+    font-size: 16px;
+    line-height: 24px;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}.orange-message, .is-style-orange-message {
+    background-color: #faa732;
+    color: #ffffff;
+    text-shadow: none;
+    font-size: 16px;
+    line-height: 24px;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}.red-message, .is-style-red-message {
+    background-color: #da4d31;
+    color: #ffffff;
+    text-shadow: none;
+    font-size: 16px;
+    line-height: 24px;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}.grey-message, .is-style-grey-message {
+    background-color: #53555c;
+    color: #ffffff;
+    text-shadow: none;
+    font-size: 16px;
+    line-height: 24px;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}.left-block, .is-style-left-block {
+    background: radial-gradient(ellipse at center center, #ffffff 0%, #f2f2f2 100%);
+    color: #8b8e97;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    margin: 10px;
+    margin-top: 10px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    margin-left: 10px;
+    float: left;
+}.right-block, .is-style-right-block {
+    background: radial-gradient(ellipse at center center, #ffffff 0%, #f2f2f2 100%);
+    color: #8b8e97;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    margin: 10px;
+    margin-top: 10px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    margin-left: 10px;
+    float: right;
+}.blockquotes, .is-style-blockquotes {
+    background-color: none;
+    border-left: 5px solid #f1f1f1;
+    color: #8B8E97;
+    font-size: 16px;
+    font-style: italic;
+    line-height: 22px;
+    padding-left: 15px;
+    padding: 10px;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    width: 60%;
+    float: left;
+}</style><link rel="icon" href="https://www.ndss-symposium.org/wp-content/uploads/cropped-NDSS_512x512-32x32.png" sizes="32x32" />
+<link rel="icon" href="https://www.ndss-symposium.org/wp-content/uploads/cropped-NDSS_512x512-192x192.png" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://www.ndss-symposium.org/wp-content/uploads/cropped-NDSS_512x512-180x180.png" />
+<meta name="msapplication-TileImage" content="https://www.ndss-symposium.org/wp-content/uploads/cropped-NDSS_512x512-270x270.png" />
+<style id="wp-custom-css">
+.text-wrapper{
+	max-width:1140px
+}
+.btn-primary,
+.wp-block-button__link {
+	color: #fff;
+	background-color: #26386c;
+	border-color: #26386c;
+}
+h3 {
+	font-size: 1.3em;
+	line-height: 1.3em;
+	margin-bottom: 0;
+}
+h1, h2, h3, h4 {
+	color: #26386c;
+}
+@media (min-width: 768px) {
+  ul.column-list {
+    list-style: none;
+    column-count: 3;
+    padding: 0;
+  }
+}	
+@media (min-width: 992px) {
+	ul.column-list {
+    column-count: 4;
+  }
+}
+.wp-block-button { 
+    white-space: nowrap;
+}
+
+.footer-logo-30 {
+	margin-top: 32px;
+	margin-bottom: 32px;
+}
+
+.footer-logo-30 img {
+	height: auto !important;
+	width: 150px;
+		
+}
+
+.footer-copy {
+	margin-top: 0;
+}
+
+.social-box .wp-block-group__inner-container {
+  margin: 10px auto 20px;
+}
+
+</style>
+			<style type="text/css">
+					</style>
+		</head>
+  <body class="wp-singular ndss-paper-template-default single single-ndss-paper postid-16847 wp-theme-ndss2resources lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors ndss2/resources app-data index-data singular-data single-data single-ndss-paper-data single-ndss-paper-lmsanitator-defending-prompt-tuning-against-task-agnostic-backdoors-data">
+        <header class="header-main">
+    
+    <div id="home-nav">
+        <div class="sitelogo">
+      <a href="https://www.ndss-symposium.org/" class="navbar-brand">
+        <img id="ndss-logo" src="https://www.ndss-symposium.org/wp-content/themes/ndss2/resources/assets/images/NDSS-Logo-120x37.svg" width="120" height="37" alt="ndss logo">
+      </a>
+      </div>
+
+      <!--
+      <a id="home-link" href="https://www.ndss-symposium.org/" class="navbar-brand">NDSS</a>
+      -->
+
+<button class="menu-toggle dashicons-before dashicons-menu main-nav-dropdown" aria-expanded="false" aria-pressed="false" id="mobile-nav-primary"><span></span><span></span><span></span><span class="sr-only">Menu Navigation</span></button>
+      <div class="main-nav">
+          <div class="wrap">
+      <ul id="menu-main-menu" class="navbar-nav"><li class="nav-item dropdown"><a href="https://www.ndss-symposium.org/about/" class="nav-link toggle"><span>About</span></a>
+<ul  class="dropdown-menu" aria-labelledby="navbarDropdown">
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss-test-of-time-award/" class="nav-link toggle"><span>Test of Time Award</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/why-ndss/" class="nav-link toggle"><span>Why NDSS Symposium</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/sponsorship/" class="nav-link toggle"><span>Sponsorship</span></a></li>
+</ul>
+</li>
+<li class="nav-item dropdown"><a href="https://www.ndss-symposium.org/ndss2027/" class="nav-link toggle"><span>2027 Symposium</span></a>
+<ul  class="dropdown-menu" aria-labelledby="navbarDropdown">
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2027/submissions/" class="nav-link toggle"><span>Submissions</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2027/leadership/" class="nav-link toggle"><span>Leadership</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2027/sponsorship/" class="nav-link toggle"><span>Sponsorship</span></a></li>
+</ul>
+</li>
+<li class="nav-item dropdown"><a href="https://www.ndss-symposium.org/ndss2026/" class="nav-link toggle"><span>2026 Symposium</span></a>
+<ul  class="dropdown-menu" aria-labelledby="navbarDropdown">
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2026/accepted-papers/" class="nav-link toggle"><span>Accepted Papers</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2026/accepted-posters/" class="nav-link toggle"><span>Accepted Posters</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2026/program/" class="nav-link toggle"><span>Program</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2026/co-located-events/" class="nav-link toggle"><span>Co-located Events</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2026/leadership/" class="nav-link toggle"><span>Leadership</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/ndss2026/sponsorship/" class="nav-link toggle"><span>Sponsorship</span></a></li>
+</ul>
+</li>
+<li class="nav-item dropdown"><a href="#" class="nav-link toggle"><span>Previous Events</span></a>
+<ul  class="dropdown-menu" aria-labelledby="navbarDropdown">
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/previous-ndss-symposia/" class="nav-link toggle"><span>Previous NDSS Symposia</span></a></li>
+	<li class="dropdown-item"><a href="https://www.ndss-symposium.org/previous-co-located-events/" class="nav-link toggle"><span>Previous Co-located Events</span></a></li>
+</ul>
+</li>
+</ul>      </div>
+      </div>
+
+
+
+      
+
+     <section class="search-box">
+            <section class="widget block-2 widget_block">
+<div class="wp-block-group top-nav-sr is-layout-flow wp-block-group-is-layout-flow"><div class="wp-block-group__inner-container">
+<figure class="wp-block-image size-full search-toggle"><a href="#"><img loading="lazy" decoding="async" width="21" height="21" src="https://www.ndss-symposium.org/wp-content/uploads/search-bar-21px-21px.svg" alt="Search Icon" class="wp-image-9241"></a></figure>
+
+
+
+<div class="wp-block-buttons is-layout-flex wp-block-buttons-is-layout-flex">
+<div class="wp-block-button blue-button header-button"><a class="wp-block-button__link wp-element-button" href="https://www.ndss-symposium.org/ndss2027/submissions/">2027 Submissions</a></div>
+</div>
+</div></div>
+</section><section class="widget block-3 widget_block">							<style type="text/css" media="screen">
+							#is-ajax-search-result-9240 .is-highlight { background-color: #FFFFB9 !important;}
+							#is-ajax-search-result-9240 .meta .is-highlight { background-color: transparent !important;}
+							</style>
+						
+<div class="wp-block-group search-dropdown is-layout-flow wp-block-group-is-layout-flow"><div class="wp-block-group__inner-container"><p><form data-min-no-for-search=1 data-result-box-max-height=400 data-form-id=9240 class="is-search-form is-disable-submit is-form-style is-form-style-3 is-form-id-9240 is-ajax-search" action="https://www.ndss-symposium.org/" method="get" role="search" ><label for="is-search-input-9240"><span class="is-screen-reader-text">Search for:</span><input  type="search" id="is-search-input-9240" name="s" value="" class="is-search-input" placeholder="Search" autocomplete=off /><span class="is-loader-image" style="display: none;background-image:url(https://www.ndss-symposium.org/wp-content/plugins/add-search-to-menu/public/images/spinner.gif);" ></span></label><button type="submit" class="is-search-submit"><span class="is-screen-reader-text">Search Button</span><span class="is-search-icon"><svg focusable="false" aria-label="Search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24px"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg></span></button><input type="hidden" name="id" value="9240" /></form></p>
+</div></div>
+</section>    </section>
+
+
+    </div>
+
+</header>
+    <div class="wrap container" role="document">
+      <div class="content">
+        <main class="main">
+                 <div class="page-header purple-heading paper-single-heading">
+<div class="wp-block-group__inner-container">
+<h1 class="entry-title">LMSanitator: Defending Prompt-Tuning Against Task-Agnostic Backdoors</h1>
+
+</div>
+</div>
+
+<section class="new-wrapper paper-single">
+<article class="post-16847 ndss-paper type-ndss-paper status-publish hentry category-ndss-2024 tag-summer-cycle-2024">
+  <div class="entry-content">
+  <div class="paper-data">
+    <p><strong>
+    <p>Chengkun Wei (Zhejiang University), Wenlong Meng (Zhejiang University), Zhikun Zhang (CISPA Helmholtz Center for Information Security and Stanford University), Min Chen (CISPA Helmholtz Center for Information Security), Minghu Zhao (Zhejiang University), Wenjing Fang (Ant Group), Lei Wang (Ant Group), Zihui Zhang (Zhejiang University), Wenzhi Chen (Zhejiang University)</p>
+    </strong></p>
+ 
+    <p><p>*Prompt-tuning* has emerged as an attractive paradigm for deploying large-scale language models due to its strong downstream task performance and efficient multitask serving ability. Despite its wide adoption, we empirically show that prompt-tuning is vulnerable to downstream task-agnostic backdoors, which reside in the pretrained models and can affect arbitrary downstream tasks. The state-of-the-art backdoor detection approaches cannot defend against task-agnostic backdoors since they hardly converge in reversing the backdoor triggers. To address this issue, we propose LMSanitator, a novel approach for detecting and removing task-agnostic backdoors on Transformer models. Instead of directly inverting the triggers, LMSanitator aims to invert the *predefined attack vectors* (pretrained models' output when the input is embedded with triggers) of the task-agnostic backdoors, which achieves much better convergence performance and backdoor detection accuracy. LMSanitator further leverages prompt-tuning’s property of freezing the pretrained model to perform accurate and fast output monitoring and input purging during the inference phase. Extensive experiments on multiple language models and NLP tasks illustrate the effectiveness of LMSanitator. For instance, LMSanitator achieves 92.8% backdoor detection accuracy on 960 models and decreases the attack success rate to less than 1% in most scenarios.</p>
+</p>
+  </div>
+
+ <div class="paper-buttons">
+    <script language='javascript'>
+        console.log("Video:")
+        console.log("Slide:https://www.ndss-symposium.org/wp-content/uploads/2024-238-slides.pdf")
+        console.log("Paper:https://www.ndss-symposium.org/wp-content/uploads/2024-238-paper.pdf")
+        </script>        <div class="btn-group-vertical" role="group">
+            <a role="button" class="btn btn-light btn-sm pdf-button" target="_blank" href="https://www.ndss-symposium.org/wp-content/uploads/2024-238-paper.pdf">Paper</a>
+        </div>
+            <div class="btn-group-vertical" role="group">
+            <a role="button" class="btn btn-light btn-sm button-slides" target="_blank" href="https://www.ndss-symposium.org/wp-content/uploads/2024-238-slides.pdf">Slides</a>
+        </div>
+    
+ </div>
+
+
+
+    
+  </div>
+  <footer>
+    
+  </footer>
+  <section id="comments" class="comments">
+  
+  
+  </section>
+</article>
+</section>
+
+<section class="rel-paper-wrap wp-block-group full-width light-gray-bg fixed-in-1110 section-padding section-title-r">
+<div class="wp-block-group__inner-container">
+
+<h2>View More Papers</h2>
+<div class="rel-wrap">
+
+        <div class="rel-paper">
+            <div class="rel-paper-in">
+            <h3><a href="https://www.ndss-symposium.org/ndss-paper/auto-draft-520/">
+            Wait, What Does a SOC Do?            </a></h3>
+
+
+            <p>
+
+            Joe Nehila, Drew Walsh (Deloitte And Touche)
+
+            </p>
+
+           <a class="paper-link-abs" href="https://www.ndss-symposium.org/ndss-paper/auto-draft-520/"><span>Read More</span></a>
+           </div>
+        </div>
+
+
+        <div class="rel-paper">
+            <div class="rel-paper-in">
+            <h3><a href="https://www.ndss-symposium.org/ndss-paper/auto-draft-537/">
+            Aligning Confidential Computing with Cloud-native ML Platforms            </a></h3>
+
+
+            <p>
+
+            Angelo Ruocco, Chris Porter, Claudio Carvalho, Daniele Buono, Derren Dunn, Hubertus Franke, James Bottomley, Marcio Silva, Mengmei Ye, Niteesh Dubey, Tobin Feldman-Fitzthum (IBM Research)
+
+            </p>
+
+           <a class="paper-link-abs" href="https://www.ndss-symposium.org/ndss-paper/auto-draft-537/"><span>Read More</span></a>
+           </div>
+        </div>
+
+
+        <div class="rel-paper">
+            <div class="rel-paper-in">
+            <h3><a href="https://www.ndss-symposium.org/ndss-paper/talisman-tamper-analysis-for-reference-monitors/">
+            TALISMAN: Tamper Analysis for Reference Monitors            </a></h3>
+
+
+            <p>
+
+            Frank Capobianco (The Pennsylvania State University), Quan Zhou (The Pennsylvania State University), Aditya Basu (The Pennsylvania State University), Trent Jaeger (The Pennsylvania State University, University of California, Riverside), Danfeng Zhang (The Pennsylvania State University, Duke University)
+
+            </p>
+
+           <a class="paper-link-abs" href="https://www.ndss-symposium.org/ndss-paper/talisman-tamper-analysis-for-reference-monitors/"><span>Read More</span></a>
+           </div>
+        </div>
+</div></div>
+</section>
+          </main>
+              </div>
+    </div>
+        <footer class="content-info">
+  <div class="container">
+<div class="copy-col">
+     </div>
+
+    <div class="footer-menu-cols">
+             <section class="footer-col-one">
+                <section class="widget nav_menu-2 widget_nav_menu"><h3>About</h3><div class="menu-footer-menu-one-container"><ul id="menu-footer-menu-one" class="menu"><li id="menu-item-10552" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-10552"><a href="/about/">About</a></li>
+<li id="menu-item-11369" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-11369"><a href="https://www.ndss-symposium.org/ndss-test-of-time-award/">Test of Time Award</a></li>
+<li id="menu-item-10055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-10055"><a href="https://www.ndss-symposium.org/why-ndss/">Why NDSS Symposium</a></li>
+<li id="menu-item-11886" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-11886"><a href="https://www.ndss-symposium.org/sponsorship/">Sponsorship</a></li>
+<li id="menu-item-16445" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-16445"><a href="https://www.ndss-symposium.org/news/">News</a></li>
+</ul></div></section>        </section>
+                 <section class="footer-col-two">
+                <section class="widget nav_menu-3 widget_nav_menu"><h3>NDSS Symposium 2023</h3><div class="menu-footer-menu-two-container"><ul id="menu-footer-menu-two" class="menu"><li id="menu-item-24818" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24818"><a href="https://www.ndss-symposium.org/ndss2027/">2027 Symposium</a></li>
+<li id="menu-item-24819" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24819"><a href="https://www.ndss-symposium.org/ndss2027/submissions/">Submissions</a></li>
+<li id="menu-item-24973" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24973"><a href="https://www.ndss-symposium.org/ndss2027/sponsorship/">Sponsorship</a></li>
+<li id="menu-item-24904" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24904"><a href="https://www.ndss-symposium.org/ndss2027/leadership/">Leadership</a></li>
+</ul></div></section>        </section>
+    
+             <section class="footer-col-three">
+                <section class="widget nav_menu-4 widget_nav_menu"><h3>NDSS Symposium 2022</h3><div class="menu-footer-menu-three-container"><ul id="menu-footer-menu-three" class="menu"><li id="menu-item-24813" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24813"><a href="https://www.ndss-symposium.org/ndss2026/">2026 Symposium</a></li>
+<li id="menu-item-24814" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24814"><a href="https://www.ndss-symposium.org/ndss2026/accepted-papers/">Accepted Papers</a></li>
+<li id="menu-item-24815" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24815"><a href="https://www.ndss-symposium.org/ndss2026/program/">Program</a></li>
+<li id="menu-item-24817" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-24817"><a href="https://www.ndss-symposium.org/ndss2026/co-located-events/">Co-located Events</a></li>
+<li id="menu-item-24816" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-24816"><a href="https://www.ndss-symposium.org/ndss2026/leadership/">Leadership</a></li>
+</ul></div></section>        </section>
+    
+             <section class="footer-col-four">
+                <section class="widget nav_menu-5 widget_nav_menu"><h3>Previous Events</h3><div class="menu-footer-menu-four-container"><ul id="menu-footer-menu-four" class="menu"><li id="menu-item-10553" class="no-link menu-item menu-item-type-custom menu-item-object-custom menu-item-10553"><a href="#">Previous Events</a></li>
+<li id="menu-item-9429" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-9429"><a href="https://www.ndss-symposium.org/previous-ndss-symposia/">Previous NDSS Symposia</a></li>
+<li id="menu-item-21357" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-21357"><a href="https://www.ndss-symposium.org/previous-co-located-events/">Previous Co-located Events</a></li>
+</ul></div></section><section class="widget block-8 widget_block">
+<div class="wp-block-group footer-logo-30 is-layout-flow wp-block-group-is-layout-flow advgb-dyn-a4e44173"><div class="wp-block-group__inner-container"></div></div>
+</section>        </section>
+    
+         </div>
+
+
+ <div class="footer-links">
+              <section class="footer-sc-block">
+                <section class="widget block-6 widget_block">
+<div class="wp-block-group social-box is-layout-flow wp-block-group-is-layout-flow"><div class="wp-block-group__inner-container">
+<figure class="wp-block-image size-large"><a href="https://www.facebook.com/NDSSSymposium/" target="_blank" rel=" noreferrer noopener"><img loading="lazy" decoding="async" width="12" height="25" src="https://www.ndss-symposium.org/wp-content/uploads/fb-12px-25px.svg" alt="Facebook" class="wp-image-9324"></a></figure>
+
+
+
+<figure class="wp-block-image size-full"><a href="https://twitter.com/NDSSSymposium" target="_blank" rel=" noreferrer noopener"><img decoding="async" src="https://www.ndss-symposium.org/wp-content/uploads/logo-white.png" alt="X home" class="wp-image-22046"></a></figure>
+
+
+
+<figure class="wp-block-image size-large"><a href="https://www.linkedin.com/company/network-and-distributed-system-symposium-ndss-/" target="_blank" rel=" noreferrer noopener"><img loading="lazy" decoding="async" width="25" height="24" src="https://www.ndss-symposium.org/wp-content/uploads/in-25px-24px.svg" alt="LinkedIn" class="wp-image-9327"></a></figure>
+
+
+
+<figure class="wp-block-image size-large"><a href="https://www.youtube.com/ndsssymposium" target="_blank" rel=" noreferrer noopener"><img loading="lazy" decoding="async" width="38" height="26" src="https://www.ndss-symposium.org/wp-content/uploads/yt-38px-26px.svg" alt="Youtube" class="wp-image-9328"></a></figure>
+</div></div>
+</section><section class="widget block-4 widget_block">
+<div class="wp-block-group footer is-layout-flow wp-block-group-is-layout-flow"><div class="wp-block-group__inner-container">
+<p class="has-text-align-center wp-block-paragraph"><a href="https://www.ndss-symposium.org/privacy-policy/">Privacy Policy</a> | <a href="https://www.ndss-symposium.org/terms-of-use/">Terms of Use</a> <span class="hide-on-mobile">|</span> <a href="https://www.ndss-symposium.org/ndss-code-of-conduct/">NDSS Code of Conduct</a> | <a href="/cdn-cgi/l/email-protection#3f515b4c4c7f5a53564c4b4c11564c505c11504d58">Contact Us</a></p>
+
+
+
+<div style="height:16px" aria-hidden="true" class="wp-block-spacer"></div>
+</div></div>
+</section><section class="widget block-15 widget_block">
+<div style="height:20px" aria-hidden="true" class="wp-block-spacer"></div>
+</section><section class="widget block-16 widget_block"><p style="font-size:16px; margin-bottom:20px">The Internet Society has been a proud host and organizer of the NDSS Symposium for over 30 years. <a href="https://www.internetsociety.org/about-internet-society/" target="_blank" style="cursor:pointer">Join us to keep the Internet and its systems secure and resilient</a>.</p></section>        </section>
+    
+ </div>
+
+
+<div class="copyright-col">
+    
+
+    <div class="footer-copy">
+        <a href="https://www.internetsociety.org"><img id="isoc-logo" src="https://www.ndss-symposium.org/wp-content/themes/ndss2/resources/dist/images/ISOC-logo-light_2.png" alt="isoc logo"></a>
+        <small>Internet Society © 1992-2026</small>
+    </div>
+</div>
+  </div>
+</footer>
+
+
+
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/ndss2/resources/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<style id="wp-block-image-inline-css">
+.wp-block-image>a,.wp-block-image>figure>a{display:inline-block}.wp-block-image img{box-sizing:border-box;height:auto;max-width:100%;vertical-align:bottom}@media not (prefers-reduced-motion){.wp-block-image img.hide{visibility:hidden}.wp-block-image img.show{animation:show-content-image .4s}}.wp-block-image[style*=border-radius] img,.wp-block-image[style*=border-radius]>a{border-radius:inherit}.wp-block-image.has-custom-border img{box-sizing:border-box}.wp-block-image.aligncenter{text-align:center}.wp-block-image.alignfull>a,.wp-block-image.alignwide>a{width:100%}.wp-block-image.alignfull img,.wp-block-image.alignwide img{height:auto;width:100%}.wp-block-image .aligncenter,.wp-block-image .alignleft,.wp-block-image .alignright,.wp-block-image.aligncenter,.wp-block-image.alignleft,.wp-block-image.alignright{display:table}.wp-block-image .aligncenter>figcaption,.wp-block-image .alignleft>figcaption,.wp-block-image .alignright>figcaption,.wp-block-image.aligncenter>figcaption,.wp-block-image.alignleft>figcaption,.wp-block-image.alignright>figcaption{caption-side:bottom;display:table-caption}.wp-block-image .alignleft{float:left;margin:.5em 1em .5em 0}.wp-block-image .alignright{float:right;margin:.5em 0 .5em 1em}.wp-block-image .aligncenter{margin-left:auto;margin-right:auto}.wp-block-image :where(figcaption){margin-bottom:1em;margin-top:.5em}.wp-block-image.is-style-circle-mask img{border-radius:9999px}@supports ((-webkit-mask-image:none) or (mask-image:none)) or (-webkit-mask-image:none){.wp-block-image.is-style-circle-mask img{border-radius:0;-webkit-mask-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50"/></svg>');mask-image:url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="50"/></svg>');mask-mode:alpha;-webkit-mask-position:center;mask-position:center;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:contain;mask-size:contain}}:root :where(.wp-block-image.is-style-rounded img,.wp-block-image .is-style-rounded img){border-radius:9999px}.wp-block-image figure{margin:0}.wp-lightbox-container{display:flex;flex-direction:column;position:relative}.wp-lightbox-container img{cursor:zoom-in}.wp-lightbox-container img:hover+button{opacity:1}.wp-lightbox-container button{align-items:center;backdrop-filter:blur(16px) saturate(180%);background-color:rgba(90,90,90,.25);border:none;border-radius:4px;cursor:zoom-in;display:flex;height:20px;justify-content:center;opacity:0;padding:0;position:absolute;right:16px;text-align:center;top:16px;width:20px;z-index:100}@media not (prefers-reduced-motion){.wp-lightbox-container button{transition:opacity .2s ease}}.wp-lightbox-container button:focus-visible{outline:3px auto rgba(90,90,90,.25);outline:3px auto -webkit-focus-ring-color;outline-offset:3px}.wp-lightbox-container button:hover{cursor:pointer;opacity:1}.wp-lightbox-container button:focus{opacity:1}.wp-lightbox-container button:focus,.wp-lightbox-container button:hover,.wp-lightbox-container button:not(:hover):not(:active):not(.has-background){background-color:rgba(90,90,90,.25);border:none}.wp-lightbox-overlay{box-sizing:border-box;cursor:zoom-out;height:100vh;left:0;overflow:hidden;position:fixed;top:0;visibility:hidden;width:100%;z-index:100000}.wp-lightbox-overlay .wp-lightbox-close-button{align-items:center;cursor:pointer;display:flex;font-family:inherit;gap:8px;justify-content:center;line-height:1;min-height:40px;min-width:40px;padding:0 4px;position:absolute;right:calc(env(safe-area-inset-right) + 16px);top:calc(env(safe-area-inset-top) + 16px);z-index:5000000}.wp-lightbox-overlay .wp-lightbox-close-button:focus,.wp-lightbox-overlay .wp-lightbox-close-button:hover,.wp-lightbox-overlay .wp-lightbox-close-button:not(:hover):not(:active):not(.has-background){background:none;border:none}.wp-lightbox-overlay .wp-lightbox-close-button:has(.wp-lightbox-close-text:not([hidden])) .wp-lightbox-close-icon svg{height:1em;width:1em}.wp-lightbox-overlay .wp-lightbox-close-icon svg{display:block}.wp-lightbox-overlay .wp-lightbox-navigation-button-next,.wp-lightbox-overlay .wp-lightbox-navigation-button-prev{align-items:center;bottom:16px;cursor:pointer;display:flex;font-family:inherit;gap:4px;justify-content:center;line-height:1;min-height:40px;min-width:40px;padding:0 8px;position:absolute;z-index:2000002}.wp-lightbox-overlay .wp-lightbox-navigation-button-next[hidden],.wp-lightbox-overlay .wp-lightbox-navigation-button-prev[hidden]{display:none}@media (min-width:960px){.wp-lightbox-overlay .wp-lightbox-navigation-button-next,.wp-lightbox-overlay .wp-lightbox-navigation-button-prev{bottom:50%;transform:translateY(-50%)}}.wp-lightbox-overlay .wp-lightbox-navigation-button-next:focus,.wp-lightbox-overlay .wp-lightbox-navigation-button-next:hover,.wp-lightbox-overlay .wp-lightbox-navigation-button-next:not(:hover):not(:active):not(.has-background),.wp-lightbox-overlay .wp-lightbox-navigation-button-prev:focus,.wp-lightbox-overlay .wp-lightbox-navigation-button-prev:hover,.wp-lightbox-overlay .wp-lightbox-navigation-button-prev:not(:hover):not(:active):not(.has-background){background:none;border:none;padding:0 8px}.wp-lightbox-overlay .wp-lightbox-navigation-button-next:has(.wp-lightbox-navigation-text:not([hidden])) .wp-lightbox-navigation-icon svg,.wp-lightbox-overlay .wp-lightbox-navigation-button-prev:has(.wp-lightbox-navigation-text:not([hidden])) .wp-lightbox-navigation-icon svg{display:block;height:1.5em;width:1.5em}.wp-lightbox-overlay .wp-lightbox-navigation-button-prev{left:calc(env(safe-area-inset-left) + 16px)}.wp-lightbox-overlay .wp-lightbox-navigation-button-next{right:calc(env(safe-area-inset-right) + 16px)}.wp-lightbox-overlay .wp-lightbox-navigation-icon svg{vertical-align:middle}.wp-lightbox-overlay .lightbox-image-container{height:var(--wp--lightbox-container-height);left:50%;overflow:hidden;position:absolute;top:50%;transform:translate(-50%,-50%);transform-origin:top left;width:var(--wp--lightbox-container-width);z-index:2000001}.wp-lightbox-overlay .wp-block-image{align-items:center;box-sizing:border-box;display:flex;height:100%;justify-content:center;margin:0;position:relative;transform-origin:0 0;width:100%;z-index:3000000}.wp-lightbox-overlay .wp-block-image img{height:var(--wp--lightbox-image-height);min-height:var(--wp--lightbox-image-height);min-width:var(--wp--lightbox-image-width);width:var(--wp--lightbox-image-width)}.wp-lightbox-overlay .wp-block-image figcaption{display:none}.wp-lightbox-overlay button{background:none;border:none}.wp-lightbox-overlay .scrim{background-color:#fff;height:100%;opacity:.9;position:absolute;width:100%;z-index:2000000}.wp-lightbox-overlay.active{visibility:visible}@media not (prefers-reduced-motion){.wp-lightbox-overlay.active{animation:turn-on-visibility .25s both}.wp-lightbox-overlay.active img{animation:turn-on-visibility .35s both}.wp-lightbox-overlay.show-closing-animation:not(.active){animation:turn-off-visibility .35s both}.wp-lightbox-overlay.show-closing-animation:not(.active) img{animation:turn-off-visibility .25s both}.wp-lightbox-overlay.zoom.active{animation:none;opacity:1;visibility:visible}.wp-lightbox-overlay.zoom.active .lightbox-image-container{animation:lightbox-zoom-in .4s}.wp-lightbox-overlay.zoom.active .lightbox-image-container img{animation:none}.wp-lightbox-overlay.zoom.active .scrim{animation:turn-on-visibility .4s forwards}.wp-lightbox-overlay.zoom.show-closing-animation:not(.active){animation:none}.wp-lightbox-overlay.zoom.show-closing-animation:not(.active) .lightbox-image-container{animation:lightbox-zoom-out .4s}.wp-lightbox-overlay.zoom.show-closing-animation:not(.active) .lightbox-image-container img{animation:none}.wp-lightbox-overlay.zoom.show-closing-animation:not(.active) .scrim{animation:turn-off-visibility .4s forwards}}@keyframes show-content-image{0%{visibility:hidden}99%{visibility:hidden}to{visibility:visible}}@keyframes turn-on-visibility{0%{opacity:0}to{opacity:1}}@keyframes turn-off-visibility{0%{opacity:1;visibility:visible}99%{opacity:0;visibility:visible}to{opacity:0;visibility:hidden}}@keyframes lightbox-zoom-in{0%{transform:translate(calc((-100vw + var(--wp--lightbox-scrollbar-width))/2 + var(--wp--lightbox-initial-left-position)),calc(-50vh + var(--wp--lightbox-initial-top-position))) scale(var(--wp--lightbox-scale))}to{transform:translate(-50%,-50%) scale(1)}}@keyframes lightbox-zoom-out{0%{transform:translate(-50%,-50%) scale(1);visibility:visible}99%{visibility:visible}to{transform:translate(calc((-100vw + var(--wp--lightbox-scrollbar-width))/2 + var(--wp--lightbox-initial-left-position)),calc(-50vh + var(--wp--lightbox-initial-top-position))) scale(var(--wp--lightbox-scale));visibility:hidden}}
+/*# sourceURL=https://www.ndss-symposium.org/wp-includes/blocks/image/style.min.css */
+</style>
+<style id="wp-block-button-inline-css">
+.wp-block-button__link{align-content:center;box-sizing:border-box;cursor:pointer;display:inline-block;height:100%;text-align:center;word-break:break-word}.wp-block-button__link.aligncenter{text-align:center}.wp-block-button__link.alignright{text-align:right}:where(.wp-block-button__link){border-radius:9999px;box-shadow:none;padding:calc(.667em + 2px) calc(1.333em + 2px);text-decoration:none}.wp-block-button[style*=text-decoration] .wp-block-button__link{text-decoration:inherit}.wp-block-buttons>.wp-block-button.has-custom-width{max-width:none}.wp-block-buttons>.wp-block-button.has-custom-width .wp-block-button__link{width:100%}.wp-block-buttons>.wp-block-button.has-custom-font-size .wp-block-button__link{font-size:inherit}.wp-block-buttons>.wp-block-button[class*=wp-block-button__width]{width:calc(var(--wp--block-button--width)*1% - var(--wp--style--block-gap, .5em)*(1 - var(--wp--block-button--width)/100))}.wp-block-buttons>.wp-block-button.wp-block-button__width-25{width:calc(25% - var(--wp--style--block-gap, .5em)*.75)}.wp-block-buttons>.wp-block-button.wp-block-button__width-50{width:calc(50% - var(--wp--style--block-gap, .5em)*.5)}.wp-block-buttons>.wp-block-button.wp-block-button__width-75{width:calc(75% - var(--wp--style--block-gap, .5em)*.25)}.wp-block-buttons>.wp-block-button.wp-block-button__width-100{flex-basis:100%;width:100%}.wp-block-buttons.is-vertical>.wp-block-button[class*=wp-block-button__width]{width:calc(var(--wp--block-button--width)*1%)}.wp-block-buttons.is-vertical>.wp-block-button.wp-block-button__width-25{width:25%}.wp-block-buttons.is-vertical>.wp-block-button.wp-block-button__width-50{width:50%}.wp-block-buttons.is-vertical>.wp-block-button.wp-block-button__width-75{width:75%}.wp-block-button.is-style-squared,.wp-block-button__link.wp-block-button.is-style-squared{border-radius:0}.wp-block-button.no-border-radius,.wp-block-button__link.no-border-radius{border-radius:0!important}:root :where(.wp-block-button .wp-block-button__link.is-style-outline),:root :where(.wp-block-button.is-style-outline>.wp-block-button__link){border:2px solid;padding:.667em 1.333em}:root :where(.wp-block-button .wp-block-button__link.is-style-outline:not(.has-text-color)),:root :where(.wp-block-button.is-style-outline>.wp-block-button__link:not(.has-text-color)){color:currentColor}:root :where(.wp-block-button .wp-block-button__link.is-style-outline:not(.has-background)),:root :where(.wp-block-button.is-style-outline>.wp-block-button__link:not(.has-background)){background-color:transparent;background-image:none}
+/*# sourceURL=https://www.ndss-symposium.org/wp-includes/blocks/button/style.min.css */
+</style>
+<style id="wp-block-buttons-inline-css">
+.wp-block-buttons{box-sizing:border-box}.wp-block-buttons.is-vertical{flex-direction:column}.wp-block-buttons.is-vertical>.wp-block-button:last-child{margin-bottom:0}.wp-block-buttons>.wp-block-button{display:inline-block;margin:0}.wp-block-buttons.is-content-justification-left{justify-content:flex-start}.wp-block-buttons.is-content-justification-left.is-vertical{align-items:flex-start}.wp-block-buttons.is-content-justification-center{justify-content:center}.wp-block-buttons.is-content-justification-center.is-vertical{align-items:center}.wp-block-buttons.is-content-justification-right{justify-content:flex-end}.wp-block-buttons.is-content-justification-right.is-vertical{align-items:flex-end}.wp-block-buttons.is-content-justification-space-between{justify-content:space-between}.wp-block-buttons.aligncenter{text-align:center}.wp-block-buttons:not(.is-content-justification-space-between,.is-content-justification-right,.is-content-justification-left,.is-content-justification-center) .wp-block-button.aligncenter{margin-left:auto;margin-right:auto;width:100%}.wp-block-buttons[style*=text-decoration] .wp-block-button,.wp-block-buttons[style*=text-decoration] .wp-block-button__link{text-decoration:inherit}.wp-block-buttons.has-custom-font-size .wp-block-button__link{font-size:inherit}.wp-block-buttons .wp-block-button__link{width:100%}.wp-block-button.aligncenter{text-align:center}
+/*# sourceURL=https://www.ndss-symposium.org/wp-includes/blocks/buttons/style.min.css */
+</style>
+<style id="wp-block-group-inline-css">
+.wp-block-group{box-sizing:border-box}:where(.wp-block-group.wp-block-group-is-layout-constrained){position:relative}
+/*# sourceURL=https://www.ndss-symposium.org/wp-includes/blocks/group/style.min.css */
+</style>
+<link rel='stylesheet' id='ivory-ajax-search-styles-css' href='https://www.ndss-symposium.org/wp-content/plugins/add-search-to-menu/public/css/ivory-ajax-search.min.css?ver=5.5.19' media='all' />
+<link rel='stylesheet' id='slick_style-css' href='https://www.ndss-symposium.org/wp-content/plugins/advanced-gutenberg/assets/css/slick.css?ver=7.1.3' media='all' />
+<link rel='stylesheet' id='slick_theme-css' href='https://www.ndss-symposium.org/wp-content/plugins/art-custom-css/slick/slick-theme.css?ver=1.8' media='all' />
+<link rel='stylesheet' id='art_style-css' href='https://www.ndss-symposium.org/wp-content/plugins/art-custom-css/css/style.css?ver=1.1' media='all' />
+<style id="wp-block-paragraph-inline-css">
+.is-small-text{font-size:.875em}.is-regular-text{font-size:1em}.is-large-text{font-size:2.25em}.is-larger-text{font-size:3em}.has-drop-cap:not(:focus):first-letter{float:left;font-size:8.4em;font-style:normal;font-weight:100;line-height:.68;margin:.05em .1em 0 0;text-transform:uppercase}body.rtl .has-drop-cap:not(:focus):first-letter{float:none;margin-left:.1em}p.has-drop-cap.has-background{overflow:hidden}:root :where(p.has-background){padding:1.25em 2.375em}:where(p.has-text-color:not(.has-link-color)) a{color:inherit}p.has-text-align-left[style*="writing-mode:vertical-lr"],p.has-text-align-right[style*="writing-mode:vertical-rl"]{rotate:180deg}
+/*# sourceURL=https://www.ndss-symposium.org/wp-includes/blocks/paragraph/style.min.css */
+</style>
+<style id="wp-block-spacer-inline-css">
+.wp-block-spacer{clear:both}
+/*# sourceURL=https://www.ndss-symposium.org/wp-includes/blocks/spacer/style.min.css */
+</style>
+<style id="global-styles-inline-css">
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--color--ground-blue: #3A82E4;--wp--preset--color--debth-blue: #24366E;--wp--preset--color--ground-green: #40B2A4;--wp--preset--color--purple: #511E84;--wp--preset--color--gray: #C0C0C0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}.wp-block-button{--wp--preset--dimension--25: 25%;--wp--preset--dimension--50: 50%;--wp--preset--dimension--75: 75%;--wp--preset--dimension--100: 100%;}:where(body) { margin: 0; }.wp-site-blocks > .alignleft { float: left; margin-right: 2em; }.wp-site-blocks > .alignright { float: right; margin-left: 2em; }.wp-site-blocks > .aligncenter { justify-content: center; margin-left: auto; margin-right: auto; }:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}.is-layout-flow > .alignleft{float: left;margin-inline-start: 0;margin-inline-end: 2em;}.is-layout-flow > .alignright{float: right;margin-inline-start: 2em;margin-inline-end: 0;}.is-layout-flow > .aligncenter{margin-left: auto !important;margin-right: auto !important;}.is-layout-constrained > .alignleft{float: left;margin-inline-start: 0;margin-inline-end: 2em;}.is-layout-constrained > .alignright{float: right;margin-inline-start: 2em;margin-inline-end: 0;}.is-layout-constrained > .aligncenter{margin-left: auto !important;margin-right: auto !important;}.is-layout-constrained > :where(:not(.alignleft):not(.alignright):not(.alignfull)){margin-left: auto !important;margin-right: auto !important;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}body{padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}:root :where(.wp-element-button, .wp-block-button__link){background-color: #32373c;border-width: 0;color: #fff;font-family: inherit;font-size: inherit;font-style: inherit;font-weight: inherit;letter-spacing: inherit;line-height: inherit;padding-top: calc(0.667em + 2px);padding-right: calc(1.333em + 2px);padding-bottom: calc(0.667em + 2px);padding-left: calc(1.333em + 2px);text-decoration: none;text-transform: inherit;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-ground-blue-color{color: var(--wp--preset--color--ground-blue) !important;}.has-debth-blue-color{color: var(--wp--preset--color--debth-blue) !important;}.has-ground-green-color{color: var(--wp--preset--color--ground-green) !important;}.has-purple-color{color: var(--wp--preset--color--purple) !important;}.has-gray-color{color: var(--wp--preset--color--gray) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-ground-blue-background-color{background-color: var(--wp--preset--color--ground-blue) !important;}.has-debth-blue-background-color{background-color: var(--wp--preset--color--debth-blue) !important;}.has-ground-green-background-color{background-color: var(--wp--preset--color--ground-green) !important;}.has-purple-background-color{background-color: var(--wp--preset--color--purple) !important;}.has-gray-background-color{background-color: var(--wp--preset--color--gray) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-ground-blue-border-color{border-color: var(--wp--preset--color--ground-blue) !important;}.has-debth-blue-border-color{border-color: var(--wp--preset--color--debth-blue) !important;}.has-ground-green-border-color{border-color: var(--wp--preset--color--ground-green) !important;}.has-purple-border-color{border-color: var(--wp--preset--color--purple) !important;}.has-gray-border-color{border-color: var(--wp--preset--color--gray) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */
+</style>
+<script id="pt-cv-content-views-script-js-extra">
+var PT_CV_PUBLIC = {"_prefix":"pt-cv-","page_to_show":"5","_nonce":"511dc4016a","is_admin":"","is_mobile":"","ajaxurl":"https://www.ndss-symposium.org/wp-admin/admin-ajax.php","lang":"","loading_image_src":"data:image/gif;base64,R0lGODlhDwAPALMPAMrKygwMDJOTkz09PZWVla+vr3p6euTk5M7OzuXl5TMzMwAAAJmZmWZmZszMzP///yH/C05FVFNDQVBFMi4wAwEAAAAh+QQFCgAPACwAAAAADwAPAAAEQvDJaZaZOIcV8iQK8VRX4iTYoAwZ4iCYoAjZ4RxejhVNoT+mRGP4cyF4Pp0N98sBGIBMEMOotl6YZ3S61Bmbkm4mAgAh+QQFCgAPACwAAAAADQANAAAENPDJSRSZeA418itN8QiK8BiLITVsFiyBBIoYqnoewAD4xPw9iY4XLGYSjkQR4UAUD45DLwIAIfkEBQoADwAsAAAAAA8ACQAABC/wyVlamTi3nSdgwFNdhEJgTJoNyoB9ISYoQmdjiZPcj7EYCAeCF1gEDo4Dz2eIAAAh+QQFCgAPACwCAAAADQANAAAEM/DJBxiYeLKdX3IJZT1FU0iIg2RNKx3OkZVnZ98ToRD4MyiDnkAh6BkNC0MvsAj0kMpHBAAh+QQFCgAPACwGAAAACQAPAAAEMDC59KpFDll73HkAA2wVY5KgiK5b0RRoI6MuzG6EQqCDMlSGheEhUAgqgUUAFRySIgAh+QQFCgAPACwCAAIADQANAAAEM/DJKZNLND/kkKaHc3xk+QAMYDKsiaqmZCxGVjSFFCxB1vwy2oOgIDxuucxAMTAJFAJNBAAh+QQFCgAPACwAAAYADwAJAAAEMNAs86q1yaWwwv2Ig0jUZx3OYa4XoRAfwADXoAwfo1+CIjyFRuEho60aSNYlOPxEAAAh+QQFCgAPACwAAAIADQANAAAENPA9s4y8+IUVcqaWJ4qEQozSoAzoIyhCK2NFU2SJk0hNnyEOhKR2AzAAj4Pj4GE4W0bkJQIAOw==","is_mobile_tablet":"","sf_no_post_found":"No posts found.","lf__separator":"____"};
+var PT_CV_PAGINATION = {"first":"\u00ab","prev":"\u2039","next":"\u203a","last":"\u00bb","goto_first":"Go to first page","goto_prev":"Go to previous page","goto_next":"Go to next page","goto_last":"Go to last page","current_page":"Current page is","goto_page":"Go to page"};
+//# sourceURL=pt-cv-content-views-script-js-extra
+</script>
+<script id="pt-cv-content-views-script-js" src="https://www.ndss-symposium.org/wp-content/plugins/content-views-query-and-display-post-page/public/assets/js/cv.js?ver=4.5.1.2"></script>
+<script id="pt-cv-public-pro-script-js" src="https://www.ndss-symposium.org/wp-content/plugins/pt-content-views-pro/public/assets/js/cvpro.min.js?ver=7.4.1"></script>
+<script id="sage/main.js-js" src="https://www.ndss-symposium.org/wp-content/themes/ndss2/dist/scripts/main.js"></script>
+<script id="ivory-search-scripts-js-extra">
+var IvorySearchVars = {"is_analytics_enabled":"1"};
+//# sourceURL=ivory-search-scripts-js-extra
+</script>
+<script id="ivory-search-scripts-js" src="https://www.ndss-symposium.org/wp-content/plugins/add-search-to-menu/public/js/ivory-search.min.js?ver=5.5.19"></script>
+<script id="ivory-ajax-search-scripts-js-extra">
+var IvoryAjaxVars = {"ajaxurl":"https://www.ndss-symposium.org/wp-admin/admin-ajax.php","ajax_nonce":"6019ed8cea"};
+//# sourceURL=ivory-ajax-search-scripts-js-extra
+</script>
+<script id="ivory-ajax-search-scripts-js" src="https://www.ndss-symposium.org/wp-content/plugins/add-search-to-menu/public/js/ivory-ajax-search.min.js?ver=5.5.19"></script>
+<script id="is-highlight-js" src="https://www.ndss-symposium.org/wp-content/plugins/add-search-to-menu/public/js/is-highlight.min.js?ver=5.5.19"></script>
+<script id="slick_js-js" src="https://www.ndss-symposium.org/wp-content/plugins/advanced-gutenberg/assets/js/slick.min.js?ver=3.7.6"></script>
+<script id="custom_js-js" src="https://www.ndss-symposium.org/wp-content/plugins/art-custom-css/js/custom.js?ver=1.1"></script>
+
+      </body>
+</html>

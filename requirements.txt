@@ -21,3 +21,4 @@ huggingface_hub>=0.34,<2
 python-dotenv>=1.0,<2
 pydantic>=2.6,<3
 socksio>=1,<2
+pdfminer.six>=20231228,<20270000

@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -37,6 +38,7 @@ sys.path.insert(0, str(ROOT))
 from data_artifacts import sync_cache_artifacts, ensure_cache_local, ensure_progress_local
 from collector.url_types import classify_paper_url
 from papervault.services.abstract_fetchers import dispatch as _dispatch_domain_fetcher
+from papervault.services.abstract_fetchers.base import MIN_ABSTRACT_CHARS
 
 # Windows 控制台 UTF-8 编码修复
 def _install_utf8_console() -> None:
@@ -77,6 +79,14 @@ CACHE_FILE = CACHE_DIR / "cache.jsonl.gz"
 PROGRESS_FILE = CACHE_DIR / "abstract_backfill_progress.jsonl.gz"
 LEGACY_PROGRESS_FILE = CACHE_DIR / "abstract_backfill_progress.json"
 BACKUP_FILE = CACHE_DIR / "cache.jsonl.gz.bak"
+
+# Headers for the DOI redirect-resolution GET in
+# ``_dispatch_via_doi_redirect``: a self-identifying bot UA, because
+# link.springer.com's F5 bot defence serves a JS challenge (and rewrites
+# the URL, stripping the /chapter/ segment) to browser-like User-Agents.
+_DOI_REDIRECT_HEADERS = {
+    "User-Agent": "PaperVault-AbstractBackfill/1.0 (+https://github.com/youngfish42/PaperVault)"
+}
 
 PROGRESS_SCHEMA = "abstract_backfill_progress/v4"
 PROGRESS_SCHEMA_VERSION = 4
@@ -224,6 +234,55 @@ def _get_session() -> requests.Session:
         _thread_local.session.trust_env = False
         _thread_local.session.mount("https://", HTTPAdapter(max_retries=2))
     return _thread_local.session
+
+
+def _get_api_session() -> requests.Session:
+    """Session for the S2 / OpenAlex endpoints: NO urllib3 status retries.
+
+    ``_get_session`` mounts ``HTTPAdapter(max_retries=2)``, which lets
+    urllib3 sleep *inside* ``send()`` on 429/5xx (honouring unbounded
+    ``Retry-After`` headers), completely bypassing ``_s2_request``'s own
+    backoff loop and the pass-level soft-timeout. Observed 2026-10-22:
+    an ``--openalex-title`` pass stalled 84 minutes inside
+    ``urllib3.util.retry.sleep_for_retry`` without a single chunk save.
+    With ``total=0`` every HTTP response (including 429) surfaces
+    immediately and ``_s2_request`` handles it with its own bounded,
+    Retry-After-aware backoff.
+    """
+    if not hasattr(_thread_local, "api_session"):
+        _thread_local.api_session = requests.Session()
+        _thread_local.api_session.trust_env = False
+        _thread_local.api_session.mount(
+            "https://",
+            HTTPAdapter(
+                max_retries=Retry(total=0, respect_retry_after_header=False)
+            ),
+        )
+    return _thread_local.api_session
+
+
+def _get_scrape_session() -> requests.Session:
+    """Session for one-shot scrape GETs (DOI redirect resolution, PDF
+    download): NO urllib3 status retries, for the same reason as
+    :func:`_get_api_session`.
+
+    ``collector.http.SESSION`` mounts ``Retry(total=5, backoff_factor=1,
+    status_forcelist=[500,502,503,504])`` *without* disabling
+    ``respect_retry_after_header`` — a 503 with ``Retry-After: 300``
+    would sleep five minutes inside ``send()`` before our own error
+    handling ever sees the response. Here every non-2xx surfaces
+    immediately; the callers translate it into their REASON_ENUM
+    degrade path themselves.
+    """
+    if not hasattr(_thread_local, "scrape_session"):
+        _thread_local.scrape_session = requests.Session()
+        _thread_local.scrape_session.trust_env = False
+        adapter = HTTPAdapter(
+            max_retries=Retry(total=0, respect_retry_after_header=False)
+        )
+        _thread_local.scrape_session.mount("https://", adapter)
+        _thread_local.scrape_session.mount("http://", adapter)
+    return _thread_local.scrape_session
 
 
 def _rate_limited_request(
@@ -535,9 +594,133 @@ def _fetch_doi_sources_concurrent(
     return None, None, "", last_time
 
 
+def _dispatch_via_doi_redirect(url: str):
+    """Follow a ``doi.org`` URL to its final landing page and re-dispatch.
+
+    Many cached ``doi.org`` URLs (Springer LNCS / MICCAI, ISCA
+    10.21437/..., ...) resolve to hosts that have a dedicated domain
+    fetcher, but the DOI-based chain (Crossref / S2 / OpenAlex) often
+    returns nothing for them. One extra GET with redirects enabled lets
+    us hand the *final* URL to :func:`_dispatch_domain_fetcher`.
+
+    Returns the fetcher's :class:`AbstractResult` when the final URL
+    lands on a *different* registered host, otherwise ``None`` (caller
+    silently degrades to the arXiv fallback — the failure reason of the
+    redirect attempt must not leak into the synthesised ``err_info``).
+    Any network / parsing exception degrades to ``None`` as well.
+    """
+    from papervault.services.abstract_fetchers import FETCHER_REGISTRY as _FETCHER_REGISTRY
+
+    def _canonical_host(u: str) -> str:
+        host = (urlparse(u).netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+
+    orig_host = _canonical_host(url)
+    try:
+        # Non-browser UA: link.springer.com's F5 bot defence rewrites the
+        # URL (stripping the /chapter/ segment) AND serves a JS challenge
+        # to browser-like User-Agents, which would break both the final
+        # URL capture here and the fetcher's own GET. See the verification
+        # note in ``abstract_fetchers/springer.py``.
+        resp = _get_scrape_session().get(
+            url, headers=_DOI_REDIRECT_HEADERS, timeout=20, allow_redirects=True
+        )
+    except requests.exceptions.RequestException:
+        return None
+    final_url = getattr(resp, "url", "") or ""
+    final_host = _canonical_host(final_url)
+    if not final_host or final_host == orig_host:
+        return None
+    if final_host not in _FETCHER_REGISTRY:
+        return None
+    try:
+        return _dispatch_domain_fetcher(final_url)
+    except Exception:
+        return None
+
+
+# ---------- PDF 摘要兜底（--no-pdf-fallback 可关） ----------
+#
+# 全库约 9.3k 条缺摘要记录是 .pdf 直链（vldb.org / ceur-ws.org /
+# web.archive.org 快照 …）：HTML 源与 DOI 链对它们都无能为力，最后一招是
+# 下载 PDF 前 3 页用 pdfminer 抽出 "Abstract" 节。解析逻辑在
+# ``papervault/services/abstract_fetchers/pdf_extract.py``（纯函数），
+# 这里只做 HTTP。
+
+PDF_FALLBACK_MAX_BYTES = 8 * 1024 * 1024  # 流式下载截断上限
+
+
+def _download_pdf_bytes(url: str) -> Tuple[Optional[bytes], str]:
+    """流式下载 PDF（≤PDF_FALLBACK_MAX_BYTES），返回 (bytes, "") 或 (None, reason)。
+
+    确认重定向后的最终响应确实是 PDF（最终 URL 仍以 .pdf 结尾或
+    Content-Type 是 application/pdf）。reason 只用 REASON_ENUM 现有成员。
+    ``scripts/validate_pdf_extract.py`` 复用此 helper 取原始字节做验证。
+    """
+    try:
+        resp = _get_scrape_session().get(
+            url, headers=HEADERS, timeout=30, stream=True, allow_redirects=True
+        )
+    except requests.exceptions.Timeout:
+        return None, "timeout"
+    except requests.exceptions.RequestException:
+        return None, "network"
+    try:
+        if resp.status_code != 200:
+            return None, _s2_status_reason(resp.status_code)
+        final_path = (urlparse(getattr(resp, "url", "") or "").path or "").lower()
+        ctype = (resp.headers.get("Content-Type") or "").lower()
+        if not (final_path.endswith(".pdf") or "application/pdf" in ctype):
+            return None, "empty_abstract"
+        # 超大 PDF（图片多的论文，如 PVLDB vol17 个别 9MB+ 文件）直接跳过：
+        # 截断下载会让 pdfminer 因 xref 缺失而解析失败，白烧带宽。
+        try:
+            declared = int(resp.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            declared = 0
+        if declared > PDF_FALLBACK_MAX_BYTES:
+            return None, "empty_abstract"
+        buf = bytearray()
+        for chunk in resp.iter_content(chunk_size=65536):
+            buf.extend(chunk)
+            if len(buf) >= PDF_FALLBACK_MAX_BYTES:
+                break
+    finally:
+        resp.close()
+    return bytes(buf), ""
+
+
+def _fetch_pdf_abstract(url: str) -> Tuple[Optional[str], str]:
+    """下载 PDF（流式，≤8MB）并抽取 Abstract 节。返回 (abstract, "") 或 (None, reason)。
+
+    reason 只用 REASON_ENUM 现有成员：网络层 ``timeout`` / ``network``，
+    内容层（非 PDF、解析失败、无 Abstract 节、版权块）一律 ``empty_abstract``。
+    """
+    from papervault.services.abstract_fetchers.pdf_extract import (
+        extract_abstract_from_pdf_bytes,
+    )
+
+    data, err = _download_pdf_bytes(url)
+    if data is None:
+        return None, err
+    try:
+        abstract = extract_abstract_from_pdf_bytes(data)
+    except Exception:
+        return None, "empty_abstract"
+    # A sub-threshold block (menu residue, stray heading) must degrade to
+    # empty_abstract, never enter the cache as a fake abstract.
+    if not abstract or len(abstract) < MIN_ABSTRACT_CHARS:
+        return None, "empty_abstract"
+    return abstract, ""
+
+
 def fetch_abstract_for_paper(
     paper: dict, last_time: dict, sleep_sec: float = 1.5, max_retries: int = 3,
     query_doi_by_title_enabled: bool = False,
+    doi_redirect_enabled: bool = True,
+    pdf_fallback_enabled: bool = True,
 ) -> Tuple[Optional[str], dict, str, dict]:
     """Fetch an abstract for ``paper`` via the multi-source fallback chain.
 
@@ -625,14 +808,24 @@ def fetch_abstract_for_paper(
     domain_reason = ""
     domain_source = ""
     if url:
-        dispatched = _dispatch_domain_fetcher(url)
-        if dispatched.ok and dispatched.abstract:
+        # A fetcher raising must never break the main chain — degrade to
+        # the DOI/title chain exactly like an ``ok=False`` dispatch
+        # (same treatment as ``_dispatch_via_doi_redirect``).
+        try:
+            dispatched = _dispatch_domain_fetcher(url)
+        except Exception:
+            dispatched = None
+        if dispatched is not None and dispatched.ok and dispatched.abstract:
             return dispatched.abstract, last_time, dispatched.source, {}
         # On dispatcher failure we fall through to the legacy DOI/title
         # chain. We do *not* return early because e.g. an older ACL page
         # without a ``.acl-abstract`` block can still be recovered via
         # CrossRef.
-        if dispatched.reason and _matched_registered_fetcher(url):
+        if (
+            dispatched is not None
+            and dispatched.reason
+            and _matched_registered_fetcher(url)
+        ):
             domain_reason = dispatched.reason
             domain_source = dispatched.source or ""
 
@@ -669,6 +862,19 @@ def fetch_abstract_for_paper(
         if not abstract:
             last_source = "doi_chain"
 
+    # ---- DOI redirect dispatch ------------------------------------------
+    # When the paper URL is a doi.org link whose DOI chain yielded nothing,
+    # follow the redirect once and re-dispatch the final landing page to
+    # the domain-fetcher registry (Springer LNCS / ISCA 10.21437/... hit
+    # their dedicated fetchers here). Failures are intentionally silent:
+    # we fall through to the arXiv fallback without touching err_info.
+    if not abstract and doi_redirect_enabled and doi and url:
+        orig_host = (urlparse(url).netloc or "").lower()
+        if orig_host == "doi.org" or orig_host.endswith(".doi.org"):
+            redirected = _dispatch_via_doi_redirect(url)
+            if redirected is not None and redirected.ok and redirected.abstract:
+                return redirected.abstract, last_time, redirected.source, {}
+
     if not abstract and title:
         arxiv_abs, api_title, last_time["arxiv"] = fetch_arxiv_abstract(
             title, last_time["arxiv"], min_interval=sleep_sec, max_retries=max_retries
@@ -681,6 +887,16 @@ def fetch_abstract_for_paper(
         if arxiv_abs:
             abstract = arxiv_abs
             source = "arxiv"
+
+    # ---- PDF fallback (last resort) --------------------------------------
+    # 仅当原 URL path 以 .pdf 结尾时触发（下载后还会确认最终响应确为 PDF）。
+    # 失败静默：不写 err_info，沿用后续合成逻辑。
+    if not abstract and pdf_fallback_enabled and url:
+        if (urlparse(url).path or "").lower().endswith(".pdf"):
+            pdf_abs, _pdf_reason = _fetch_pdf_abstract(url)
+            if pdf_abs:
+                abstract = pdf_abs
+                source = "pdf"
 
     if abstract:
         return abstract, last_time, source, {}
@@ -722,6 +938,723 @@ def fetch_abstract_for_paper(
         err_info["title_mismatch"] = True
 
     return None, last_time, source, err_info
+
+
+# ---------- Semantic Scholar / OpenAlex 补漏模式（--s2-batch / --s2-title-match / --openalex-title） ----------
+#
+# 三个互斥的专用 pass，针对主链 (fetch_abstract_for_paper) 跑完后仍失败的记录：
+#
+# * ``--s2-batch``：doi.org URL 的失败记录 → S2 ``/paper/batch`` 批量按 DOI 查询。
+#   主链对 S2 的调用是逐 DOI 的 GET；批量端点一次最多 500 条，吞吐高几个数量级。
+# * ``--s2-title-match``：无 DOI 的长尾失败记录（dl.acm.org / vldb.org /
+#   web.archive.org / auai.org / ceur-ws.org / ieeexplore.ieee.org …）→
+#   S2 ``/paper/search/match`` 按标题精确匹配。
+# * ``--openalex-title``：同上但走 OpenAlex ``/works?search=``（匿名配额更宽松，
+#   3 rps 保守限速），摘要从 ``abstract_inverted_index`` 重建；排除集去掉了
+#   ndss-symposium.org（该站页面本身无摘要，只能靠外部索引）。
+#
+# 三者复用本脚本的缓存加载 / v4 进度文件 / HF 同步机制，不改动主链。
+
+S2_BATCH_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/batch"
+S2_MATCH_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search/match"
+# S2 batch 端点单次请求 ids 上限。
+S2_BATCH_SIZE = 500
+# 两个端点都按 ~1 rps 限速（match 端点限流尤其严格）。
+S2_MIN_INTERVAL = 1.0
+# 回填门控的最小摘要长度（与 abstract_fetchers 的 MIN_ABSTRACT_CHARS 对齐）。
+S2_MIN_ABSTRACT_CHARS = MIN_ABSTRACT_CHARS
+# --s2-title-match 的标题相似度阈值（比主链 is_title_match 的 0.70 严格）。
+S2_TITLE_RATIO_THRESHOLD = 0.85
+# 单次 429/5xx 退避的等待上限：服务器用 Retry-After 要求更长等待时直接放弃
+# 该请求（归类 rate_limited），不让单篇论文卡住整个 pass。
+S2_MAX_RETRY_WAIT = 120.0
+
+# --s2-title-match 的排除 host 集合（canonical 小写、无 www）：
+#   * openaccess.thecvf.com / openreview.net —— 各有专用回填脚本
+#     (fetch_cvf_abstracts.py / fetch_openreview_abstracts.py)，主链本就
+#     委托短路，不应被模糊标题匹配抢跑；
+#   * 其余为 FETCHER_REGISTRY 已注册的 host —— 正确的补漏姿势是带着修好的
+#     fetcher 重试（registry 直达或 DOI 重定向分派），标题模糊匹配只应
+#     覆盖没有专用途径的长尾 host（dl.acm.org / vldb.org / web.archive.org
+#     / auai.org / ceur-ws.org / ieeexplore.ieee.org …）。
+S2_TITLE_EXCLUDED_HOSTS = frozenset(
+    {
+        "openaccess.thecvf.com",
+        "openreview.net",
+        "aclanthology.org",
+        "proceedings.mlr.press",
+        "jmlr.org",
+        "isca-archive.org",
+        "ojs.aaai.org",
+        "aaai.org",
+        "ijcai.org",
+        "link.springer.com",
+        "usenix.org",
+        "ndss-symposium.org",
+    }
+)
+
+_s2_rate_state = {"last_time": 0.0}
+
+
+def _s2_headers() -> dict:
+    """S2 请求头：可选 API key（env ``S2_API_KEY`` → ``x-api-key``），没有也能跑。"""
+    headers = dict(HEADERS)
+    api_key = os.getenv("S2_API_KEY", "").strip()
+    if api_key:
+        headers["x-api-key"] = api_key
+    return headers
+
+
+def _s2_status_reason(status: Optional[int]) -> str:
+    """把最终 HTTP 状态码映射为 REASON_ENUM 成员（请求级失败时使用）。"""
+    if status == 429:
+        return "rate_limited"
+    return "network"
+
+
+def _s2_request(
+    method: str,
+    url: str,
+    *,
+    max_retries: int = 5,
+    min_interval: float = S2_MIN_INTERVAL,
+    timeout: int = 60,
+    headers: Optional[dict] = None,
+    rate_state: Optional[dict] = None,
+    **kwargs,
+) -> Tuple[Optional[requests.Response], str]:
+    """限速 + 指数退避的请求（S2 与 OpenAlex 标题匹配共用的底层 helper）。
+
+    返回 ``(response, "")`` 当拿到 *任何* HTTP 响应（含最终失败的 4xx/5xx，
+    由调用方用 ``_s2_status_reason`` 归类）；``(None, reason)`` 仅当网络层
+    异常（timeout / connection error）且重试耗尽。429 / 5xx 指数退避并尊重
+    ``Retry-After`` 响应头。
+
+    ``headers`` 默认 S2 请求头（带可选 ``x-api-key``）；OpenAlex 调用传入
+    普通 ``HEADERS`` 以免把 S2 key 泄漏给第三方。``rate_state`` 默认 S2 的
+    限速状态；不同端点的限速预算应传入各自的状态字典。
+    """
+    session = _get_api_session()
+    state = _s2_rate_state if rate_state is None else rate_state
+    req_headers = _s2_headers() if headers is None else headers
+    last_reason = "network"
+    for attempt in range(1, max_retries + 1):
+        wait = max(0.0, min_interval - (time.time() - state["last_time"]))
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            if method.lower() == "post":
+                resp = session.post(url, headers=req_headers, timeout=timeout, **kwargs)
+            else:
+                resp = session.get(url, headers=req_headers, timeout=timeout, **kwargs)
+        except requests.exceptions.Timeout:
+            state["last_time"] = time.time()
+            last_reason = "timeout"
+            if attempt < max_retries:
+                time.sleep(min(60, 2 ** attempt))
+            continue
+        except requests.exceptions.RequestException:
+            state["last_time"] = time.time()
+            last_reason = "network"
+            if attempt < max_retries:
+                time.sleep(min(60, 2 ** attempt))
+            continue
+        state["last_time"] = time.time()
+        if resp.status_code == 429 or 500 <= resp.status_code < 600:
+            retry_after = resp.headers.get("Retry-After")
+            try:
+                delay = float(retry_after) if retry_after else min(60, 2 ** attempt)
+            except (TypeError, ValueError):
+                delay = min(60, 2 ** attempt)
+            # 服务器要求的长等待（如 Retry-After: 600）不值得在本 pass 里硬扛：
+            # 立即把响应交还调用方归类 rate_limited，让下一篇继续。
+            if delay > S2_MAX_RETRY_WAIT:
+                return resp, ""
+            if attempt < max_retries:
+                time.sleep(delay)
+                continue
+        return resp, ""
+    return None, last_reason
+
+
+def _s2_batch_fetch(dois: List[str]) -> Tuple[Optional[List[Optional[dict]]], str]:
+    """POST /paper/batch，返回 (与 ``dois`` 索引对齐的结果数组, error_reason)。
+
+    数组中缺失条目为 ``None``（S2 查无此 DOI）。请求级失败返回 ``(None, reason)``。
+    """
+    resp, err = _s2_request(
+        "post",
+        S2_BATCH_ENDPOINT,
+        params={"fields": "title,abstract,externalIds"},
+        json={"ids": [f"DOI:{doi}" for doi in dois]},
+    )
+    if err or resp is None:
+        return None, err or "network"
+    if resp.status_code != 200:
+        return None, _s2_status_reason(resp.status_code)
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, "network"
+    if not isinstance(data, list):
+        return None, "network"
+    return data, ""
+
+
+def _s2_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
+    """GET /paper/search/match，返回 (候选 paper dict, error_reason)。
+
+    S2 对无匹配返回 404 —— 这里归类为 ``empty_abstract``（"无候选可回填"），
+    与主链 "标题查不到" 的语义一致。
+    """
+    resp, err = _s2_request(
+        "get",
+        S2_MATCH_ENDPOINT,
+        params={"query": title, "fields": "title,abstract,year,externalIds"},
+        timeout=30,
+    )
+    if err or resp is None:
+        return None, err or "network"
+    if resp.status_code == 404:
+        return None, "empty_abstract"
+    if resp.status_code != 200:
+        return None, _s2_status_reason(resp.status_code)
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, "network"
+    if not isinstance(data, dict):
+        return None, "network"
+    # 实际响应是 {"data": [candidate, ...]} 包装（match 通常只有一条）；
+    # 空列表等价于 404 的 "无候选"。
+    candidates = data.get("data")
+    if not isinstance(candidates, list):
+        return None, "network"
+    if not candidates:
+        return None, "empty_abstract"
+    first = candidates[0]
+    if not isinstance(first, dict):
+        return None, "empty_abstract"
+    return first, ""
+
+
+def _title_gate(api_title: str, local_title: str) -> bool:
+    """标题门控（比主链 is_title_match 的 0.70 严格）：归一化相等 / 互相包含，
+    或 SequenceMatcher ratio >= 0.85。S2 / OpenAlex 标题匹配 pass 共用。"""
+    norm = lambda t: re.sub(r"[^\w]+", "", (t or "").strip().lower(), flags=re.UNICODE)
+    a, b = norm(api_title), norm(local_title)
+    if not a or not b:
+        return False
+    if a == b or a in b or b in a:
+        return True
+    return difflib.SequenceMatcher(None, a, b).ratio() >= S2_TITLE_RATIO_THRESHOLD
+
+
+def _year_gate(conf: str, api_year) -> bool:
+    """年份守卫：从本地 ``conf`` 提取 4 位年份，与上游年份相差须 ≤1。
+    上游年份缺失（或 conf 无年份）时放行，仅靠标题门控。"""
+    if not api_year:
+        return True
+    m = re.search(r"(\d{4})", conf or "")
+    if not m:
+        return True
+    try:
+        return abs(int(api_year) - int(m.group(1))) <= 1
+    except (TypeError, ValueError):
+        return True
+
+
+def _canonical_host_of(url: str) -> str:
+    host = (urlparse(url or "").netloc or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _collect_s2_batch_targets(
+    all_papers: List[dict], progress: Dict[str, dict]
+) -> List[Tuple[dict, str]]:
+    """--s2-batch 目标集合：progress=failed、cache 摘要仍为空、doi.org URL。
+
+    DOI 一律小写归一（S2 的 DOI 标识大小写不敏感，小写保证回映射一致）。
+    同一 paper_url 可能随多个 conf 重复出现（同 DOI 被收录进不同会议条目），
+    按提取出的 DOI 去重，避免同一批请求里出现重复 id。
+    """
+    targets: List[Tuple[dict, str]] = []
+    seen_dois = set()
+    for p in all_papers:
+        url = p.get("paper_url", "")
+        if (p.get("paper_abstract") or "").strip():
+            continue
+        meta = progress.get(url)
+        if not meta or meta.get("status") != "failed":
+            continue
+        doi = extract_doi(url)
+        if not doi:
+            continue
+        doi = doi.lower()
+        if doi in seen_dois:
+            continue
+        seen_dois.add(doi)
+        targets.append((p, doi))
+    return targets
+
+
+def _collect_s2_title_targets(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    excluded_hosts: Optional[frozenset] = None,
+) -> List[dict]:
+    """标题匹配 pass 目标集合：failed、摘要为空、非 doi.org、不在排除 host 集合。
+
+    ``excluded_hosts`` 默认 :data:`S2_TITLE_EXCLUDED_HOSTS`；OpenAlex pass
+    传入不含 ndss-symposium.org 的变体（该站页面本身无摘要，只能靠外部索引）。
+    """
+    excluded = S2_TITLE_EXCLUDED_HOSTS if excluded_hosts is None else excluded_hosts
+    targets: List[dict] = []
+    for p in all_papers:
+        url = p.get("paper_url", "")
+        if (p.get("paper_abstract") or "").strip():
+            continue
+        meta = progress.get(url)
+        if not meta or meta.get("status") != "failed":
+            continue
+        if extract_doi(url):
+            continue
+        if _canonical_host_of(url) in excluded:
+            continue
+        if not (p.get("paper_name") or "").strip():
+            continue
+        targets.append(p)
+    return targets
+
+
+def _evaluate_s2_batch_item(item: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
+    """单条 batch 响应的回填门控，返回 (abstract, "") 或 (None, reason)。"""
+    if item is None:
+        return None, "doi_not_found"
+    api_title = (item.get("title") or "").strip()
+    local_title = (paper.get("paper_name") or "").strip()
+    if not is_title_match(api_title, local_title):
+        return None, "title_mismatch"
+    abstract = clean_abstract(item.get("abstract") or "")
+    if len(abstract) < S2_MIN_ABSTRACT_CHARS:
+        return None, "empty_abstract"
+    return abstract, ""
+
+
+# ---------- OpenAlex 标题匹配（--openalex-title） ----------
+#
+# S2 的 search/match 端点匿名配额极紧（本机持续 429）；OpenAlex 的
+# ``/works?search=`` 对标题匹配的召回相当（ACL Anthology 老年份收录尤其全），
+# 且 polite pool（mailto）允许 10 rps。结构完全仿照 --s2-title-match。
+
+OPENALEX_SEARCH_ENDPOINT = "https://api.openalex.org/works"
+# OpenAlex polite pool 允许 10 rps；用 3 rps 保守值。
+OPENALEX_MIN_INTERVAL = 1.0 / 3
+# NDSS 页面本身不含摘要（正文只有短描述），无法靠 fetcher 重试补——
+# OpenAlex 模式把它从排除集中拿掉，允许标题匹配兜底。
+OPENALEX_TITLE_EXCLUDED_HOSTS = S2_TITLE_EXCLUDED_HOSTS - {"ndss-symposium.org"}
+
+_openalex_rate_state = {"last_time": 0.0}
+
+
+def _openalex_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
+    """GET /works?search=<title>，返回 (首个候选 work dict, error_reason)。
+
+    无候选（空 results）归类为 ``empty_abstract``，与 S2 match 404 的语义一致。
+    """
+    params = {
+        "search": title,
+        "per-page": 3,
+        "select": "title,abstract_inverted_index,publication_year,doi",
+    }
+    if CONTACT_EMAIL:
+        params["mailto"] = CONTACT_EMAIL
+    # OpenAlex 匿名配额按出口 IP 共享且会耗尽（Retry-After 可达次日）；
+    # 有 key 时走 api_key 参数。
+    api_key = os.getenv("OPENALEX_API_KEY", "").strip()
+    if api_key:
+        params["api_key"] = api_key
+    resp, err = _s2_request(
+        "get",
+        OPENALEX_SEARCH_ENDPOINT,
+        params=params,
+        timeout=30,
+        min_interval=OPENALEX_MIN_INTERVAL,
+        headers=HEADERS,  # 不带 S2 的 x-api-key
+        rate_state=_openalex_rate_state,
+    )
+    if err or resp is None:
+        return None, err or "network"
+    if resp.status_code != 200:
+        return None, _s2_status_reason(resp.status_code)
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, "network"
+    results = data.get("results") if isinstance(data, dict) else None
+    if not results:
+        return None, "empty_abstract"
+    first = results[0]
+    if not isinstance(first, dict):
+        return None, "empty_abstract"
+    return first, ""
+
+
+def _evaluate_openalex_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
+    """单条 OpenAlex work 的回填门控（标题 + 年份守卫 + inverted-index 摘要
+    重建 + 长度），返回 (abstract, "") 或 (None, reason)。"""
+    if not data:
+        return None, "empty_abstract"
+    api_title = (data.get("title") or "").strip()
+    local_title = (paper.get("paper_name") or "").strip()
+    if not _title_gate(api_title, local_title):
+        return None, "title_mismatch"
+    if not _year_gate(paper.get("conf", ""), data.get("publication_year")):
+        return None, "title_mismatch"
+    abstract = clean_abstract(
+        _reconstruct_openalex_abstract(data.get("abstract_inverted_index") or {}) or ""
+    )
+    if len(abstract) < S2_MIN_ABSTRACT_CHARS:
+        return None, "empty_abstract"
+    return abstract, ""
+
+
+def _evaluate_s2_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
+    """单条 search/match 响应的回填门控（标题 + 年份守卫 + 长度），
+    返回 (abstract, "") 或 (None, reason)。"""
+    if not data:
+        return None, "empty_abstract"
+    api_title = (data.get("title") or "").strip()
+    local_title = (paper.get("paper_name") or "").strip()
+    if not _title_gate(api_title, local_title):
+        return None, "title_mismatch"
+    if not _year_gate(paper.get("conf", ""), data.get("year")):
+        return None, "title_mismatch"
+    abstract = clean_abstract(data.get("abstract") or "")
+    if len(abstract) < S2_MIN_ABSTRACT_CHARS:
+        return None, "empty_abstract"
+    return abstract, ""
+
+
+def _s2_record_success(progress: Dict[str, dict], paper: dict, abstract: str, source: str) -> None:
+    url = paper.get("paper_url", "")
+    paper["paper_abstract"] = abstract
+    progress[url] = {
+        "status": "success",
+        "source": source,
+        "chars": len(abstract),
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+
+
+def _s2_record_failure(
+    progress: Dict[str, dict],
+    paper: dict,
+    reason: str,
+    last_source: str,
+    count_attempt: bool = True,
+) -> None:
+    """记录条目级失败。``count_attempt=False`` 用于整批请求级失败
+    （瞬时 429/网络故障）——不递增 ``attempts``，避免把整批 500 篇推向
+    ``max_failed_attempts`` 永久跳过阈值。"""
+    url = paper.get("paper_url", "")
+    old_attempts = progress.get(url, {}).get("attempts", 0)
+    progress[url] = {
+        "status": "failed",
+        "attempts": old_attempts + (1 if count_attempt else 0),
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "reason": normalize_reason(reason),
+        "last_source": last_source,
+    }
+
+
+def _write_cache_atomic(all_papers: List[dict]) -> None:
+    """整文件原子重写 cache.jsonl.gz（.tmp + os.replace，与主流程一致）。"""
+    tmp_file = CACHE_FILE.with_suffix(".jsonl.gz.tmp")
+    with gzip.open(tmp_file, "wt", encoding="utf-8") as f:
+        for p in all_papers:
+            f.write(json.dumps(p, ensure_ascii=False) + "\n")
+    os.replace(str(tmp_file), str(CACHE_FILE))
+
+
+def _run_s2_batch_pass(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    *,
+    chunk_size: int,
+    max_papers: Optional[int],
+    soft_timeout: Optional[float],
+    start_time: float,
+    dry_run: bool,
+) -> Tuple[int, int, bool]:
+    targets = _collect_s2_batch_targets(all_papers, progress)
+    if max_papers is not None:
+        targets = targets[:max_papers]
+    print(f"[*] S2 batch targets (failed doi.org papers): {len(targets)}")
+    if not targets:
+        return 0, 0, False
+
+    success = failed = processed = 0
+    cache_dirty = False
+    timed_out = False
+    for chunk_start in range(0, len(targets), chunk_size):
+        if soft_timeout and (time.time() - start_time) >= soft_timeout:
+            print(f"[!] Soft timeout ({soft_timeout}s) reached. Saving progress and exiting.")
+            timed_out = True
+            break
+        chunk = targets[chunk_start:chunk_start + chunk_size]
+        for sub_start in range(0, len(chunk), S2_BATCH_SIZE):
+            sub = chunk[sub_start:sub_start + S2_BATCH_SIZE]
+            dois = [doi for _, doi in sub]
+            results, err = _s2_batch_fetch(dois)
+            if results is None:
+                reason = err or "network"
+                print(f"  [!] batch request failed ({reason}); marking {len(sub)} papers failed")
+                for paper, _doi in sub:
+                    if not dry_run:
+                        # 请求级失败（瞬时 429/网络）不递增 attempts——
+                        # 条目本身没有被评估过，不应消耗重试配额。
+                        _s2_record_failure(
+                            progress, paper, reason, "semanticscholar_batch",
+                            count_attempt=False,
+                        )
+                    failed += 1
+                    processed += 1
+                continue
+            for (paper, _doi), item in zip(sub, results):
+                abstract, reason = _evaluate_s2_batch_item(item, paper)
+                if abstract:
+                    if dry_run:
+                        print(f"  [dry-run] HIT [{paper.get('conf')}] {(paper.get('paper_name') or '')[:60]} ({len(abstract)} chars)")
+                    else:
+                        _s2_record_success(progress, paper, abstract, "semanticscholar_batch")
+                        cache_dirty = True
+                    success += 1
+                else:
+                    if not dry_run:
+                        _s2_record_failure(progress, paper, reason, "semanticscholar_batch")
+                    failed += 1
+                processed += 1
+        if not dry_run:
+            save_progress(progress)
+            if cache_dirty:
+                _write_cache_atomic(all_papers)
+                cache_dirty = False
+        elapsed = time.time() - start_time
+        rate = processed / (elapsed / 60) if elapsed > 0 else 0.0
+        print(
+            f"[*] chunk done: processed={processed}/{len(targets)} ({rate:.1f}/min), "
+            f"success={success}, failed={failed}"
+        )
+    if not dry_run:
+        save_progress(progress)
+        if cache_dirty:
+            _write_cache_atomic(all_papers)
+    return success, failed, timed_out
+
+
+def _run_title_match_pass(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    *,
+    chunk_size: int,
+    max_papers: Optional[int],
+    soft_timeout: Optional[float],
+    start_time: float,
+    dry_run: bool,
+    collect_fn,
+    fetch_fn,
+    evaluate_fn,
+    source: str,
+    label: str,
+) -> Tuple[int, int, bool]:
+    """S2 / OpenAlex 标题匹配 pass 共用的执行骨架；端点相关部分通过
+    ``collect_fn`` / ``fetch_fn`` / ``evaluate_fn`` / ``source`` 注入。"""
+    targets = collect_fn(all_papers, progress)
+    if max_papers is not None:
+        targets = targets[:max_papers]
+    print(f"[*] {label} targets (failed non-DOI long-tail papers): {len(targets)}")
+    if not targets:
+        return 0, 0, False
+
+    success = failed = processed = 0
+    cache_dirty = False
+    timed_out = False
+    for i, paper in enumerate(targets, 1):
+        if soft_timeout and (time.time() - start_time) >= soft_timeout:
+            print(f"[!] Soft timeout ({soft_timeout}s) reached at paper {i}/{len(targets)}. Saving progress and exiting.")
+            timed_out = True
+            break
+        title = (paper.get("paper_name") or "").strip()
+        data, err = fetch_fn(title)
+        if data is None:
+            reason = err or "network"
+            if not dry_run:
+                _s2_record_failure(progress, paper, reason, source)
+            failed += 1
+        else:
+            abstract, reason = evaluate_fn(data, paper)
+            if abstract:
+                if dry_run:
+                    print(f"  [dry-run] HIT [{paper.get('conf')}] {title[:60]} ({len(abstract)} chars)")
+                else:
+                    _s2_record_success(progress, paper, abstract, source)
+                    cache_dirty = True
+                success += 1
+            else:
+                if not dry_run:
+                    _s2_record_failure(progress, paper, reason, source)
+                failed += 1
+        processed += 1
+        if processed % chunk_size == 0 or processed == len(targets):
+            if not dry_run:
+                save_progress(progress)
+                if cache_dirty:
+                    _write_cache_atomic(all_papers)
+                    cache_dirty = False
+            elapsed = time.time() - start_time
+            rate = processed / (elapsed / 60) if elapsed > 0 else 0.0
+            print(
+                f"[*] progress: processed={processed}/{len(targets)} ({rate:.1f}/min), "
+                f"success={success}, failed={failed}"
+            )
+    if not dry_run:
+        save_progress(progress)
+        if cache_dirty:
+            _write_cache_atomic(all_papers)
+    return success, failed, timed_out
+
+
+def _run_s2_title_pass(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    *,
+    chunk_size: int,
+    max_papers: Optional[int],
+    soft_timeout: Optional[float],
+    start_time: float,
+    dry_run: bool,
+) -> Tuple[int, int, bool]:
+    return _run_title_match_pass(
+        all_papers, progress,
+        chunk_size=chunk_size, max_papers=max_papers,
+        soft_timeout=soft_timeout, start_time=start_time, dry_run=dry_run,
+        collect_fn=_collect_s2_title_targets,
+        fetch_fn=_s2_title_match_fetch,
+        evaluate_fn=_evaluate_s2_title_item,
+        source="semanticscholar_title",
+        label="S2 title-match",
+    )
+
+
+def _run_openalex_title_pass(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    *,
+    chunk_size: int,
+    max_papers: Optional[int],
+    soft_timeout: Optional[float],
+    start_time: float,
+    dry_run: bool,
+) -> Tuple[int, int, bool]:
+    return _run_title_match_pass(
+        all_papers, progress,
+        chunk_size=chunk_size, max_papers=max_papers,
+        soft_timeout=soft_timeout, start_time=start_time, dry_run=dry_run,
+        collect_fn=lambda ps, pr: _collect_s2_title_targets(
+            ps, pr, excluded_hosts=OPENALEX_TITLE_EXCLUDED_HOSTS
+        ),
+        fetch_fn=_openalex_title_match_fetch,
+        evaluate_fn=_evaluate_openalex_title_item,
+        source="openalex_title",
+        label="OpenAlex title-match",
+    )
+
+
+def run_s2(
+    mode: str,
+    *,
+    chunk_size: int = 500,
+    max_papers: Optional[int] = None,
+    soft_timeout: Optional[float] = None,
+    no_sync: bool = False,
+    offline: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """``--s2-batch`` / ``--s2-title-match`` / ``--openalex-title`` 专用 pass 的入口。
+
+    与主流程同一约定：开始前 ensure_cache_local / ensure_progress_local
+    （--offline 跳过），结束后 sync_cache_artifacts（--no-sync / --offline /
+    --dry-run 跳过）。
+    """
+    global_start = time.time()
+    if not offline:
+        ensure_cache_local(CACHE_FILE, refresh=True)
+        ensure_progress_local(PROGRESS_FILE, refresh=True)
+    print(
+        f"[*] S2 mode: {mode}, chunk_size={chunk_size}, "
+        f"max_papers={max_papers or 'unlimited'}, dry_run={dry_run}"
+    )
+    api_key_note = "set" if os.getenv("S2_API_KEY", "").strip() else "not set (anonymous quota)"
+    print(f"[*] S2_API_KEY: {api_key_note}")
+    if soft_timeout:
+        print(f"[*] Soft timeout: {soft_timeout}s ({soft_timeout/3600:.1f}h)")
+
+    all_papers: List[dict] = []
+    with gzip.open(CACHE_FILE, "rt", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                all_papers.append(json.loads(line))
+    print(f"[*] Total papers in cache: {len(all_papers)}")
+    progress = load_progress()
+
+    if mode == "batch":
+        success, failed, timed_out = _run_s2_batch_pass(
+            all_papers, progress,
+            chunk_size=chunk_size, max_papers=max_papers,
+            soft_timeout=soft_timeout, start_time=global_start, dry_run=dry_run,
+        )
+    elif mode == "openalex":
+        success, failed, timed_out = _run_openalex_title_pass(
+            all_papers, progress,
+            chunk_size=chunk_size, max_papers=max_papers,
+            soft_timeout=soft_timeout, start_time=global_start, dry_run=dry_run,
+        )
+    else:
+        success, failed, timed_out = _run_s2_title_pass(
+            all_papers, progress,
+            chunk_size=chunk_size, max_papers=max_papers,
+            soft_timeout=soft_timeout, start_time=global_start, dry_run=dry_run,
+        )
+
+    elapsed = time.time() - global_start
+    total = success + failed
+    rate = total / (elapsed / 60) if elapsed > 0 else 0.0
+    hit_rate = success / total * 100 if total else 0.0
+    print(
+        f"[*] S2 {mode} pass done in {elapsed:.0f}s: processed={total} "
+        f"({rate:.1f}/min), success={success} ({hit_rate:.0f}% hit), failed={failed}"
+        + (" [timed out]" if timed_out else "")
+    )
+
+    if dry_run:
+        print("[*] Dry run: no cache/progress writes, no Hugging Face sync.")
+        return
+    if success > 0:
+        if no_sync or offline:
+            mode_note = "--offline" if offline else "--no-sync"
+            print(
+                f"[*] {mode_note} set; skipped Hugging Face push. "
+                "Local cache has been updated; remember to run "
+                "`python -c \"from data_artifacts import sync_cache_artifacts; "
+                "sync_cache_artifacts()\"` before any other workflow touches HF."
+            )
+        else:
+            sync_artifacts_after_cache_update("Update PaperVault data artifacts after S2 abstract backfill")
 
 
 # ---------- 进度管理（v3 JSONL.gz 格式，兼容旧 JSON / 旧 v2 格式） ----------
@@ -1207,6 +2140,8 @@ def _process_targets(
     reason_in: Optional[Set[str]] = None,
     include_legacy: bool = True,
     force: bool = False,
+    doi_redirect_enabled: bool = True,
+    pdf_fallback_enabled: bool = True,
 ) -> Tuple[int, int, bool]:
     """处理一组目标论文，返回 (success_count, failed_count, timed_out)。
 
@@ -1307,7 +2242,9 @@ def _process_targets(
         print(f"[{i}/{len(targets)}] {title[:60]}...")
 
         abstract, last_time, source, err_info = fetch_abstract_for_paper(
-            paper, last_time, query_doi_by_title_enabled=query_doi_by_title
+            paper, last_time, query_doi_by_title_enabled=query_doi_by_title,
+            doi_redirect_enabled=doi_redirect_enabled,
+            pdf_fallback_enabled=pdf_fallback_enabled,
         )
 
         if abstract and len(abstract.strip()) >= 5:
@@ -1381,6 +2318,8 @@ def run(
     no_sync: bool = False,
     offline: bool = False,
     force: bool = False,
+    doi_redirect_enabled: bool = True,
+    pdf_fallback_enabled: bool = True,
 ) -> None:
     global_start = time.time()
     # Pull the latest cache from Hugging Face before reading/writing anything.
@@ -1512,6 +2451,8 @@ def run(
             reason_in=reason_in,
             include_legacy=include_legacy,
             force=force,
+            doi_redirect_enabled=doi_redirect_enabled,
+            pdf_fallback_enabled=pdf_fallback_enabled,
         )
         if success > 0:
             if no_sync or offline:
@@ -1557,7 +2498,8 @@ def run(
             conf_papers, all_papers, chunk_size, retry_failed, retry_partial, query_doi_by_title,
             start_time=global_start, soft_timeout=soft_timeout, max_failed_attempts=max_failed_attempts,
             progress=progress, reason_in=reason_in, include_legacy=include_legacy,
-            force=force,
+            force=force, doi_redirect_enabled=doi_redirect_enabled,
+            pdf_fallback_enabled=pdf_fallback_enabled,
         )
         attempted = success + failed
         processed_total += attempted
@@ -1664,7 +2606,85 @@ if __name__ == "__main__":
             "Does NOT re-fetch papers that already have a non-empty abstract."
         ),
     )
+    parser.add_argument(
+        "--no-doi-redirect",
+        dest="doi_redirect_enabled",
+        action="store_false",
+        help=(
+            "Disable the DOI redirect dispatch step (enabled by default): after "
+            "the DOI chain fails for a doi.org URL, follow the redirect once and "
+            "re-dispatch the final landing page to the domain-fetcher registry "
+            "(e.g. link.springer.com / isca-archive.org)."
+        ),
+    )
+    s2_group = parser.add_mutually_exclusive_group()
+    s2_group.add_argument(
+        "--s2-batch",
+        dest="s2_batch",
+        action="store_true",
+        help=(
+            "Dedicated pass: re-try failed doi.org records via the Semantic "
+            "Scholar /paper/batch endpoint (up to 500 DOIs per request, ~1 rps). "
+            "Mutually exclusive with --s2-title-match; bypasses the --phase flow."
+        ),
+    )
+    s2_group.add_argument(
+        "--s2-title-match",
+        dest="s2_title_match",
+        action="store_true",
+        help=(
+            "Dedicated pass: re-try failed non-DOI long-tail records (dl.acm.org, "
+            "vldb.org, web.archive.org, ...) via the Semantic Scholar "
+            "/paper/search/match endpoint with strict title (>=0.85) and year (±1) "
+            "gates. Mutually exclusive with --s2-batch/--openalex-title; bypasses "
+            "the --phase flow."
+        ),
+    )
+    s2_group.add_argument(
+        "--openalex-title",
+        dest="openalex_title",
+        action="store_true",
+        help=(
+            "Dedicated pass: like --s2-title-match but via OpenAlex "
+            "/works?search=<title> (3 rps, inverted-index abstract rebuild). "
+            "The excluded-host set drops ndss-symposium.org (its pages carry no "
+            "abstract, so an external index is the only source). Mutually "
+            "exclusive with --s2-batch/--s2-title-match; bypasses the --phase flow."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help=(
+            "S2/OpenAlex dedicated modes only: call the API and log what would "
+            "be backfilled, but do not write cache/progress and do not sync to "
+            "Hugging Face."
+        ),
+    )
+    parser.add_argument(
+        "--no-pdf-fallback",
+        dest="pdf_fallback_enabled",
+        action="store_false",
+        help=(
+            "Disable the last-resort PDF abstract extraction (enabled by "
+            "default): when every metadata source fails and the paper URL is a "
+            "direct .pdf link, download it (<=8MB, first 3 pages) and extract "
+            "the Abstract section with pdfminer."
+        ),
+    )
     args = parser.parse_args()
+    if args.s2_batch or args.s2_title_match or args.openalex_title:
+        run_s2(
+            "batch" if args.s2_batch else ("openalex" if args.openalex_title else "title"),
+            chunk_size=args.chunk_size,
+            max_papers=args.max_papers,
+            soft_timeout=args.soft_timeout,
+            no_sync=args.no_sync,
+            offline=args.offline,
+            dry_run=args.dry_run,
+        )
+        sys.exit(0)
     reason_in_set: Optional[Set[str]] = None
     if args.reason_in:
         reason_in_set = {r.strip() for r in args.reason_in.split(",") if r.strip()}
@@ -1686,4 +2706,6 @@ if __name__ == "__main__":
         no_sync=args.no_sync,
         offline=args.offline,
         force=args.force,
+        doi_redirect_enabled=args.doi_redirect_enabled,
+        pdf_fallback_enabled=args.pdf_fallback_enabled,
     )

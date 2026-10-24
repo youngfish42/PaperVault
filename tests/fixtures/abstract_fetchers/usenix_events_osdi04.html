@@ -1,0 +1,167 @@
+<html><head><title>OSDI '04 Abstract</title>
+<script language="Javascript" src="/legacy/page.js"><!-- // PAGE 1.0
+iover() { ; } iout() { ; }
+// -->
+</script>
+</HEAD>
+
+<a href="https://www.usenix.org"><img src="/graphics/new_usenix.jpg" width="288" height="232" alt="Check out the new USENIX Web site." align="right"></a>
+
+<!-- IE understands topmargin, leftmargin, rightmargin, NS understands marginheight -->
+<body BGCOLOR="#ffffff" TEXT="#000000"  link="#990000" alink="#666666" vlink="#666666" TOPMARGIN="0" LEFTMARGIN="0" RIGHTMARGIN="0" MARGINHEIGHT="0">
+<!-- Banner --><center><div>
+<table border="0" cellpadding="0" cellspacing="0" width="600">
+<!-- space at top -->
+<tr><td colspan="13"><img src="/legacy/graphics/dot_clear.gif" width="1" height="5" alt=""><br></td></tr>
+<tr><!-- row 1 -->
+   <td colspan="13"><img src="/legacy/graphics/smalltop.gif" width="600" height="6" border="0" alt=""></td>
+</tr>
+<tr><!-- row 2 -->
+   <td rowspan=2><a href="/legacy/"><img src="/legacy/graphics/smallleftpc.gif" width="102" height="23" border="0" alt="USENIX"></a></td>
+   <td><a href="/legacy/" onMouseOver="iover('home');" onMouseOut="iout('home');"><img src="/legacy/graphics/smallhome.gif" width="38" height="16" border="0" name="home" alt="Home"></a></td>
+   <td><img src="/legacy/graphics/divider16.gif" width="17" height="16" border="0" alt="."></td>
+   <td><a href="/legacy/about" onMouseOver="iover('about');" onMouseOut="iout('about');"><img src="/legacy/graphics/smallabout.gif" width="90" height="16" border="0" alt="About USENIX" name="about"></a></td>
+   <td><img src="/legacy/graphics/divider16.gif" width="17" height="16" border="0" alt="."></td>
+   <td><a href="/legacy/events" onMouseOver="iover('events');" onMouseOut="iout('events');"><img src="/legacy/graphics/smallevents.gif" width="42" height="16" border="0" alt="Events" name="events"></a></td>
+   <td><img src="/legacy/graphics/divider16.gif" width="17" height="16" border="0" alt="."></td>
+   <td><a href="/legacy/membership" onMouseOver="iover('membership');" onMouseOut="iout('membership')"><img src="/legacy/graphics/smallmembership.gif" width="78" height="16" border="0" alt="membership" name="membership"></a></td>
+   <td><img src="/legacy/graphics/divider16.gif" width="17" height="16" border="0" alt="."></td>
+   <td><a href="/legacy/publications" onMouseOver="iover('publications');" onMouseOut="iout('publications');"><img src="/legacy/graphics/smallpublications.gif" width="77" height="16" border="0" alt="Publications" name="publications"></a></td>
+   <td><img src="/legacy/graphics/divider16.gif" width="17" height="16" border="0" alt="."></td>
+   <td><a href="/legacy/students" onMouseOver="iover('students');"  onMouseOut="iout('students');"><img src="/legacy/graphics/smallstudents.gif" width="54" height="16" border="0" alt="Students" name="students"></a></td>
+  <td rowspan=2><img src="/legacy/graphics/smallright.gif" width="34" height="23" border="0" alt=""></td>
+</tr>
+<tr><!-- row 3 -->
+  <td colspan=11 bgcolor="#666666"><img src="/legacy/graphics/dot_clear.gif" width="2" height="7" border="0" alt=""></td>
+</tr></table>
+</div><!-- End of Banner -->
+<DIV>
+<CENTER>
+<TABLE BORDER="0" WIDTH="600" CELLSPACING="0" CELLPADDING="0">
+<tr>
+
+<!--Left Border-->
+<td width="2" valign="top" bgcolor="#CCCCCC"><img src="/legacy/graphics/dot_clear.gif" width="2" height="1" alt=""></td>
+
+<!--Links Column-->
+<td width="596" valign="top" bgcolor="#FFFFFF">
+<table width=100% border=0 cellspacing=0 cellpadding=8><tr><td>
+
+
+<FONT SIZE="+1" COLOR="#990000" FACE="verdana, arial, helvetica, sans-serif"><B>OSDI '04 &#151; Abstract</FONT>
+<p>
+<b>Pp. 1&#150;16 of the <i>Proceedings</i></b>
+<p>
+<font color="#990000" FACE="verdana, arial, helvetica, sans-serif">Awarded Best Paper!</B></FONT>
+
+
+<FONT SIZE="-1" FACE="verdana, arial, helvetica, sans-serif">
+
+<!-- START OF PAGE CONTENTS -->
+<!-- Title and authors from 'tech sessions' page; abstract from body of page. -->
+<H2>Recovering Device Drivers
+</H2>
+
+Michael M. Swift, Muthukaruppan Annamalai, Brian N. Bershad, and Henry M. Levy, <i>University of Washington</i>
+
+<H3>Abstract</H3>
+
+ This paper presents a new mechanism that enables applications
+to run correctly when device drivers fail. Because
+device drivers are the principal failing component in most systems,
+reducing driver-induced failures greatly improves overall reliability.
+Earlier work has shown that an operating system can survive driver
+failures&nbsp;[<a href="#swift04" name="CITEswift04">33</a>], but the applications that depend on them cannot.
+Thus, while operating system reliability was greatly improved,
+application reliability generally was not.
+
+<P>
+To remedy this situation, we introduce a new operating system
+mechanism called a <em>shadow driver</em>. A shadow driver monitors
+device drivers and transparently recovers from driver failures.
+Moreover, it assumes the role of the failed driver during recovery.
+In this way, applications using the failed driver, as well as
+the kernel itself, continue to function as expected.
+
+<P>
+We implemented shadow drivers for the Linux operating system and
+tested them on over a dozen device drivers. Our results show that
+applications and the OS can indeed survive the failure of a variety of
+device drivers. Moreover, shadow drivers impose minimal performance
+overhead.  Lastly, they can be introduced with only modest changes to
+the OS kernel and with no changes at all to existing device drivers. 
+
+
+ <P>
+
+ <UL>
+ 
+ <LI>View the full text of this paper in <A href="swift/swift_html/index.html">HTML</A> and 
+ <A href="swift/swift.pdf">PDF</A>.  
+      <br><a href="https://db.usenix.org/cgi-bin/auth/forgotten.cgi?nexturl=/publications/library/proceedings/osdi04/tech/swift.html"><img
+ src="/legacy/graphics/forgotten.gif" WIDTH="125" HEIGHT="44" border=0
+ alt="Click here if you have forgotten your password" align="right"></a>
+
+The Proceedings are published as a collective work, &copy; 2004 by the USENIX Association. All Rights Reserved. Rights to individual papers remain with the author or the author's employer. Permission is granted for the noncommercial reproduction of the complete work for educational or research purposes. USENIX acknowledges all trademarks within this paper.
+ <P>
+ 
+ <LI>If you need the latest Adobe Acrobat Reader, you can download it from <A
+ href="https://www.adobe.com/prodindex/acrobat/readstep.html">Adobe's site</A>.
+ 
+ </ul>
+ <table>
+ <tr><td>
+ <a href="/legacy/membership/index.html"><img src="/legacy/graphics/join_now.gif" border="0" width="60" height="25"></a></td>
+ <td><font SIZE="-1" FACE="verdana, arial, helvetica, sans-serif">To become a USENIX Member, please see our <a href="/legacy/membership/index.html">Membership Information</a>.</font></td></tr>
+ </table> 
+ </font>
+
+<br>
+&nbsp;
+
+
+<p>
+<!-- END OF PAGE CONTENTS -->
+</td></tr></table></td>
+
+<!--Right Border-->
+<td width="2" valign="top" bgcolor="#CCCCCC"><img src="/legacy/graphics/dot_clear.gif" width="2" height="1" alt=""></td>
+
+</tr>
+<tr><td colspan="3" bgcolor="#CCCCCC" width="600" height="2"><img src="/legacy/graphics/dot_clear.gif" width="1" height="2" alt=""></td></tr>
+<tr><td colspan="3" width="600" height="5"><img src="/legacy/graphics/dot_clear.gif" width="1" height="5" alt=""></td></tr>
+</table>
+
+<TABLE BORDER="0" WIDTH="600" CELLSPACING="0" CELLPADDING="0">
+<TR><TD VALIGN="TOP">
+<font size=2><img src="/legacy/graphics/questmark.gif" width=12 height=16
+alt="?" hspace=2 align="left">Need help? <a
+href="/legacy/about/contacts.html">Use our Contacts page.</a></font>
+<br clear="left">
+<img src="/legacy/graphics/dot_clear.gif" width=1 height=5 alt=""><br>
+<ADDRESS>
+
+<!-- EDIT THE DATE AND YOUR LOGIN NAME BELOW -->
+<FONT SIZE="2">Last changed: 6 Dec. 2004 aw</FONT><BR>
+</ADDRESS>
+</TD><TD VALIGN="TOP" ALIGN="RIGHT">
+
+
+<!-- Upwards Navigation Table -->
+<table border=0 cellspacing=0 cellpadding=0>
+<tr><td>
+<a href="tech.html"><font size=1>Technical Program</font></a><br>
+</td></tr>
+<tr><td>
+<a href="../osdi04.html"><font size=1>OSDI '04  Home</font></a><br>
+</td></tr>
+<tr><td>
+<a href="/legacy/"><font size=1>USENIX home</font></a><br>
+</td></tr></table>
+<!-- End of Upwards Navigation Table -->
+
+</TD></TR></TABLE>
+</CENTER>
+</DIV>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d54e4b1d9f0e58',t:'MTc5MjQ3MDgyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></BODY>
+</HTML>

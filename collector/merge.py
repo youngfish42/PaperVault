@@ -68,8 +68,26 @@ def _merge_with_cache(new_res, cache_res, multi_volume_names, collected_dblp_nam
     * For every conf we *did* recollect, URL-dedupe the cache against the new
       records and field-merge (longer abstract / authors / non-placeholder
       code) so cache abstracts survive a fresh source run.
+    * Filter front-matter records (volume covers / proceedings landing pages)
+      out of the **new** side before they ever enter the cache — see
+      ``collector/frontmatter.py`` for the collection-side predicate and how
+      it deliberately differs from the cleanup-side one. Existing cache
+      records are never deleted here; that is the cleanup script's job.
     """
-    result = dict(new_res)
+    from collector.frontmatter import should_drop_on_collect
+
+    dropped = 0
+    result = {}
+    for conf_name, papers in new_res.items():
+        kept = []
+        for p in papers:
+            if should_drop_on_collect(p):
+                dropped += 1
+                continue
+            kept.append(p)
+        result[conf_name] = kept
+    if dropped:
+        print(f"[*] collector: filtered {dropped} front-matter record(s) before cache merge")
     for conf_name, papers in cache_res.items():
         if conf_name not in result:
             result[conf_name] = papers

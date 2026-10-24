@@ -19,9 +19,12 @@ Design contract
   without performing any HTTP call.
 
 The PDF-only sites (``vldb`` / ``ceur``) intentionally short-circuit to
-``ok=False, reason="no_abstract_available"``. PDF extraction is
-explicitly out of scope for this iteration — see
-[spec.md](file:///d:/git/youngfish/PaperVault/.trae/specs/abstract-backfill-repair/spec.md#L21).
+``ok=False, reason="no_abstract_available"`` — their abstract lives in
+the PDF. When the upstream chain also fails, the last-resort PDF
+fallback in ``scripts/fetch_abstracts.py`` (:mod:`.pdf_extract` +
+``_fetch_pdf_abstract``) downloads the PDF and extracts the Abstract
+section; pdfminer is imported lazily so this package stays PDF-free at
+import time.
 """
 
 from __future__ import annotations
@@ -37,6 +40,9 @@ from .vldb import VLDB_FETCHER
 from .ceur import CEUR_FETCHER
 from .jmlr import JMLR_FETCHER
 from .isca import ISCA_FETCHER
+from .springer import SPRINGER_FETCHER
+from .usenix import USENIX_FETCHER
+from .ndss import NDSS_FETCHER
 
 __all__ = [
     "AbstractResult",
@@ -63,6 +69,9 @@ FETCHER_REGISTRY: dict = _register(
     CEUR_FETCHER,
     JMLR_FETCHER,
     ISCA_FETCHER,
+    SPRINGER_FETCHER,
+    USENIX_FETCHER,
+    NDSS_FETCHER,
 )
 
 
