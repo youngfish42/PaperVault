@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -234,6 +235,31 @@ def _get_session() -> requests.Session:
         _thread_local.session.trust_env = False
         _thread_local.session.mount("https://", HTTPAdapter(max_retries=2))
     return _thread_local.session
+
+
+def _get_api_session() -> requests.Session:
+    """Session for the S2 / OpenAlex endpoints: NO urllib3 status retries.
+
+    ``_get_session`` mounts ``HTTPAdapter(max_retries=2)``, which lets
+    urllib3 sleep *inside* ``send()`` on 429/5xx (honouring unbounded
+    ``Retry-After`` headers), completely bypassing ``_s2_request``'s own
+    backoff loop and the pass-level soft-timeout. Observed 2026-10-22:
+    an ``--openalex-title`` pass stalled 84 minutes inside
+    ``urllib3.util.retry.sleep_for_retry`` without a single chunk save.
+    With ``total=0`` every HTTP response (including 429) surfaces
+    immediately and ``_s2_request`` handles it with its own bounded,
+    Retry-After-aware backoff.
+    """
+    if not hasattr(_thread_local, "api_session"):
+        _thread_local.api_session = requests.Session()
+        _thread_local.api_session.trust_env = False
+        _thread_local.api_session.mount(
+            "https://",
+            HTTPAdapter(
+                max_retries=Retry(total=0, respect_retry_after_header=False)
+            ),
+        )
+    return _thread_local.api_session
 
 
 def _rate_limited_request(
@@ -904,6 +930,9 @@ S2_MIN_INTERVAL = 1.0
 S2_MIN_ABSTRACT_CHARS = MIN_ABSTRACT_CHARS
 # --s2-title-match 的标题相似度阈值（比主链 is_title_match 的 0.70 严格）。
 S2_TITLE_RATIO_THRESHOLD = 0.85
+# 单次 429/5xx 退避的等待上限：服务器用 Retry-After 要求更长等待时直接放弃
+# 该请求（归类 rate_limited），不让单篇论文卡住整个 pass。
+S2_MAX_RETRY_WAIT = 120.0
 
 # --s2-title-match 的排除 host 集合（canonical 小写、无 www）：
 #   * openaccess.thecvf.com / openreview.net —— 各有专用回填脚本
@@ -971,7 +1000,7 @@ def _s2_request(
     普通 ``HEADERS`` 以免把 S2 key 泄漏给第三方。``rate_state`` 默认 S2 的
     限速状态；不同端点的限速预算应传入各自的状态字典。
     """
-    session = _get_session()
+    session = _get_api_session()
     state = _s2_rate_state if rate_state is None else rate_state
     req_headers = _s2_headers() if headers is None else headers
     last_reason = "network"
@@ -1003,6 +1032,10 @@ def _s2_request(
                 delay = float(retry_after) if retry_after else min(60, 2 ** attempt)
             except (TypeError, ValueError):
                 delay = min(60, 2 ** attempt)
+            # 服务器要求的长等待（如 Retry-After: 600）不值得在本 pass 里硬扛：
+            # 立即把响应交还调用方归类 rate_limited，让下一篇继续。
+            if delay > S2_MAX_RETRY_WAIT:
+                return resp, ""
             if attempt < max_retries:
                 time.sleep(delay)
                 continue

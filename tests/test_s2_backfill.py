@@ -369,7 +369,7 @@ def test_s2_request_retries_429_honouring_retry_after(monkeypatch):
         _s2_response({}, status=429, headers={"Retry-After": "7"}),
         _s2_response({"title": "ok"}, status=200),
     ]
-    monkeypatch.setattr(fa, "_get_session", lambda: session)
+    monkeypatch.setattr(fa, "_get_api_session", lambda: session)
     sleeps = []
     monkeypatch.setattr(fa.time, "sleep", lambda s: sleeps.append(s))
 
@@ -381,10 +381,45 @@ def test_s2_request_retries_429_honouring_retry_after(monkeypatch):
     assert 7.0 in sleeps  # Retry-After respected
 
 
+def test_s2_request_gives_up_on_long_retry_after(monkeypatch):
+    """A ``Retry-After`` beyond ``S2_MAX_RETRY_WAIT`` must NOT sleep: the 429
+    response is returned immediately so the caller can classify it as
+    ``rate_limited`` and move on to the next paper."""
+    session = MagicMock()
+    session.get.side_effect = [
+        _s2_response({}, status=429, headers={"Retry-After": "600"}),
+    ]
+    monkeypatch.setattr(fa, "_get_api_session", lambda: session)
+    sleeps = []
+    monkeypatch.setattr(fa.time, "sleep", lambda s: sleeps.append(s))
+
+    resp, err = fa._s2_request("get", "https://api.openalex.org/x", min_interval=0)
+
+    assert err == ""
+    assert resp.status_code == 429
+    assert session.get.call_count == 1  # no retry at all
+    assert all(s <= fa.S2_MAX_RETRY_WAIT for s in sleeps)
+
+
+def test_api_session_disables_urllib3_status_retries():
+    """Regression: urllib3-level retries sleep inside ``send()`` on 429/5xx
+    (honouring unbounded Retry-After), which stalled a pass for 84 minutes
+    on 2026-10-22. The API session must disable them; ``_s2_request``'s own
+    bounded backoff is the only retry layer."""
+    session = fa._get_api_session()
+    retry = session.adapters["https://"].max_retries
+    # urllib3 把 Retry(total=0) 的 status 归一化为 None（= 跟随 total），
+    # 两者等价于"绝不做状态码重试"；respect_retry_after_header 也必须关掉，
+    # 否则长 Retry-After 仍可能在 adapter 内部睡眠。
+    assert retry.total == 0
+    assert not retry.status
+    assert retry.respect_retry_after_header is False
+
+
 def test_s2_request_network_exhaustion_returns_reason(monkeypatch):
     session = MagicMock()
     session.get.side_effect = requests.exceptions.ConnectionError("boom")
-    monkeypatch.setattr(fa, "_get_session", lambda: session)
+    monkeypatch.setattr(fa, "_get_api_session", lambda: session)
     monkeypatch.setattr(fa.time, "sleep", lambda _s: None)
 
     resp, err = fa._s2_request("get", "https://api.semanticscholar.org/x", max_retries=2, min_interval=0)
