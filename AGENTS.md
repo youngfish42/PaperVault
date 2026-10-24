@@ -107,6 +107,7 @@ PaperVault/
 │   ├── test_load_dedup.py        # In-memory dedupe when loading `cache.jsonl.gz`
 │   ├── test_collector_dedupe.py  # `_merge_with_cache` per-`(conf, paper_url)` dedupe
 │   ├── test_cleanup_cache_dedupe.py  # One-shot `scripts/cleanup_cache_dedupe.py` regression
+│   ├── test_cleanup_frontmatter.py   # `scripts/cleanup_cache_frontmatter.py`: front-matter predicate (title regex × venue-index/empty-field evidence), dry-run no-write, atomic write + backup, idempotency
 │   ├── test_ai_providers.py      # `ProviderPreset` catalog shape + `get_preset` fallback
 │   ├── test_ai_clients.py        # `call_openai_compatible` / `call_anthropic` dispatch (mocked SDKs)
 │   ├── test_ai_rerank.py         # `POST /v1/ai/rerank` end-to-end (mocked LLM)
@@ -147,6 +148,7 @@ PaperVault/
 │   ├── validate_pdf_extract.py       # Validation harness for the PDF abstract fallback: stratified sampling of .pdf records, OpenAlex/S2 reference abstracts, PASS/REVIEW/FAIL report → docs/pdf_extract_validation.md
 │   ├── repair_wayback_urls.py        # Repair web.archive.org-wrapped dead paper URLs (~4.4k, AAAI/UAI 2000-2014) via OpenAlex title lookup; migration trail goes to cache/wayback_repair_log.jsonl (REASON_ENUM has no `migrated`)
 │   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
+│   ├── cleanup_cache_frontmatter.py  # One-shot removal of front-matter records (proceedings covers / venue indexes; conservative title-regex + (venue-index | no-abstract & no-code) double condition; `--review` prints the full deletion list)
 │   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
 │   ├── sync_hf_readme.py             # Render `docs/HF_README.md` and push it as the Hugging Face dataset repo root README
 │   └── capture_screenshot.py         # Playwright-driven README hero screenshot regenerator (1280x540 @ 2x; assumes backend :5001 + Vite :8080)
@@ -398,6 +400,7 @@ Other frontend scripts:
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
 | `python scripts/fetch_pwc_backfill.py` | Offline backfill of empty abstracts/code links from `pwc-archive/papers-with-abstracts` + `pwc-archive/links-between-paper-and-code` (2025-07 snapshots). Conservative exact-key matching (arXiv ID → OpenReview ID → normalized URL → unique normalized title with year guard). Supports `--dry-run`, `--report`, `--conf`, `--no-upload` |
 | `python scripts/cleanup_cache_dedupe.py` | One-shot cache dedupe by `(conf, paper_url)` — reuses `collector._merge_paper_record` so semantics stay in lockstep with the collector |
+| `python scripts/cleanup_cache_frontmatter.py` | One-shot removal of front-matter records (proceedings covers / venue-index pages): conservative double condition (title regex AND (venue-index OR no-abstract & no-code-link)). Dry-run by default (`--write` applies, atomic `.tmp`+`os.replace` with `.bak`); `--review` prints the full deletion list; progress ledger untouched. Supports `--no-sync` / `--offline` |
 | `python scripts/migrate_progress_to_jsonl.py` | Migrate legacy `abstract_backfill_progress.json` to the JSONL.gz format (`--dry-run` to preview) |
 | `python scripts/sync_hf_readme.py` | Render `docs/HF_README.md` + push it as the Hugging Face dataset repo root README |
 | `python scripts/repair_wayback_urls.py` | Repair `web.archive.org`-wrapped dead paper URLs via OpenAlex title lookup (title ≥0.85 + year ±1 gates; new URL = `doi.org/<doi>` > landing page; conflict merge via `collector._merge_paper_record`; may side-fill abstracts with `source=openalex_title`). Dry-run by default; `--write` to apply. Supports `--max-papers`, `--no-sync`, `--offline`; honours optional `OPENALEX_API_KEY` |
