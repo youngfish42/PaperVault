@@ -514,7 +514,7 @@ There are six GitHub Actions workflows in total: one **quality-gate** workflow (
 The `wayback-repair` job rewrites `paper_url`s in the authoritative HF cache. Rollback options, safest first:
 
 1. **HF dataset is a plain git repo** — the repair push is an ordinary commit. Clone it (`git clone https://<user>:<HF_TOKEN>@huggingface.co/datasets/<repo_id>`), then `git revert <commit>` (preferred; keeps history) or `git reset --hard <previous-commit>` + force-push, then pull the cache locally again via `ensure_cache_local(refresh=True)`.
-2. **Precise per-record undo** — `cache/wayback_repair_log.jsonl` (committed into the auto PR) records every `{old_url, new_url, action, abstract_filled}` mapping; a reverse script can restore each `paper_url` exactly.
+2. **Precise per-record undo** — `cache/wayback_repair_log.jsonl` (committed into the auto PR on the dedicated `auto-wayback-repair` branch) records every `{old_url, new_url, action, abstract_filled}` mapping; a reverse script can restore each `paper_url` exactly. Both the scheduled workflow and the manual job also upload the log as a run artifact (`if: always()`), so the mappings survive even when the PR step itself fails after a successful HF push.
 3. **Idempotency** — already-repaired records no longer match the wayback regex, so re-running after an interruption never double-processes; an interrupted run is safe to simply re-run.
 
 ## License

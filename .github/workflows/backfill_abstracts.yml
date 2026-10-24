@@ -516,3 +516,16 @@ jobs:
           delete-branch: false
           add-paths: |
             cache/wayback_repair_log.jsonl
+
+      - name: Upload repair log artifact
+        # 回滚映射的兜底留存：HF 推送先于 PR 创建（同进程保乐观锁的代价），
+        # 若 PR 步骤失败，本次运行的 旧→新 URL 映射仅靠 runner 上的日志文件
+        # 就会随 runner 销毁而丢失。artifact（if: always()）保证任何结局下
+        # 映射都可下载。与 wayback_repair.yml 的同名步骤保持一致。
+        if: ${{ always() && !inputs.wayback_repair_dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: wayback-repair-log-manual-${{ github.run_number }}
+          path: cache/wayback_repair_log.jsonl
+          if-no-files-found: ignore
+          retention-days: 30
