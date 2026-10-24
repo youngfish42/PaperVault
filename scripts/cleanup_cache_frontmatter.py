@@ -30,7 +30,6 @@ import argparse
 import gzip
 import json
 import os
-import re
 import sys
 import time
 from pathlib import Path
@@ -38,30 +37,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from collector.url_types import classify_paper_url  # noqa: E402
+from collector.frontmatter import FRONT_MATTER_RE, is_frontmatter_record  # noqa: E402,F401
 from data_artifacts import ensure_cache_local, sync_cache_artifacts  # noqa: E402
 
 DEFAULT_CACHE = ROOT / "cache" / "cache.jsonl.gz"
-
-FRONT_MATTER_RE = re.compile(
-    r"^(proceedings\b|front matter|frontmatter|table of contents|preface\b|findings of the association)",
-    re.IGNORECASE,
-)
-
-
-def is_frontmatter_record(rec: dict) -> bool:
-    """判定一条记录是否为 front-matter（保守双重条件，见模块 docstring）。"""
-    if not isinstance(rec, dict):
-        return False
-    title = (rec.get("paper_name") or "").strip()
-    if not FRONT_MATTER_RE.match(title):
-        return False
-    if classify_paper_url(rec.get("paper_url", "")) == "venue-index":
-        return True
-    has_abstract = bool((rec.get("paper_abstract") or "").strip())
-    code = (rec.get("paper_code") or "").strip()
-    has_code = bool(code and code != "#")
-    return not has_abstract and not has_code
 
 
 def cleanup(
