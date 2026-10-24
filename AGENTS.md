@@ -116,7 +116,8 @@ PaperVault/
 │   ├── test_saved_queries.py     # `/v1/saved_queries` CRUD, `require_user` 401, per-user isolation, quota, validation
 │   ├── test_doi_redirect_dispatch.py  # DOI redirect dispatch: doi.org → final-URL re-dispatch to the fetcher registry, failure degrade, `--no-doi-redirect`
 │   ├── test_s2_backfill.py       # `--s2-batch` / `--s2-title-match` / `--openalex-title` backfill passes: batch mapping (null entries), title/year gates, excluded hosts (incl. NDSS inclusion for OpenAlex), dry-run
-│   └── test_pdf_fallback.py      # PDF abstract fallback: `extract_abstract_from_pdf_bytes` on in-process minimal PDFs (inline prefix / no-section / copyright rejection / 2000-char cap) + `_fetch_pdf_abstract` HTTP stubs + `source="pdf"` integration
+│   ├── test_pdf_fallback.py      # PDF abstract fallback: `extract_abstract_from_pdf_bytes` on in-process minimal PDFs (inline prefix / no-section / copyright rejection / 2000-char cap) + `_fetch_pdf_abstract` HTTP stubs + `source="pdf"` integration
+│   └── test_repair_wayback.py    # `repair_wayback_urls.py`: wayback unwrap regex, new-URL priority (doi.org > landing page), title/year gates, conflict merge, dry-run no-write
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -144,6 +145,7 @@ PaperVault/
 │   ├── fetch_code_links.py           # Extract GitHub code links from abstracts
 │   ├── fetch_pwc_backfill.py         # Offline one-shot backfill of empty abstracts/code links from the archived PwC HF snapshots (exact-key matching only; never overwrites non-empty fields)
 │   ├── validate_pdf_extract.py       # Validation harness for the PDF abstract fallback: stratified sampling of .pdf records, OpenAlex/S2 reference abstracts, PASS/REVIEW/FAIL report → docs/pdf_extract_validation.md
+│   ├── repair_wayback_urls.py        # Repair web.archive.org-wrapped dead paper URLs (~4.4k, AAAI/UAI 2000-2014) via OpenAlex title lookup; migration trail goes to cache/wayback_repair_log.jsonl (REASON_ENUM has no `migrated`)
 │   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
 │   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
 │   ├── sync_hf_readme.py             # Render `docs/HF_README.md` and push it as the Hugging Face dataset repo root README
@@ -398,6 +400,7 @@ Other frontend scripts:
 | `python scripts/cleanup_cache_dedupe.py` | One-shot cache dedupe by `(conf, paper_url)` — reuses `collector._merge_paper_record` so semantics stay in lockstep with the collector |
 | `python scripts/migrate_progress_to_jsonl.py` | Migrate legacy `abstract_backfill_progress.json` to the JSONL.gz format (`--dry-run` to preview) |
 | `python scripts/sync_hf_readme.py` | Render `docs/HF_README.md` + push it as the Hugging Face dataset repo root README |
+| `python scripts/repair_wayback_urls.py` | Repair `web.archive.org`-wrapped dead paper URLs via OpenAlex title lookup (title ≥0.85 + year ±1 gates; new URL = `doi.org/<doi>` > landing page; conflict merge via `collector._merge_paper_record`; may side-fill abstracts with `source=openalex_title`). Dry-run by default; `--write` to apply. Supports `--max-papers`, `--no-sync`, `--offline`; honours optional `OPENALEX_API_KEY` |
 | `python scripts/capture_screenshot.py` | Regenerate `pics/screenshot/web.jpg` via Playwright (requires backend on :5001 and Vite dev server on :8080). Supports `--url`, `--output`, `--width`, `--height`, `--scale`, `--quality` |
 | `python -m discovery.generate_conf` | Generate / merge discovered conference configs |
 | `cd web-vue && npm run dev` | Start frontend dev server (Vite, :8080, proxies `/api` to the backend) |

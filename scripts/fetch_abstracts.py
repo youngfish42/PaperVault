@@ -1272,6 +1272,11 @@ def _openalex_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
     }
     if CONTACT_EMAIL:
         params["mailto"] = CONTACT_EMAIL
+    # OpenAlex 匿名配额按出口 IP 共享且会耗尽（Retry-After 可达次日）；
+    # 有 key 时走 api_key 参数。
+    api_key = os.getenv("OPENALEX_API_KEY", "").strip()
+    if api_key:
+        params["api_key"] = api_key
     resp, err = _s2_request(
         "get",
         OPENALEX_SEARCH_ENDPOINT,
