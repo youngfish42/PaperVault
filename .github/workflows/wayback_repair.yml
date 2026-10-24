@@ -4,7 +4,9 @@ name: Wayback URL Repair
 # 等 ~4.4k 条），工具为 scripts/repair_wayback_urls.py。
 #
 # 定时设计：OpenAlex 匿名日配额按 UTC 日重置，该配额在 runner 共享 IP 段上
-# 通常很快耗尽，因此定在 UTC 00:43（北京 08:43，重置后第一时间）开跑。
+# 通常很快耗尽，因此定在 UTC 00:35（北京 08:35）开跑——backfill_abstracts.yml
+# 已于 2026-10-24 相位平移到 UTC 02:00/08:00/14:00/20:00，本窗口（00:35-02:00）
+# 独享配额重置后的新鲜时段，不会再排在 5h 回填任务之后。
 # 注意：GitHub 的 schedule 只在默认分支（main）上生效——本 workflow 合入
 # main 后才会真正每日运行。
 #
@@ -14,7 +16,7 @@ name: Wayback URL Repair
 
 on:
   schedule:
-    - cron: "43 0 * * *"  # UTC 00:43 = 北京 08:43（OpenAlex 配额 UTC 午夜重置后）
+    - cron: "35 0 * * *"  # UTC 00:35 = 北京 08:35（OpenAlex 配额 UTC 午夜重置后；窗口至 02:00 回填开跑前）
   workflow_dispatch:      # 允许手动补跑（write 模式；dry-run 请用 backfill_abstracts.yml 的 wayback-repair job）
 
 concurrency:

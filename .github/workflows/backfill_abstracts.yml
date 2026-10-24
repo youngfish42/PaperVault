@@ -10,8 +10,11 @@ env:
 
 on:
   schedule:
-    # 每 6 小时运行一次 (UTC 00:00 / 06:00 / 12:00 / 18:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）
-    - cron: "0 */6 * * *"
+    # 每 6 小时运行一次 (UTC 02:00 / 08:00 / 14:00 / 20:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）。
+    # 2026-10-24 相位平移：从 00:00/06:00/12:00/18:00 后移 2 小时，给
+    # wayback_repair.yml（UTC 00:35 开跑）让出 OpenAlex 日配额刚重置后的
+    # 新鲜窗口（papervault-cache 并发组串行，避免修复任务排在 5h 回填之后）。
+    - cron: "0 2,8,14,20 * * *"
   workflow_dispatch:
     inputs:
       target_conf:
