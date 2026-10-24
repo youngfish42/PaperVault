@@ -4,9 +4,10 @@ name: Wayback URL Repair
 # 等 ~4.4k 条），工具为 scripts/repair_wayback_urls.py。
 #
 # 定时设计：OpenAlex 匿名日配额按 UTC 日重置，该配额在 runner 共享 IP 段上
-# 通常很快耗尽，因此定在 UTC 00:35（北京 08:35）开跑——backfill_abstracts.yml
-# 已于 2026-10-24 相位平移到 UTC 02:00/08:00/14:00/20:00，本窗口（00:35-02:00）
-# 独享配额重置后的新鲜时段，不会再排在 5h 回填任务之后。
+# 通常很快耗尽，因此定在 UTC 00:40（北京 08:40）开跑——backfill_abstracts.yml
+# 已于 2026-10-24 相位平移到 UTC 01:00/07:00/13:00/19:00（每 6 小时），其
+# 19:00 档在最坏情况下 00:30 前结束，本任务独享配额重置后的新鲜窗口，
+# 不会再排在 5h 回填任务之后（papervault-cache 并发组串行）。
 # 注意：GitHub 的 schedule 只在默认分支（main）上生效——本 workflow 合入
 # main 后才会真正每日运行。
 #
@@ -16,7 +17,7 @@ name: Wayback URL Repair
 
 on:
   schedule:
-    - cron: "35 0 * * *"  # UTC 00:35 = 北京 08:35（OpenAlex 配额 UTC 午夜重置后；窗口至 02:00 回填开跑前）
+    - cron: "40 0 * * *"  # UTC 00:40 = 北京 08:40（OpenAlex 配额 UTC 午夜重置后；19:00 档回填最坏 00:30 已结束）
   workflow_dispatch:      # 允许手动补跑（write 模式；dry-run 请用 backfill_abstracts.yml 的 wayback-repair job）
 
 concurrency:
@@ -27,7 +28,9 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.10"
-  AUTO_BACKFILL_BRANCH: "auto-backfill-abstracts"
+  # 专用分支：不与 backfill_abstracts.yml 的 auto-backfill-abstracts 争用
+  #（同一 head 分支只能对应一个打开中的 PR，共用会互相覆盖）。
+  WAYBACK_BRANCH: "auto-wayback-repair"
 
 jobs:
   wayback-repair:
@@ -66,11 +69,29 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Repair wayback-wrapped URLs (write mode, HF sync deferred)
-        # --no-sync：HF 推送延后到 PR 开好以后，保证"PR（含迁移日志）先行、
-        # HF 推送殿后"。被限流的记录保持不变，次日定时 run 自然重试。
+      - name: Restore previous migration log (if any)
+        # 迁移日志按 PR 分支持久化（本工作流专用的 auto-wayback-repair 分支，
+        # 不与 backfill_abstracts 的 auto-backfill-abstracts 分支争用——同一
+        # head 分支只能对应一个打开中的 PR，共用会互相覆盖）。修复脚本以
+        # append 方式写日志，恢复后多日的迁移记录可在同一 PR 中累积。
         run: |
-          python scripts/repair_wayback_urls.py --write --no-sync | tee "$RUNNER_TEMP/wayback_repair.log"
+          if git ls-remote --exit-code --heads origin "${{ env.WAYBACK_BRANCH }}" >/dev/null 2>&1; then
+            git fetch --no-tags origin "${{ env.WAYBACK_BRANCH }}"
+            if git cat-file -e "origin/${{ env.WAYBACK_BRANCH }}:cache/wayback_repair_log.jsonl" 2>/dev/null; then
+              git checkout "origin/${{ env.WAYBACK_BRANCH }}" -- cache/wayback_repair_log.jsonl
+              echo "Restored migration log from ${{ env.WAYBACK_BRANCH }}."
+            fi
+          else
+            echo "No existing ${{ env.WAYBACK_BRANCH }} branch; starting fresh."
+          fi
+
+      - name: Repair wayback-wrapped URLs (write mode, in-process verified HF push)
+        # 修复脚本在同一进程内完成 HF 上传（_sync_or_die）：启动时
+        # ensure_cache_local 登记的 parent_commit 仍然有效（乐观锁保留），
+        # 上传结果显式校验、失败非零退出。被限流的记录保持不变，次日定时
+        # run 自然重试。
+        run: |
+          python scripts/repair_wayback_urls.py --write | tee "$RUNNER_TEMP/wayback_repair.log"
           {
             echo "### Wayback repair report (scheduled write run)"
             echo ""
@@ -81,7 +102,7 @@ jobs:
 
       - name: Check whether anything was repaired
         # 报告中的 "rewrite (in place)" + "merge (dup (conf,url))" 计数；
-        # 全限流的日子（rewrite=0）不开空 PR、不推 HF。
+        # 全限流的日子（rewrite=0）不开空 PR。
         id: repaired
         run: |
           rewritten=$(grep -oP 'rewrite \(in place\)\s*:\s*\K[0-9]+' "$RUNNER_TEMP/wayback_repair.log" || echo 0)
@@ -107,7 +128,8 @@ jobs:
 
       - name: Create Pull Request with migration log
         # 迁移日志（每条 旧→新 URL 映射）是回滚依据，必须随 PR 提交。
-        # cache.jsonl.gz / progress 不进 PR（它们在 Hugging Face 上）。
+        # cache.jsonl.gz / progress 不进 PR（它们在 Hugging Face 上，已由
+        # 修复步骤在同一进程内带乐观锁推送并校验）。
         if: steps.repaired.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
@@ -125,20 +147,16 @@ jobs:
             `cache/wayback_repair_log.jsonl` records every old→new URL mapping
             and is the basis for rollback (see AGENTS.md "CI/CD Workflows").
 
-            The cache itself (`cache/cache.jsonl.gz`) is pushed to Hugging Face
-            by the follow-up step, not committed here.
+            The cache itself (`cache/cache.jsonl.gz`) was already pushed to
+            Hugging Face by the repair step (in-process, with the
+            parent_commit optimistic lock and a verified upload result).
 
             ---
             *Maintained by [@youngfish42](https://github.com/youngfish42).*
-          branch: ${{ env.AUTO_BACKFILL_BRANCH }}
+          branch: ${{ env.WAYBACK_BRANCH }}
           delete-branch: false
           add-paths: |
             cache/wayback_repair_log.jsonl
-
-      - name: Push updated cache to Hugging Face
-        if: steps.repaired.outputs.changed == 'true'
-        run: |
-          python -c "from data_artifacts import sync_cache_artifacts; sync_cache_artifacts(commit_message='Repair web.archive.org-wrapped dead paper URLs (scheduled)')"
 
       - name: Upload repair log artifact
         # 无论是否有改写都留 artifact，便于核查限流日与成功日。

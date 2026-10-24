@@ -20,8 +20,9 @@ progress / 审计：
     记录保持不动。
 
 默认 ``--dry-run``（只输出报告）；``--write`` 才改缓存。缓存写入走与主链
-一致的 ``.tmp + os.replace`` 原子方式；结束 sync_cache_artifacts（除非
---no-sync/--offline/--dry-run）。
+一致的 ``.tmp + os.replace`` 原子方式；结束在**同一进程内**做带
+parent_commit 乐观锁的验证式上传 ``_sync_or_die``（除非
+--no-sync/--offline/--dry-run），上传失败会以非零退出。
 
 用法::
 
@@ -48,7 +49,7 @@ from collector import _merge_paper_record  # noqa: E402
 from data_artifacts import (  # noqa: E402
     ensure_cache_local,
     ensure_progress_local,
-    sync_cache_artifacts,
+    upload_to_huggingface,
 )
 from scripts.fetch_abstracts import (  # noqa: E402
     CACHE_FILE,
@@ -367,16 +368,47 @@ def main() -> None:
         print("[*] Dry run: no cache/progress writes, no Hugging Face sync.")
         return
     if stats["processed"] > 0 and not (args.no_sync or args.offline):
-        sync_cache_artifacts(
-            cache_path=CACHE_FILE,
-            commit_message="Repair web.archive.org-wrapped dead paper URLs",
-        )
+        _sync_or_die()
     elif stats["processed"] > 0:
         print(
             "[*] --no-sync/--offline set; skipped Hugging Face push. "
             "Local cache has been updated; remember to sync before any other "
             "workflow touches HF."
         )
+
+
+def _sync_or_die() -> None:
+    """Verified in-process upload of cache + progress to Hugging Face.
+
+    Two deliberate deviations from calling ``sync_cache_artifacts`` here or
+    from a follow-up ``python -c ...`` CI step (PR #221 review):
+
+    1. **Same process**: ``ensure_cache_local`` at startup registered the
+       ``parent_commit`` for the optimistic lock in this process; a separate
+       push process would upload WITHOUT any parent_commit and could
+       silently clobber a concurrent writer (no 412 retry).
+    2. **Verified**: ``sync_cache_artifacts`` prints-and-continues on upload
+       failure (by design for the 6h backfill), but here the push *is* the
+       deliverable — a silent failure would leave the migration-log PR
+       mergeable while HF still serves the unrepaired cache. We therefore
+       upload directly and exit non-zero when the cache file is not
+       confirmed uploaded.
+    """
+    targets = [CACHE_FILE]
+    progress_included = PROGRESS_FILE.exists()
+    if progress_included:
+        targets.append(PROGRESS_FILE)
+    uploaded = upload_to_huggingface(
+        targets,
+        commit_message="Repair web.archive.org-wrapped dead paper URLs",
+    )
+    if "cache/cache.jsonl.gz" not in uploaded:
+        print("[!] FATAL: cache.jsonl.gz was NOT confirmed uploaded to Hugging Face.")
+        sys.exit(1)
+    if progress_included and "cache/abstract_backfill_progress.jsonl.gz" not in uploaded:
+        # The progress ledger is event-sourced and re-derived on the next
+        # run; a missed upload is worth a loud warning, not a job failure.
+        print("[!] WARNING: progress file was not confirmed uploaded (cache is safe).")
 
 
 if __name__ == "__main__":
