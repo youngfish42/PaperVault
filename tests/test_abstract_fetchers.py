@@ -478,6 +478,23 @@ def test_no_pdf_deps_leak():
                 del sys.modules[name]
         sys.modules.update(saved)
         sys.modules.update(saved_forbidden)
+        # The fresh ``import`` in ``try`` also rebound the
+        # ``abstract_fetchers`` attribute on the parent package to the NEW
+        # module object; restoring sys.modules alone is not enough.
+        # Python <= 3.11's unittest.mock resolves patch targets via
+        # attribute chains (3.12 switched to pkgutil.resolve_name), so
+        # without this, downstream patch("..._http.SESSION") would patch
+        # the orphaned fresh copy while ``af`` keeps using the original —
+        # observed as real HTTP calls in CI (ubuntu-latest/py3.10).
+        parent = sys.modules.get("papervault.services")
+        original_pkg = saved.get(prefix)
+        if parent is not None and original_pkg is not None:
+            parent.abstract_fetchers = original_pkg
+    import papervault.services  # noqa: F401  (already imported; just the binding)
+    assert papervault.services.abstract_fetchers is af, (
+        "parent package attribute must point at the module object bound "
+        "at test-file import time, otherwise patch() targets diverge"
+    )
 
 
 # ---------- Springer: layout guard, truncated-meta fallback -----------------
