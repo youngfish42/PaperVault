@@ -1,13 +1,26 @@
 """修复 web.archive.org 包装的死论文链接（AAAI 2000-2015 / UAI 2000-2014 等）。
 
 缓存中约 4.4k 条记录的 ``paper_url`` 形如
-``https://web.archive.org/web/<ts>/<原始 URL>``，原始站已死。本脚本用标题
-查 OpenAlex（门控与 ``--openalex-title`` 一致：标题 ratio ≥0.85 + 年份 ±1），
-把链接改写为 ``https://doi.org/<doi>``（优先）或
-``primary_location.landing_page_url``（http/https 且非 wayback/原死链 host）。
+``https://web.archive.org/web/<ts>/<原始 URL>``，原始站已死。本脚本按标题做
+**逐条兜底链**查询（``--source auto`` 默认）：
 
-顺带回填：OpenAlex 返回摘要（inverted-index 重建后 ≥60 字符）且记录摘要为空时
-一并填上（progress source 记 ``openalex_title``）。
+1. **OpenAlex** ``/works?search=``（3 rps）——覆盖最全但匿名配额按 IP/日
+   发放且极小（实测全量跑 270 条即 429 断供，Retry-After 数万秒）；
+2. **Crossref** ``/works?query.bibliographic=``（2 rps，独立 rate_state）——
+   OpenAlex rate_limited / 无候选时落这里；命中即得 ``https://doi.org/<DOI>``；
+3. **arXiv** ``export.arxiv.org/api/query?search_query=ti:"..."``（3s 间隔，
+   独立 rate_state）——最后兜底；新 URL = 去版本号的
+   ``https://arxiv.org/abs/<id>``。arXiv **不过年份守卫**（老论文的 arXiv
+   年份是挂出年，与会议年无关）。
+
+门控：标题 ``_title_gate``（ratio ≥0.85）；年份 ``_year_gate``（±1）只约束
+模糊匹配——ratio ≥0.98 的精确匹配跳过（OpenAlex/Crossref 的年份也常是
+在线年而非会议年）。某源 ``rate_limited`` 时立即落下一源，不重试当前源
+（每日配额型 429 重试无意义）。
+
+顺带回填：源返回摘要（OpenAlex inverted-index 重建 / Crossref JATS 去标签 /
+arXiv summary，均需 ≥MIN_ABSTRACT_CHARS）且记录摘要为空时一并填上
+（progress source 记 ``<source>_title``）。Crossref 不带摘要就只修 URL。
 
 冲突处理：``(conf, new_url)`` 已存在时用 ``collector._merge_paper_record``
 把 wayback 记录合入既有记录并删除前者；否则原地改写 ``paper_url``。
@@ -16,8 +29,8 @@ progress / 审计：
   * 新 URL 复制旧 URL 的进度记录（保持 status）；摘要顺带填上的记 success。
   * REASON_ENUM 没有 ``migrated`` 成员，往 progress 里塞新值会破坏分析器，
     因此迁移痕迹写入独立日志 ``cache/wayback_repair_log.jsonl``（每条一行：
-    ts/conf/old_url/new_url/action/abstract_filled），旧 URL 的 progress
-    记录保持不动。
+    ts/conf/old_url/new_url/action/abstract_filled/source），旧 URL 的
+    progress 记录保持不动。
 
 默认 ``--dry-run``（只输出报告）；``--write`` 才改缓存。缓存写入走与主链
 一致的 ``.tmp + os.replace`` 原子方式；结束在**同一进程内**做带
@@ -26,8 +39,8 @@ parent_commit 乐观锁的验证式上传 ``_sync_or_die``（除非
 
 用法::
 
-    python scripts/repair_wayback_urls.py                      # dry-run 报告
-    python scripts/repair_wayback_urls.py --dry-run --max-papers 10
+    python scripts/repair_wayback_urls.py                      # dry-run 报告（auto 链）
+    python scripts/repair_wayback_urls.py --dry-run --max-papers 10 --source crossref
     python scripts/repair_wayback_urls.py --write --no-sync    # 真正改写，本地不同步
 """
 
@@ -78,6 +91,14 @@ WAYBACK_REPAIR_LOG = Path("cache") / "wayback_repair_log.jsonl"
 OPENALEX_REPAIR_SELECT = (
     "title,abstract_inverted_index,publication_year,doi,primary_location"
 )
+
+# 兜底链各源的限速预算与独立 rate_state（互不占额度）。
+CROSSREF_MIN_INTERVAL = 0.5  # 2 rps
+ARXIV_MIN_INTERVAL = 3.0
+_crossref_rate_state = {"last_time": 0.0}
+_arxiv_rate_state = {"last_time": 0.0}
+
+SOURCE_CHAIN = ("openalex", "crossref", "arxiv")
 
 
 def unwrap_wayback(url: str) -> Optional[str]:
@@ -135,6 +156,150 @@ def _openalex_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
     return first, ""
 
 
+def _crossref_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
+    """GET api.crossref.org/works?query.bibliographic=<title>&rows=1。
+
+    返回 (items[0] 原始 dict, error_reason)；无候选返回 ``empty_abstract``。
+    Crossref 的 ``abstract`` 字段是 JATS XML 包裹的，去标签留给
+    ``evaluate_repair``（复用 fetch_abstracts 的 ``clean_abstract``）。
+    """
+    params = {
+        "query.bibliographic": title,
+        "rows": 1,
+        "select": "DOI,title,published,abstract",
+    }
+    if CONTACT_EMAIL:
+        params["mailto"] = CONTACT_EMAIL
+    resp, err = _s2_request(
+        "get",
+        "https://api.crossref.org/works",
+        params=params,
+        timeout=30,
+        min_interval=CROSSREF_MIN_INTERVAL,
+        headers=HEADERS,
+        rate_state=_crossref_rate_state,
+    )
+    if err or resp is None:
+        return None, err or "network"
+    if resp.status_code != 200:
+        return None, _s2_status_reason(resp.status_code)
+    try:
+        data = resp.json()
+    except ValueError:
+        return None, "network"
+    items = (data.get("message") or {}).get("items") if isinstance(data, dict) else None
+    if not items:
+        return None, "empty_abstract"
+    first = items[0]
+    if not isinstance(first, dict):
+        return None, "empty_abstract"
+    return first, ""
+
+
+def _arxiv_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
+    """GET export.arxiv.org Atom API（ti:"<title>" 短语查询，max_results=1）。
+
+    返回规范化 dict ``{"title", "abs_url", "summary"}``：``abs_url`` 是去掉
+    版本后缀的 ``https://arxiv.org/abs/<id>``。无候选返回 ``empty_abstract``。
+    """
+    import xml.etree.ElementTree as ET
+
+    import requests as _requests
+
+    encoded = _requests.utils.quote(title)
+    url = f'http://export.arxiv.org/api/query?search_query=ti:"{encoded}"&max_results=1'
+    resp, err = _s2_request(
+        "get",
+        url,
+        timeout=30,
+        min_interval=ARXIV_MIN_INTERVAL,
+        headers=HEADERS,
+        rate_state=_arxiv_rate_state,
+    )
+    if err or resp is None:
+        return None, err or "network"
+    if resp.status_code != 200:
+        return None, _s2_status_reason(resp.status_code)
+    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    try:
+        root = ET.fromstring(resp.text)
+    except ET.ParseError:
+        return None, "network"
+    entry = root.find("atom:entry", ns)
+    if entry is None:
+        return None, "empty_abstract"
+    id_elem = entry.find("atom:id", ns)
+    entry_id = (id_elem.text or "").strip() if id_elem is not None else ""
+    if not entry_id:
+        return None, "empty_abstract"
+    abs_url = re.sub(r"v\d+$", "", entry_id)
+    if abs_url.startswith("http://"):
+        abs_url = "https://" + abs_url[len("http://"):]
+    title_elem = entry.find("atom:title", ns)
+    summary_elem = entry.find("atom:summary", ns)
+    return {
+        "title": (title_elem.text or "").strip() if title_elem is not None else "",
+        "abs_url": abs_url,
+        "summary": (summary_elem.text or "").strip() if summary_elem is not None else "",
+    }, ""
+
+
+def _fetch_by_source(source: str, title: str) -> Tuple[Optional[dict], str]:
+    if source == "openalex":
+        return _openalex_repair_fetch(title)
+    if source == "crossref":
+        return _crossref_repair_fetch(title)
+    if source == "arxiv":
+        return _arxiv_repair_fetch(title)
+    raise ValueError(f"unknown repair source: {source}")
+
+
+def _first_title(raw) -> str:
+    """Crossref 的 ``title`` 字段是列表形态；其余源是字符串。统一取首个。"""
+    if isinstance(raw, list):
+        return (raw[0] if raw else "") or ""
+    return raw or ""
+
+
+def make_lookup(source: str = "auto"):
+    """构造 per-record 兜底链 ``lookup(title, conf) -> (source, work, err)``。
+
+    ``auto``：OpenAlex → Crossref → arXiv。某源 ``rate_limited`` 或无候选
+    （``empty_abstract``）立即落下一源，不重试当前源（每日配额型 429 重试
+    无意义）。**候选拿到但标题门控失败同样落下一源**：Crossref 的
+    ``query.bibliographic`` 模糊搜索对库外论文几乎总会返回"某个东西"，
+    把这种候选当终点会挡住 arXiv 兜底（2026-10-25 第二轮实测 3,817 条
+    因此滞留；年份守卫仍留在 ``evaluate_repair`` 中按源差异化执行）。
+    单源模式（``--source crossref`` 等）只查对应源。
+    """
+    chain = list(SOURCE_CHAIN) if source == "auto" else [source]
+
+    def lookup(title: str, conf: str = ""):
+        """返回 (source, work, err, attempts)；attempts 是 [(src, err), ...]
+        逐源失败记录，供报告按源统计 rate_limited 计数。"""
+        attempts = []
+        last_err = ""
+        saw_title_mismatch = False
+        for src in chain:
+            work, err = _fetch_by_source(src, title)
+            if work is not None:
+                if _title_gate(_first_title(work.get("title")), title):
+                    return src, work, "", attempts
+                saw_title_mismatch = True
+                attempts.append((src, "title_mismatch"))
+                continue
+            last_err = err or "empty_abstract"
+            attempts.append((src, last_err))
+            # 网络类错误（timeout/network）也落下一源，但 Crossref 挂了
+            # arXiv 大概率也连不上——仍然尝试，成本是一次快失败。
+        if saw_title_mismatch:
+            # 有源返回过"像但不对"的候选比"查无此文"信息量更高，优先汇报。
+            last_err = "title_mismatch"
+        return None, None, last_err, attempts
+
+    return lookup
+
+
 def choose_new_url(work: dict, orig_url: str) -> Optional[str]:
     """新 URL 优先级：doi.org/<doi> > primary_location.landing_page_url
     （须 http/https 且不是 wayback / 原死链 host）> None（不修改）。"""
@@ -157,17 +322,50 @@ def choose_new_url(work: dict, orig_url: str) -> Optional[str]:
     return landing or None
 
 
-def evaluate_repair(work: Optional[dict], paper: dict) -> Tuple[Optional[str], Optional[str], str]:
+def evaluate_repair(
+    work: Optional[dict], paper: dict, source: str = "openalex"
+) -> Tuple[Optional[str], Optional[str], str]:
     """门控 + 新 URL 选择 + 顺带摘要。
 
     返回 (new_url, abstract_or_None, reason)。reason 为空串表示通过门控；
     new_url 为 None 表示不改链接（无 DOI/可用 landing page）。
+
+    ``source`` 感知各源的数据形态与年份语义：
+      * ``openalex``：``publication_year`` + inverted-index 摘要；
+      * ``crossref``：``published.date-parts[0][0]`` 年份、JATS 摘要（去标签）、
+        新 URL 恒为 ``https://doi.org/<DOI>``；
+      * ``arxiv``：**不过年份守卫**（老论文的 arXiv 年份是挂出年，与会议年
+        无关），新 URL 为去版本号的 abs 页。
     """
     if not work:
         return None, None, "empty_abstract"
     title = (paper.get("paper_name") or "").strip()
-    oa_title = work.get("title") or ""
-    if not _title_gate(oa_title, title):
+
+    if source == "crossref":
+        cand_title = _first_title(work.get("title"))
+        year = None
+        parts = (work.get("published") or {}).get("date-parts") or []
+        if parts and parts[0]:
+            year = parts[0][0]
+        doi = (work.get("DOI") or "").strip()
+        new_url = f"https://doi.org/{doi}" if doi else None
+        abstract = clean_abstract(work.get("abstract") or "")
+    elif source == "arxiv":
+        cand_title = work.get("title") or ""
+        year = None  # arXiv 不过年份守卫
+        new_url = work.get("abs_url") or None
+        abstract = clean_abstract(work.get("summary") or "")
+    else:  # openalex
+        cand_title = work.get("title") or ""
+        year = work.get("publication_year")
+        new_url = choose_new_url(
+            work, unwrap_wayback(paper.get("paper_url", "")) or paper.get("paper_url", "")
+        )
+        abstract = clean_abstract(
+            _reconstruct_openalex_abstract(work.get("abstract_inverted_index") or {}) or ""
+        )
+
+    if not _title_gate(cand_title, title):
         return None, None, "title_mismatch"
     # 年份守卫只约束模糊匹配：这批 wayback 记录是老会议论文（UAI/AAAI
     # 2000-2014），OpenAlex 常把年份记为 arXiv 挂出年（2012/2013）而非会议年，
@@ -175,13 +373,9 @@ def evaluate_repair(work: Optional[dict], paper: dict) -> Tuple[Optional[str], O
     # publication_year 全部是 arXiv 年份）。ratio ≥ 0.98 视为精确匹配，
     # 跳过年份守卫；0.85–0.98 的模糊匹配仍须过年份守卫以拦同名不同文。
     norm = lambda t: re.sub(r"[^\w]+", "", (t or "").strip().lower())
-    ratio = difflib.SequenceMatcher(None, norm(oa_title), norm(title)).ratio()
-    if ratio < 0.98 and not _year_gate(paper.get("conf", ""), work.get("publication_year")):
+    ratio = difflib.SequenceMatcher(None, norm(cand_title), norm(title)).ratio()
+    if source != "arxiv" and ratio < 0.98 and not _year_gate(paper.get("conf", ""), year):
         return None, None, "title_mismatch"
-    new_url = choose_new_url(work, unwrap_wayback(paper.get("paper_url", "")) or paper.get("paper_url", ""))
-    abstract = clean_abstract(
-        _reconstruct_openalex_abstract(work.get("abstract_inverted_index") or {}) or ""
-    )
     if len(abstract) < MIN_ABSTRACT_CHARS:
         abstract = None
     return new_url, abstract, ""
@@ -193,9 +387,15 @@ def _repair_pass(
     *,
     max_papers: Optional[int],
     dry_run: bool,
-    fetch_fn=_openalex_repair_fetch,
+    lookup_fn=None,
 ) -> dict:
-    """核心 pass。dry-run 下不改任何数据。返回统计字典。"""
+    """核心 pass。dry-run 下不改任何数据。返回统计字典。
+
+    ``lookup_fn(title, conf) -> (source, work, err)`` —— 默认
+    :func:`make_lookup()` 的 auto 兜底链（OpenAlex → Crossref → arXiv）。
+    """
+    if lookup_fn is None:
+        lookup_fn = make_lookup("auto")
     index: Dict[Tuple[str, str], dict] = {
         (p.get("conf", ""), p.get("paper_url", "")): p
         for p in all_papers
@@ -222,6 +422,7 @@ def _repair_pass(
         "orig_hosts": {},
         "new_hosts": {},
         "reasons": {},
+        "by_source": {},  # source -> {"rewrite","merge","rate_limited","no_candidate"}
         "samples": [],
     }
     log_lines: List[dict] = []
@@ -233,15 +434,32 @@ def _repair_pass(
         orig_host = _host_of(orig)
         stats["orig_hosts"][orig_host] = stats["orig_hosts"].get(orig_host, 0) + 1
         title = (paper.get("paper_name") or "").strip()
-        print(f"[{i}/{len(targets)}] [{paper.get('conf')}] {title[:60]}")
-        work, err = fetch_fn(title)
+        conf = paper.get("conf", "")
+        print(f"[{i}/{len(targets)}] [{conf}] {title[:60]}")
+        src, work, err, attempts = lookup_fn(title, conf)
+        # 逐源失败记录入账（每源 rate_limited 计数进报告）。
+        for attempt_src, attempt_err in attempts:
+            b = stats["by_source"].setdefault(
+                attempt_src, {"rewrite": 0, "merge": 0, "rate_limited": 0, "no_candidate": 0}
+            )
+            if attempt_err == "rate_limited":
+                b["rate_limited"] += 1
+            else:
+                b["no_candidate"] += 1
+        src_bucket = stats["by_source"].setdefault(
+            src or "none", {"rewrite": 0, "merge": 0, "rate_limited": 0, "no_candidate": 0}
+        )
         if not work:
             # 请求级失败（429/网络/无候选）：只记一次 reason，不再进评估门控
             reason = err or "empty_abstract"
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
+            if reason == "rate_limited":
+                src_bucket["rate_limited"] += 1
+            else:
+                src_bucket["no_candidate"] += 1
             stats["unchanged"] += 1
             continue
-        new_url, abstract, reason = evaluate_repair(work, paper)
+        new_url, abstract, reason = evaluate_repair(work, paper, source=src)
         if reason:
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
             stats["unchanged"] += 1
@@ -255,9 +473,10 @@ def _repair_pass(
         abstract_filled = bool(abstract) and not (paper.get("paper_abstract") or "").strip()
         existing = index.get((paper.get("conf", ""), new_url))
         action = "merge" if (existing is not None and existing is not paper) else "rewrite"
+        src_bucket[action] += 1
 
         if len(stats["samples"]) < 12:
-            stats["samples"].append((old_url, new_url, action, abstract_filled))
+            stats["samples"].append((old_url, new_url, action, abstract_filled, src))
 
         stats["processed"] += 1
         stats[action] += 1
@@ -281,7 +500,7 @@ def _repair_pass(
         if abstract_filled:
             progress[new_url] = {
                 "status": "success",
-                "source": "openalex_title",
+                "source": f"{src}_title",
                 "chars": len(abstract),
                 "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
             }
@@ -296,6 +515,7 @@ def _repair_pass(
             "new_url": new_url,
             "action": action,
             "abstract_filled": abstract_filled,
+            "source": src,
         })
 
     if not dry_run and log_lines:
@@ -327,15 +547,22 @@ def _print_report(stats: dict, dry_run: bool) -> None:
     print("new host distribution    :")
     for host, n in sorted(stats["new_hosts"].items(), key=lambda kv: -kv[1])[:10]:
         print(f"    {host:35} {n}")
+    if stats["by_source"]:
+        print("by source                :")
+        for src, b in sorted(stats["by_source"].items()):
+            print(
+                f"    {src:15} rewrite={b['rewrite']} merge={b['merge']} "
+                f"rate_limited={b['rate_limited']} no_candidate={b['no_candidate']}"
+            )
     if stats["reasons"]:
         print("unchanged reasons        :")
         for r, n in sorted(stats["reasons"].items(), key=lambda kv: -kv[1]):
             print(f"    {r:35} {n}")
     if stats["samples"]:
         print("samples                  :")
-        for old, new, action, filled in stats["samples"]:
+        for old, new, action, filled, src in stats["samples"]:
             mark = " +abstract" if filled else ""
-            print(f"    [{action}]{mark}\n      - {old}\n      + {new}")
+            print(f"    [{action} via {src}]{mark}\n      - {old}\n      + {new}")
 
 
 def main() -> None:
@@ -346,6 +573,9 @@ def main() -> None:
     g.add_argument("--write", dest="dry_run", action="store_false",
                    help="Actually rewrite the cache/progress")
     ap.add_argument("--max-papers", "-n", type=int, default=None)
+    ap.add_argument("--source", choices=["auto", "openalex", "crossref", "arxiv"],
+                    default="auto",
+                    help="查询源：auto=OpenAlex→Crossref→arXiv 兜底链（默认）；单源则只查对应源")
     ap.add_argument("--no-sync", action="store_true", help="Skip the final Hugging Face push")
     ap.add_argument("--offline", action="store_true",
                     help="Skip ensure_cache_local / ensure_progress_local AND the final sync")
@@ -369,6 +599,7 @@ def main() -> None:
     stats = _repair_pass(
         all_papers, progress,
         max_papers=args.max_papers, dry_run=args.dry_run,
+        lookup_fn=make_lookup(args.source),
     )
     _print_report(stats, args.dry_run)
     print(f"[*] Done in {time.time() - t0:.0f}s")
