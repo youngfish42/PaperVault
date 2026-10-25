@@ -35,6 +35,7 @@ import argparse
 import gzip
 import json
 import os
+import difflib
 import re
 import sys
 import time
@@ -165,9 +166,17 @@ def evaluate_repair(work: Optional[dict], paper: dict) -> Tuple[Optional[str], O
     if not work:
         return None, None, "empty_abstract"
     title = (paper.get("paper_name") or "").strip()
-    if not _title_gate(work.get("title") or "", title):
+    oa_title = work.get("title") or ""
+    if not _title_gate(oa_title, title):
         return None, None, "title_mismatch"
-    if not _year_gate(paper.get("conf", ""), work.get("publication_year")):
+    # 年份守卫只约束模糊匹配：这批 wayback 记录是老会议论文（UAI/AAAI
+    # 2000-2014），OpenAlex 常把年份记为 arXiv 挂出年（2012/2013）而非会议年，
+    # 精确标题匹配下 ±1 年守卫会大面积误杀（实测 15/15 精确命中的
+    # publication_year 全部是 arXiv 年份）。ratio ≥ 0.98 视为精确匹配，
+    # 跳过年份守卫；0.85–0.98 的模糊匹配仍须过年份守卫以拦同名不同文。
+    norm = lambda t: re.sub(r"[^\w]+", "", (t or "").strip().lower())
+    ratio = difflib.SequenceMatcher(None, norm(oa_title), norm(title)).ratio()
+    if ratio < 0.98 and not _year_gate(paper.get("conf", ""), work.get("publication_year")):
         return None, None, "title_mismatch"
     new_url = choose_new_url(work, unwrap_wayback(paper.get("paper_url", "")) or paper.get("paper_url", ""))
     abstract = clean_abstract(

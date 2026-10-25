@@ -120,10 +120,22 @@ def test_evaluate_repair_title_gate_rejects():
 
 def test_evaluate_repair_year_gate_rejects():
     paper = _paper(WAYBACK_AAAI, conf="AAAI2006")
-    work = _work(year=2020, doi="https://doi.org/10.1/x")
+    # 模糊标题（包含关系但 ratio < 0.98）仍受年份守卫约束。
+    work = _work(title="Some Old Paper Revisited", year=2020, doi="https://doi.org/10.1/x")
     assert rw.evaluate_repair(work, paper)[2] == "title_mismatch"
-    work = _work(year=2007, doi="https://doi.org/10.1/x")  # ±1 allowed
+    work = _work(title="Some Old Paper Revisited", year=2007, doi="https://doi.org/10.1/x")  # ±1 allowed
     assert rw.evaluate_repair(work, paper)[0] == "https://doi.org/10.1/x"
+
+
+def test_evaluate_repair_exact_title_skips_year_gate():
+    """老会议论文在 OpenAlex 的年份常是 arXiv 挂出年（如 UAI2000 → 2013），
+    精确标题匹配（ratio ≥ 0.98）时年份守卫必须跳过，否则这批 wayback 记录
+    会被大面积误杀（2026-10-25 CI run 40155700566 的 title_mismatch 主因）。"""
+    paper = _paper(WAYBACK_AAAI, conf="UAI2000")
+    work = _work(year=2013, doi="https://doi.org/10.48550/arxiv.1301.3857")
+    new_url, _abstract, reason = rw.evaluate_repair(work, paper)
+    assert reason == ""
+    assert new_url == "https://doi.org/10.48550/arxiv.1301.3857"
 
 
 def test_evaluate_repair_short_abstract_not_filled():
