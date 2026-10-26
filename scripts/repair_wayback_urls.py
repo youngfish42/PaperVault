@@ -13,10 +13,13 @@
    ``https://arxiv.org/abs/<id>``。arXiv **不过年份守卫**（老论文的 arXiv
    年份是挂出年，与会议年无关）。
 
-门控：标题 ``_title_gate``（ratio ≥0.85）；年份 ``_year_gate``（±1）只约束
-模糊匹配——ratio ≥0.98 的精确匹配跳过（OpenAlex/Crossref 的年份也常是
-在线年而非会议年）。某源 ``rate_limited`` 时立即落下一源，不重试当前源
-（每日配额型 429 重试无意义）。
+门控（PR #228 评审后收紧）：纯 SequenceMatcher ratio（**无包含捷径**）
+≥ ``REPAIR_MIN_RATIO``（0.90）；ratio ≥ ``REPAIR_EXACT_RATIO``（0.98）视为
+精确匹配、免年份守卫；0.90–0.98 的模糊匹配须过 ``_year_gate``（±1）且
+候选缺年份一律拒绝；arXiv 源只接受 ratio ≥ ``ARXIV_MIN_RATIO``（0.98）
+的精确匹配且不过年份守卫（老论文的 arXiv 年份是挂出年，与会议年无关）。
+候选未过完整接受判定（标题或年份）同样落下一源。某源 ``rate_limited``
+或无候选立即落下一源，不重试当前源（每日配额型 429 重试无意义）。
 
 顺带回填：源返回摘要（OpenAlex inverted-index 重建 / Crossref JATS 去标签 /
 arXiv summary，均需 ≥MIN_ABSTRACT_CHARS）且记录摘要为空时一并填上
@@ -76,7 +79,6 @@ from scripts.fetch_abstracts import (  # noqa: E402
     _reconstruct_openalex_abstract,
     _s2_request,
     _s2_status_reason,
-    _title_gate,
     _write_cache_atomic,
     _year_gate,
     clean_abstract,
@@ -185,7 +187,9 @@ def _crossref_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
     params = {
         "query.bibliographic": title,
         "rows": 1,
-        "select": "DOI,title,published,abstract",
+        # published 之外补 issued / published-print：很多老会议记录只有后者，
+        # 只取 published 会把年份误判为缺失（模糊候选因此被一律拒收）。
+        "select": "DOI,title,published,published-print,issued,abstract",
     }
     if CONTACT_EMAIL:
         params["mailto"] = CONTACT_EMAIL
@@ -299,11 +303,16 @@ def _title_ratio(a: str, b: str) -> float:
 
 
 def _candidate_year(source: str, work: dict):
-    """按源提取候选年份（arxiv 无年份语义，恒 None）。"""
+    """按源提取候选年份（arxiv 无年份语义，恒 None）。
+
+    Crossref 按 ``published → published-print → issued`` 顺序回退取
+    ``date-parts[0][0]``——老会议记录常只有 ``issued``/``published-print``。
+    """
     if source == "crossref":
-        parts = (work.get("published") or {}).get("date-parts") or []
-        if parts and parts[0]:
-            return parts[0][0]
+        for field in ("published", "published-print", "issued"):
+            parts = (work.get(field) or {}).get("date-parts") or []
+            if parts and parts[0] and parts[0][0]:
+                return parts[0][0]
         return None
     if source == "openalex":
         return work.get("publication_year")
@@ -567,6 +576,8 @@ def _repair_pass(
                 "old_title": paper.get("paper_name", ""),
                 "old_authors": paper.get("paper_authors") or [],
                 "old_abstract": paper.get("paper_abstract") or "",
+                # _merge_paper_record 也合并 paper_code；缺了它无法完整重建被删记录。
+                "old_code": paper.get("paper_code") or "#",
             }
         if abstract_filled:
             paper["paper_abstract"] = abstract

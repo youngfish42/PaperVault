@@ -63,12 +63,17 @@ from scripts.repair_wayback_urls import (  # noqa: E402
 
 # 与修复门控同口径：纯 ratio ≥ 0.90，无包含捷径。
 AUDIT_MIN_RATIO = 0.90
-# --revert 默认只回滚 ratio < 0.75 的 FAIL 条目（人工抽样结论：<0.75 基本是
-# 错链；≥0.75 多为同论文的期刊/书籍/扩展版，属规范 canonical 链接，保留）。
-REVERT_DEFAULT_MAX_RATIO = 0.75
+# --revert 的回滚阈值（用户确认 0.90）：只有 ratio ≥ 0.90 的 FAIL 条目才视为
+# 同论文的期刊/书籍/扩展版 canonical 链接予以保留；0.75 阈值经复核过宽
+#（保留清单里混入非同作品错链，如 AAAI2000《The Automatic Interpretation of
+# Nominalizations》被指到 De Gruyter 章节）。
+REVERT_DEFAULT_MAX_RATIO = 0.90
 # 硬规则：表格/图子页与百科条目在任何 sub-0.90 比例下都不是合格论文链接，
-# 一律回滚（覆盖 peerj table-4 这类 ratio 0.81 的漏网案例）。
+# 一律回滚（覆盖 peerj table-4 这类 ratio 0.81 的漏网案例）。/tables/ 与
+# /figures/ 复数形态对 unverifiable 条目（无 ratio）同样生效——这些子页
+# 永远不是论文链接。
 REVERT_HARD_PATTERNS = ("/table-", "/figure", "springerreference")
+REVERT_HARD_PATTERNS_ANY = ("/table-", "/tables/", "/figure", "/figures/", "springerreference")
 # 首轮修复推送时间：取早于它的最新 HF commit 作为"修复前"缓存。
 PREREPAIR_BEFORE = "2026-10-25T03:30:00Z"
 AUDIT_REPORT = ROOT / "docs" / "wayback_repair_audit.md"
@@ -331,13 +336,24 @@ def audit_entries(
 
 
 def should_revert(row: dict, max_ratio: float = REVERT_DEFAULT_MAX_RATIO) -> bool:
-    """FAIL 条目的回滚判定收窄（人工抽样结论见常量注释）。"""
-    if row["verdict"] != "FAIL":
+    """FAIL/unverifiable 条目的回滚判定（人工抽样结论见常量注释）。
+
+    * FAIL：ratio < ``max_ratio`` 回滚；硬规则子页（/table- 等）在
+      ratio < 0.90 下一律回滚；
+    * unverifiable：new_url 含坏 pattern（/table- /tables/ /figure
+      /figures/ springerreference）一律回滚（无论 ratio——这些子页永远
+      不是论文链接）；其余 unverifiable 保留；
+    * PASS 永不回滚。
+    """
+    verdict = row["verdict"]
+    if verdict == "PASS":
         return False
+    url = (row["entry"].get("new_url") or "").lower()
+    if verdict == "unverifiable":
+        return any(p in url for p in REVERT_HARD_PATTERNS_ANY)
     ratio = row["ratio"] or 0.0
     if ratio < max_ratio:
         return True
-    url = (row["entry"].get("new_url") or "").lower()
     return any(p in url for p in REVERT_HARD_PATTERNS) and ratio < AUDIT_MIN_RATIO
 
 
@@ -442,8 +458,9 @@ def write_report(rows: List[dict], path: Path, kept_variants: Optional[List[dict
         lines.append("")
     if kept_variants:
         lines += [
-            "## same-paper variant 保留清单（FAIL 但未回滚：ratio 高于回滚阈值，"
-            "且非表格/图/百科子页——多为同论文的期刊/书籍/扩展版 canonical 链接）",
+            "## same-paper variant 保留清单（保留只存在于 ratio ≥ 0.90 的"
+            "同论文期刊/书籍/扩展版 canonical 链接；本节正常应为空——"
+            "0.90 以下的 FAIL 已全部回滚）",
             "",
             "| conf | old_url | new_url | ratio | remote title | local title |",
             "|------|---------|---------|-------|--------------|-------------|",
@@ -471,7 +488,8 @@ def main() -> None:
     ap.add_argument("--revert-max-ratio", type=float, default=REVERT_DEFAULT_MAX_RATIO,
                     help="Only revert FAIL entries with ratio below this value "
                          f"(default {REVERT_DEFAULT_MAX_RATIO}); hard rule: /table-, "
-                         "/figure, springerreference URLs revert below 0.90 regardless")
+                         "/tables/, /figure, /figures/, springerreference URLs always "
+                         "revert (unverifiable ones too, at any ratio)")
     ap.add_argument("--write", dest="write", action="store_true",
                     help="With --revert: actually mutate cache/progress and push to HF")
     ap.add_argument("--no-sync", action="store_true")

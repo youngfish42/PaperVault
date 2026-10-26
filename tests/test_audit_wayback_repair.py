@@ -19,6 +19,43 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from scripts import audit_wayback_repair as au  # noqa: E402
+from scripts import repair_wayback_urls as rw  # noqa: E402
+
+
+CROSSREF_ITEM = {
+    "DOI": "10.1609/aaai.v21i1.7326",
+    "title": ["Some Old Paper"],
+    "published": {"date-parts": [[2006]]},
+    "abstract": "<jats:p>We present a sufficiently long synthetic abstract for the "
+    "wayback repair tests, comfortably clearing the sixty-character minimum gate.</jats:p>",
+}
+
+
+def _paper(url, title="Some Old Paper", conf="AAAI2006"):
+    return {"paper_url": url, "paper_name": title, "paper_abstract": "",
+            "paper_code": "#", "paper_authors": ["A"], "conf": conf}
+
+
+def _resp(payload=None, status=200, text=""):
+    r = MagicMock()
+    r.status_code = status
+    if payload is not None:
+        r.json.return_value = payload
+    r.text = text
+    r.headers = {}
+    return r
+
+
+def _work(title="Some Old Paper", year=2006, doi=None, abstract=True):
+    inv = {}
+    if abstract:
+        text = ("We present a sufficiently long synthetic abstract for the wayback "
+                "repair tests, comfortably clearing the sixty-character minimum gate.")
+        for pos, w in enumerate(text.split()):
+            inv.setdefault(w, []).append(pos)
+    return {"title": title, "publication_year": year, "doi": doi,
+            "abstract_inverted_index": inv or None}
+
 
 
 OLD_URL = ("https://web.archive.org/web/2015/http://www.aaai.org/ocs/index.php"
@@ -236,13 +273,17 @@ def _row(ratio, url=NEW_DOI, verdict="FAIL"):
 
 
 def test_should_revert_threshold_boundary():
+    # 默认阈值已升至 0.90（用户确认；0.75 过宽会留下非同作品错链）
+    assert au.REVERT_DEFAULT_MAX_RATIO == 0.90
     assert au.should_revert(_row(0.74)) is True
-    assert au.should_revert(_row(0.75)) is False   # 阈值含头不含尾
-    assert au.should_revert(_row(0.89)) is False
+    assert au.should_revert(_row(0.89)) is True    # 0.75–0.90 带也回滚
+    assert au.should_revert(_row(0.89)) is True
     assert au.should_revert(_row(0.20)) is True
-    # PASS / unverifiable 永不回滚
+    # 显式给 0.75 时恢复旧边界（含头不含尾）
+    assert au.should_revert(_row(0.75), 0.75) is False
+    assert au.should_revert(_row(0.74), 0.75) is True
+    # PASS 永不回滚
     assert au.should_revert(_row(0.3, verdict="PASS")) is False
-    assert au.should_revert(_row(None, verdict="unverifiable")) is False
 
 
 def test_should_revert_hard_rules():
@@ -252,12 +293,12 @@ def test_should_revert_hard_rules():
     assert au.should_revert(_row(0.83, "https://example.org/paper/figure-2")) is True
     # 硬规则在 >=0.90 不再适用（那已是 PASS，不会走到这）
     assert au.should_revert(_row(0.91, "https://doi.org/10.1007/springerreference_61955")) is False
-    # 普通 DOI 高于阈值保留
-    assert au.should_revert(_row(0.86, NEW_DOI)) is False
+    # 普通 DOI 高于（显式 0.75）阈值保留
+    assert au.should_revert(_row(0.86, NEW_DOI), 0.75) is False
 
 
 def test_revert_selection_leaves_same_paper_variants_untouched():
-    """阈值以上的 FAIL（同论文变体）保留：URL 与 progress 均不动。"""
+    """显式阈值 0.75 时，0.82 的同论文变体保留：URL 与 progress 均不动。"""
     papers = [_rec(NEW_DOI, abstract="variant abstract kept")]
     progress = {NEW_DOI: {"status": "success", "source": "crossref_title"}}
     rows = [{"entry": _entry(filled=True), "ratio": 0.82, "verdict": "FAIL",
@@ -269,6 +310,84 @@ def test_revert_selection_leaves_same_paper_variants_untouched():
     assert stats["rewrite_reverted"] == 0
     assert papers[0]["paper_url"] == NEW_DOI
     assert progress[NEW_DOI]["status"] == "success"
+
+
+def test_revert_default_threshold_090_recovers_075_090_band():
+    """默认 0.90：0.82 的 FAIL 条目本轮应回滚（0.75 时代的保留带被收回）。"""
+    papers = [_rec(NEW_DOI, abstract="wrong abstract")]
+    progress = {NEW_DOI: {"status": "success"}}
+    rows = [{"entry": _entry(filled=True), "ratio": 0.82, "verdict": "FAIL",
+             "local_title": "", "remote_title": ""}]
+    to_revert = [r for r in rows if au.should_revert(r)]
+    assert len(to_revert) == 1
+    stats = au.revert_failed(to_revert, papers, None, progress, dry_run=False)
+    assert stats["rewrite_reverted"] == 1
+    assert papers[0]["paper_url"] == OLD_URL
+
+
+def test_should_revert_unverifiable_hard_patterns():
+    """Fix 5: unverifiable 条目中表格/图子页一律回滚，无坏 pattern 的保留。"""
+    assert au.should_revert(_row(None, "https://peerj.com/articles/20567/table-4", verdict="unverifiable")) is True
+    assert au.should_revert(_row(None, "https://doi.org/10.1007/x/tables/3", verdict="unverifiable")) is True
+    assert au.should_revert(_row(None, "https://doi.org/10.1007/x/figures/2", verdict="unverifiable")) is True
+    assert au.should_revert(_row(None, "https://doi.org/10.1007/springerreference_1", verdict="unverifiable")) is True
+    # 无坏 pattern 的 unverifiable 继续保留
+    assert au.should_revert(_row(None, "https://peerj.com/articles/20567/", verdict="unverifiable")) is False
+    assert au.should_revert(_row(None, NEW_DOI, verdict="unverifiable")) is False
+
+
+def test_candidate_year_crossref_fallback_chain():
+    """Fix 2: Crossref 年份按 published → published-print → issued 回退。"""
+    base = dict(CROSSREF_ITEM)
+    assert rw._candidate_year("crossref", base) == 2006  # published 优先
+    item = {k: v for k, v in base.items() if k != "published"}
+    item["published-print"] = {"date-parts": [[2005]]}
+    item["issued"] = {"date-parts": [[2007]]}
+    assert rw._candidate_year("crossref", item) == 2005
+    item = {k: v for k, v in item.items() if k != "published-print"}
+    assert rw._candidate_year("crossref", item) == 2007
+    item = {k: v for k, v in base.items() if k not in ("published",)}
+    assert rw._candidate_year("crossref", item) is None
+
+
+def test_crossref_fetch_select_includes_year_fallbacks(monkeypatch):
+    """Fix 2: select 必须含 published/published-print/issued。"""
+    captured = {}
+    def fake(method, url, **kw):
+        captured["params"] = kw.get("params")
+        return _resp({"message": {"items": [CROSSREF_ITEM]}}), ""
+    monkeypatch.setattr(rw, "_s2_request", fake)
+    rw._crossref_repair_fetch("Some Old Paper")
+    select = captured["params"]["select"]
+    for f in ("published", "published-print", "issued"):
+        assert f in select
+
+
+def test_merge_log_carries_old_code(monkeypatch):
+    """Fix 3: merge 日志行带 old_code（_merge_paper_record 会合并该字段）。"""
+    new_url = "https://doi.org/10.1609/aaai.v21i1.7326"
+    existing = _paper(new_url, conf="AAAI2012")
+    existing["paper_abstract"] = "existing abstract long enough to win the merge tiebreaker."
+    wayback = _paper(OLD_URL, conf="AAAI2012")
+    wayback["paper_code"] = "https://github.com/old/repo"
+    papers = [existing, wayback]
+    progress = {}
+
+    import tempfile, pathlib
+    log = pathlib.Path(tempfile.mkdtemp()) / "log.jsonl"
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_LOG", log)
+    monkeypatch.setattr(rw, "_write_cache_atomic", MagicMock())
+    monkeypatch.setattr(rw, "save_progress", MagicMock())
+
+    work = _work(doi=new_url, abstract=False)
+    rw._repair_pass(
+        papers, progress, max_papers=None, dry_run=False,
+        lookup_fn=lambda _t, _c: ("openalex", work, "", []),
+    )
+    import json as _json
+    rec = _json.loads(log.read_text(encoding="utf-8").strip())
+    assert rec["action"] == "merge"
+    assert rec["old_code"] == "https://github.com/old/repo"
 
 
 def test_report_lists_kept_variants(tmp_path):
