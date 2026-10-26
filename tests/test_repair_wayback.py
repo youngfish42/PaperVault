@@ -465,3 +465,28 @@ def test_pass_chain_rewrite_by_source_and_progress_source(monkeypatch):
     new_url = "https://doi.org/10.1609/aaai.v21i1.7326"
     assert progress[new_url]["source"] == "crossref_title"
     assert paper["paper_url"] == new_url
+
+
+def test_pass_flushes_in_chunks(monkeypatch, tmp_path):
+    """每 REPAIR_FLUSH_EVERY 条落盘一次：挂机/中断只损失一个 chunk
+    （2026-10-26 两次长跑卡死、all-or-nothing 落盘全丢数小时成果的回归）。"""
+    monkeypatch.setattr(rw, "REPAIR_FLUSH_EVERY", 2)
+    papers = [_paper(WAYBACK_AAAI.replace("7326", str(8000 + i))) for i in range(3)]
+    progress = {}
+
+    def fake(src, title):
+        return (CROSSREF_ITEM, "") if src == "crossref" else (None, "rate_limited")
+
+    monkeypatch.setattr(rw, "_fetch_by_source", fake)
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_LOG", tmp_path / "log.jsonl")
+    write_cache = MagicMock()
+    monkeypatch.setattr(rw, "_write_cache_atomic", write_cache)
+    monkeypatch.setattr(rw, "save_progress", MagicMock())
+
+    stats = rw._repair_pass(papers, progress, max_papers=None, dry_run=False)
+
+    assert stats["processed"] == 3
+    # chunk=2：i=2 触发一次 chunk flush，结尾终刷一次 → 共 2 次写缓存
+    assert write_cache.call_count == 2
+    lines = (tmp_path / "log.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 3

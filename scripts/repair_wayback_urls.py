@@ -88,6 +88,10 @@ from papervault.services.abstract_fetchers.base import MIN_ABSTRACT_CHARS  # noq
 WAYBACK_RE = re.compile(r"web\.archive\.org/web/[^/]+/(https?://.+)$")
 WAYBACK_REPAIR_LOG = Path("cache") / "wayback_repair_log.jsonl"
 
+# 每处理 N 条目标落盘一次（cache + progress + 迁移日志）。长跑在系统休眠 /
+# 进程被终止时只损失最近一个 chunk 的进度，而不是 all-or-nothing 全丢。
+REPAIR_FLUSH_EVERY = 250
+
 OPENALEX_REPAIR_SELECT = (
     "title,abstract_inverted_index,publication_year,doi,primary_location"
 )
@@ -518,17 +522,41 @@ def _repair_pass(
             "source": src,
         })
 
-    if not dry_run and log_lines:
-        # 真正落盘：cache 原子重写 + progress + 迁移日志
-        remaining = [p for p in all_papers if id(p) not in drop_ids]
-        all_papers[:] = remaining
-        _write_cache_atomic(all_papers)
-        save_progress(progress)
-        WAYBACK_REPAIR_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with open(WAYBACK_REPAIR_LOG, "a", encoding="utf-8") as f:
-            for line in log_lines:
-                f.write(json.dumps(line, ensure_ascii=False) + "\n")
+        # 分块落盘：长跑在挂机/崩溃/卡死被终止时只损失一个 chunk 的进度
+        #（2026-10-26 曾两次在长跑途中卡死，all-or-nothing 落盘丢失数小时
+        # 处理量）。写盘本身不产生新改写，故仅在有 pending 变更时触发。
+        if not dry_run and log_lines and i % REPAIR_FLUSH_EVERY == 0:
+            _flush_repair_writes(all_papers, progress, drop_ids, log_lines)
+            print(f"[*] flushed at record {i}/{len(targets)}")
+
+    if not dry_run:
+        _flush_repair_writes(all_papers, progress, drop_ids, log_lines)
     return stats
+
+
+def _flush_repair_writes(
+    all_papers: List[dict],
+    progress: Dict[str, dict],
+    drop_ids: set,
+    log_lines: List[dict],
+) -> None:
+    """把累计的改写原子落盘：cache（.tmp + os.replace）+ progress + 迁移日志 append。
+
+    无 pending 变更（log_lines 为空）时不写任何文件——merge/rewrite 都会
+    产生日志行，所以空日志即代表本轮无实质改动。
+    """
+    if not log_lines:
+        return
+    if drop_ids:
+        all_papers[:] = [p for p in all_papers if id(p) not in drop_ids]
+        drop_ids.clear()
+    _write_cache_atomic(all_papers)
+    save_progress(progress)
+    WAYBACK_REPAIR_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(WAYBACK_REPAIR_LOG, "a", encoding="utf-8") as f:
+        for line in log_lines:
+            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    log_lines.clear()
 
 
 def _print_report(stats: dict, dry_run: bool) -> None:
