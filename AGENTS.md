@@ -120,7 +120,8 @@ PaperVault/
 │   ├── test_doi_redirect_dispatch.py  # DOI redirect dispatch: doi.org → final-URL re-dispatch to the fetcher registry, failure degrade, `--no-doi-redirect`
 │   ├── test_s2_backfill.py       # `--s2-batch` / `--s2-title-match` / `--openalex-title` backfill passes: batch mapping (null entries), title/year gates, excluded hosts (incl. NDSS inclusion for OpenAlex), dry-run
 │   ├── test_pdf_fallback.py      # PDF abstract fallback: `extract_abstract_from_pdf_bytes` on in-process minimal PDFs (inline prefix / no-section / copyright rejection / 2000-char cap) + `_fetch_pdf_abstract` HTTP stubs + `source="pdf"` integration
-│   └── test_repair_wayback.py    # `repair_wayback_urls.py`: wayback unwrap regex, new-URL priority (doi.org > landing page), title/year gates, conflict merge, dry-run no-write
+│   ├── test_repair_wayback.py    # `repair_wayback_urls.py`: wayback unwrap regex, new-URL priority (doi.org > landing page), title/year gates, conflict merge, dry-run no-write
+│   └── test_audit_wayback_repair.py  # `audit_wayback_repair.py`: audit verdicts (PASS/FAIL/unverifiable/collision groups), rewrite & merge revert semantics, dry-run no-write
 ├── cache/
 │   ├── cache.jsonl.gz            # Gzip-compressed JSON Lines database of all papers (stored on Hugging Face; git-ignored locally)
 │   ├── collect_progress.json     # Per-URL incremental collection progress
@@ -149,6 +150,7 @@ PaperVault/
 │   ├── fetch_pwc_backfill.py         # Offline one-shot backfill of empty abstracts/code links from the archived PwC HF snapshots (exact-key matching only; never overwrites non-empty fields)
 │   ├── validate_pdf_extract.py       # Validation harness for the PDF abstract fallback: stratified sampling of .pdf records, OpenAlex/S2 reference abstracts, PASS/REVIEW/FAIL report → docs/pdf_extract_validation.md
 │   ├── repair_wayback_urls.py        # Repair web.archive.org-wrapped dead paper URLs (~4.4k, AAAI/UAI 2000-2014) via a quota-free-aware per-record chain OpenAlex → Crossref → arXiv (`--source auto` default; rate_limited/no-candidate falls through immediately); migration trail goes to cache/wayback_repair_log.jsonl (REASON_ENUM has no `migrated`)
+│   ├── audit_wayback_repair.py       # Audit repair-log entries against real remote titles (Crossref direct / arXiv batch id_list), pure-ratio ≥0.90 verdicts (PASS/FAIL/unverifiable), report → docs/wayback_repair_audit.md; `--revert [--write]` rolls back FAIL entries (rewrite: URL back + clear filled abstract; merge: restore record + target fields from the pre-repair HF revision) and marks progress title_mismatch
 │   ├── cleanup_cache_dedupe.py       # One-shot cache dedupe by `(conf, paper_url)`; reuses `collector._merge_paper_record`
 │   ├── cleanup_cache_frontmatter.py  # One-shot removal of front-matter records (proceedings covers / venue indexes; conservative title-regex + (venue-index | no-abstract & no-code) double condition; `--review` prints the full deletion list)
 │   ├── migrate_progress_to_jsonl.py  # Migrate legacy `abstract_backfill_progress.json` → `.jsonl.gz`
@@ -407,6 +409,7 @@ Other frontend scripts:
 | `python scripts/migrate_progress_to_jsonl.py` | Migrate legacy `abstract_backfill_progress.json` to the JSONL.gz format (`--dry-run` to preview) |
 | `python scripts/sync_hf_readme.py` | Render `docs/HF_README.md` + push it as the Hugging Face dataset repo root README |
 | `python scripts/repair_wayback_urls.py` | Repair `web.archive.org`-wrapped dead paper URLs via a per-record fallback chain — OpenAlex (3 rps, tiny shared daily quota) → Crossref `query.bibliographic` (2 rps; yields `doi.org/<DOI>`) → arXiv `ti:"..."` phrase query (3s; yields version-stripped `arxiv.org/abs/<id>`, no year gate) — `--source auto` default, single-source selectable; a rate_limited/no-candidate source falls through immediately without retrying. Gates: title ≥0.85, year ±1 for fuzzy matches only (ratio ≥0.98 skips). Conflict merge via `collector._merge_paper_record`; may side-fill abstracts (`source=<src>_title`). Dry-run by default; `--write` applies. Supports `--max-papers`, `--no-sync`, `--offline`; honours optional `OPENALEX_API_KEY` |
+| `python scripts/audit_wayback_repair.py` | Audit wayback-repair migration-log entries against the *actual* titles behind the new URLs (Crossref direct lookup for `doi.org`, arXiv `id_list` batches for `arxiv.org`, other hosts → unverifiable). Verdict = normalised pure ratio ≥0.90 (no containment shortcut); report at `docs/wayback_repair_audit.md`. `--revert` (dry-run unless `--write`) rolls back FAIL entries using the pre-repair HF cache revision; `--offline` / `--no-sync` supported |
 | `python scripts/capture_screenshot.py` | Regenerate `pics/screenshot/web.jpg` via Playwright (requires backend on :5001 and Vite dev server on :8080). Supports `--url`, `--output`, `--width`, `--height`, `--scale`, `--quality` |
 | `python -m discovery.generate_conf` | Generate / merge discovered conference configs |
 | `cd web-vue && npm run dev` | Start frontend dev server (Vite, :8080, proxies `/api` to the backend) |
