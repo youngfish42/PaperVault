@@ -63,6 +63,12 @@ from scripts.repair_wayback_urls import (  # noqa: E402
 
 # 与修复门控同口径：纯 ratio ≥ 0.90，无包含捷径。
 AUDIT_MIN_RATIO = 0.90
+# --revert 默认只回滚 ratio < 0.75 的 FAIL 条目（人工抽样结论：<0.75 基本是
+# 错链；≥0.75 多为同论文的期刊/书籍/扩展版，属规范 canonical 链接，保留）。
+REVERT_DEFAULT_MAX_RATIO = 0.75
+# 硬规则：表格/图子页与百科条目在任何 sub-0.90 比例下都不是合格论文链接，
+# 一律回滚（覆盖 peerj table-4 这类 ratio 0.81 的漏网案例）。
+REVERT_HARD_PATTERNS = ("/table-", "/figure", "springerreference")
 # 首轮修复推送时间：取早于它的最新 HF commit 作为"修复前"缓存。
 PREREPAIR_BEFORE = "2026-10-25T03:30:00Z"
 AUDIT_REPORT = ROOT / "docs" / "wayback_repair_audit.md"
@@ -324,6 +330,17 @@ def audit_entries(
 # ---------- 回滚（纯逻辑，可测） ----------------------------------------------------
 
 
+def should_revert(row: dict, max_ratio: float = REVERT_DEFAULT_MAX_RATIO) -> bool:
+    """FAIL 条目的回滚判定收窄（人工抽样结论见常量注释）。"""
+    if row["verdict"] != "FAIL":
+        return False
+    ratio = row["ratio"] or 0.0
+    if ratio < max_ratio:
+        return True
+    url = (row["entry"].get("new_url") or "").lower()
+    return any(p in url for p in REVERT_HARD_PATTERNS) and ratio < AUDIT_MIN_RATIO
+
+
 def revert_failed(
     failed_rows: List[dict],
     all_papers: List[dict],
@@ -393,7 +410,7 @@ def revert_failed(
 # ---------- 报告 --------------------------------------------------------------------
 
 
-def write_report(rows: List[dict], path: Path) -> dict:
+def write_report(rows: List[dict], path: Path, kept_variants: Optional[List[dict]] = None) -> dict:
     counts = {"PASS": 0, "FAIL": 0, "unverifiable": 0}
     for r in rows:
         counts[r["verdict"]] += 1
@@ -423,6 +440,22 @@ def write_report(rows: List[dict], path: Path) -> dict:
                 f"| {(r['local_title'] or '')[:60]} |"
             )
         lines.append("")
+    if kept_variants:
+        lines += [
+            "## same-paper variant 保留清单（FAIL 但未回滚：ratio 高于回滚阈值，"
+            "且非表格/图/百科子页——多为同论文的期刊/书籍/扩展版 canonical 链接）",
+            "",
+            "| conf | old_url | new_url | ratio | remote title | local title |",
+            "|------|---------|---------|-------|--------------|-------------|",
+        ]
+        for r in kept_variants:
+            e = r["entry"]
+            lines.append(
+                f"| {e.get('conf','')} | {e.get('old_url','')} "
+                f"| {e.get('new_url','')} | {r['ratio']:.2f} | {(r['remote_title'] or '')[:60]} "
+                f"| {(r['local_title'] or '')[:60]} |"
+            )
+        lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return counts
@@ -435,6 +468,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--revert", action="store_true",
                     help="Revert FAIL entries (still dry-run unless --write)")
+    ap.add_argument("--revert-max-ratio", type=float, default=REVERT_DEFAULT_MAX_RATIO,
+                    help="Only revert FAIL entries with ratio below this value "
+                         f"(default {REVERT_DEFAULT_MAX_RATIO}); hard rule: /table-, "
+                         "/figure, springerreference URLs revert below 0.90 regardless")
     ap.add_argument("--write", dest="write", action="store_true",
                     help="With --revert: actually mutate cache/progress and push to HF")
     ap.add_argument("--no-sync", action="store_true")
@@ -482,16 +519,22 @@ def main() -> None:
 
     # 3. 审计
     rows = audit_entries(entries, current_by_key, prerepair_by_key, remote_titles)
-    counts = write_report(rows, args.output)
+
+    # 4. 可选回滚（先按阈值/硬规则收窄，再把"保留清单"写进报告）
+    failed = [r for r in rows if r["verdict"] == "FAIL"]
+    to_revert = [r for r in failed if should_revert(r, args.revert_max_ratio)]
+    kept = [r for r in failed if not should_revert(r, args.revert_max_ratio)]
+
+    counts = write_report(rows, args.output, kept_variants=kept if args.revert else None)
     print(f"[*] audit: PASS={counts['PASS']} FAIL={counts['FAIL']} "
           f"unverifiable={counts['unverifiable']} (report: {args.output})")
 
-    # 4. 可选回滚
     if args.revert:
-        failed = [r for r in rows if r["verdict"] == "FAIL"]
+        print(f"[*] revert selection: {len(to_revert)} of {len(failed)} FAIL entries "
+              f"(threshold ratio < {args.revert_max_ratio}; kept as same-paper variants: {len(kept)})")
         progress = load_progress()
         stats = revert_failed(
-            failed, current_papers, prerepair_by_key, progress,
+            to_revert, current_papers, prerepair_by_key, progress,
             dry_run=not args.write,
         )
         print(f"[*] revert stats: {stats}")

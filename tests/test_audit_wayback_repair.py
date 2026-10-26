@@ -225,3 +225,63 @@ def test_load_log_entries_dedupes(tmp_path):
                  encoding="utf-8")
     entries = au.load_log_entries([a, b, tmp_path / "missing.jsonl"])
     assert len(entries) == 2
+
+
+# ---------- --revert-max-ratio 收窄 + 硬规则 -----------------------------------
+
+
+def _row(ratio, url=NEW_DOI, verdict="FAIL"):
+    return {"entry": _entry(new=url), "ratio": ratio, "verdict": verdict,
+            "local_title": "", "remote_title": ""}
+
+
+def test_should_revert_threshold_boundary():
+    assert au.should_revert(_row(0.74)) is True
+    assert au.should_revert(_row(0.75)) is False   # 阈值含头不含尾
+    assert au.should_revert(_row(0.89)) is False
+    assert au.should_revert(_row(0.20)) is True
+    # PASS / unverifiable 永不回滚
+    assert au.should_revert(_row(0.3, verdict="PASS")) is False
+    assert au.should_revert(_row(None, verdict="unverifiable")) is False
+
+
+def test_should_revert_hard_rules():
+    # peerj table-4（ratio 0.81）必须被硬规则覆盖
+    assert au.should_revert(_row(0.81, "https://peerj.com/articles/20567/table-4")) is True
+    assert au.should_revert(_row(0.85, "https://doi.org/10.1007/springerreference_61955")) is True
+    assert au.should_revert(_row(0.83, "https://example.org/paper/figure-2")) is True
+    # 硬规则在 >=0.90 不再适用（那已是 PASS，不会走到这）
+    assert au.should_revert(_row(0.91, "https://doi.org/10.1007/springerreference_61955")) is False
+    # 普通 DOI 高于阈值保留
+    assert au.should_revert(_row(0.86, NEW_DOI)) is False
+
+
+def test_revert_selection_leaves_same_paper_variants_untouched():
+    """阈值以上的 FAIL（同论文变体）保留：URL 与 progress 均不动。"""
+    papers = [_rec(NEW_DOI, abstract="variant abstract kept")]
+    progress = {NEW_DOI: {"status": "success", "source": "crossref_title"}}
+    rows = [{"entry": _entry(filled=True), "ratio": 0.82, "verdict": "FAIL",
+             "local_title": "", "remote_title": ""}]
+    to_revert = [r for r in rows if au.should_revert(r, 0.75)]
+    kept = [r for r in rows if not au.should_revert(r, 0.75)]
+    assert to_revert == [] and len(kept) == 1
+    stats = au.revert_failed(to_revert, papers, None, progress, dry_run=False)
+    assert stats["rewrite_reverted"] == 0
+    assert papers[0]["paper_url"] == NEW_DOI
+    assert progress[NEW_DOI]["status"] == "success"
+
+
+def test_report_lists_kept_variants(tmp_path):
+    rows = [
+        {"entry": _entry(), "ratio": 0.82, "verdict": "FAIL",
+         "local_title": "Local Variant Title", "remote_title": "Remote Canonical Title"},
+    ]
+    out = tmp_path / "report.md"
+    au.write_report(rows, out, kept_variants=rows)
+    text = out.read_text(encoding="utf-8")
+    assert "same-paper variant" in text
+    assert "Remote Canonical Title" in text
+    # 不给 kept_variants 时没有这一节
+    out2 = tmp_path / "report2.md"
+    au.write_report(rows, out2)
+    assert "same-paper variant" not in out2.read_text(encoding="utf-8")
