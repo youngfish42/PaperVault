@@ -104,6 +104,20 @@ _arxiv_rate_state = {"last_time": 0.0}
 
 SOURCE_CHAIN = ("openalex", "crossref", "arxiv")
 
+# ---- 候选接受阈值（PR #228 评审后收紧） ----
+# 评审发现已写入 HF 的真实污染：Crossref 兜底把二十余条 AAAI 2010-2014
+# 论文改到两个无关的 2024 期刊 DOI（10.17816/psaic720-406 等）、UAI2001
+# 被改到 PeerJ 表格页；arXiv 源把同一 arxiv id 分给 UAI+AAAI 两篇不同
+# 论文。根因是门控太松：``_title_gate`` 的**包含捷径**让短标题被无关长
+# 标题吞掉，且候选缺年份时年份守卫默认放行。因此：
+#   * REPAIR_MIN_RATIO：模糊匹配下限，纯 SequenceMatcher ratio，无包含捷径；
+#   * REPAIR_EXACT_RATIO：视为精确匹配（免年份守卫——在线年≠会议年是常态）；
+#   * ARXIV_MIN_RATIO：arXiv 源只接受精确匹配（其年份无会议语义，
+#     包含匹配曾被证实会把同 id 分给不同论文）。
+REPAIR_MIN_RATIO = 0.90
+REPAIR_EXACT_RATIO = 0.98
+ARXIV_MIN_RATIO = 0.98
+
 
 def unwrap_wayback(url: str) -> Optional[str]:
     """解包 wayback 包装 URL；不是 wayback 包装或解不出时返回 None。"""
@@ -142,6 +156,7 @@ def _openalex_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
         min_interval=OPENALEX_MIN_INTERVAL,
         headers=HEADERS,
         rate_state=_openalex_rate_state,
+        max_retries=2,  # 日配额型 429 重试一次即放弃，快速落下一源
     )
     if err or resp is None:
         return None, err or "network"
@@ -182,6 +197,7 @@ def _crossref_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
         min_interval=CROSSREF_MIN_INTERVAL,
         headers=HEADERS,
         rate_state=_crossref_rate_state,
+        max_retries=2,  # 日配额型 429 重试一次即放弃，快速落下一源
     )
     if err or resp is None:
         return None, err or "network"
@@ -211,7 +227,7 @@ def _arxiv_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
     import requests as _requests
 
     encoded = _requests.utils.quote(title)
-    url = f'http://export.arxiv.org/api/query?search_query=ti:"{encoded}"&max_results=1'
+    url = f'https://export.arxiv.org/api/query?search_query=ti:"{encoded}"&max_results=1'
     resp, err = _s2_request(
         "get",
         url,
@@ -219,6 +235,7 @@ def _arxiv_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
         min_interval=ARXIV_MIN_INTERVAL,
         headers=HEADERS,
         rate_state=_arxiv_rate_state,
+        max_retries=2,  # 日配额型 429 重试一次即放弃，快速落下一源
     )
     if err or resp is None:
         return None, err or "network"
@@ -239,6 +256,10 @@ def _arxiv_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
     abs_url = re.sub(r"v\d+$", "", entry_id)
     if abs_url.startswith("http://"):
         abs_url = "https://" + abs_url[len("http://"):]
+    # 安全校验：entry id 必须指向 https 的 arxiv.org，其它 host 一律丢弃
+    #（防上游被劫持/畸形响应把外链写进缓存）。
+    if not abs_url.startswith("https://") or _host_of(abs_url) != "arxiv.org":
+        return None, "empty_abstract"
     title_elem = entry.find("atom:title", ns)
     summary_elem = entry.find("atom:summary", ns)
     return {
@@ -265,15 +286,65 @@ def _first_title(raw) -> str:
     return raw or ""
 
 
+def _norm_title(t: str) -> str:
+    """与 ``fetch_abstracts._title_gate`` 相同的归一化（去非词字符小写）。"""
+    return re.sub(r"[^\w]+", "", (t or "").strip().lower())
+
+
+def _title_ratio(a: str, b: str) -> float:
+    na, nb = _norm_title(a), _norm_title(b)
+    if not na or not nb:
+        return 0.0
+    return difflib.SequenceMatcher(None, na, nb).ratio()
+
+
+def _candidate_year(source: str, work: dict):
+    """按源提取候选年份（arxiv 无年份语义，恒 None）。"""
+    if source == "crossref":
+        parts = (work.get("published") or {}).get("date-parts") or []
+        if parts and parts[0]:
+            return parts[0][0]
+        return None
+    if source == "openalex":
+        return work.get("publication_year")
+    return None
+
+
+def _candidate_accepted(cand_title: str, cand_year, title: str, conf: str, source: str) -> bool:
+    """完整的候选接受判定（链路预过滤 + evaluate_repair 防御共用）。
+
+    * arxiv：只接受归一化 ratio ≥ ARXIV_MIN_RATIO 的精确匹配（无年份守卫）；
+    * crossref / openalex：纯 ratio ≥ REPAIR_MIN_RATIO（无包含捷径）；
+      ratio ≥ REPAIR_EXACT_RATIO 视为精确匹配、免年份守卫；
+      其余模糊匹配必须过年份守卫（±1），候选缺年份时一律拒绝
+      （缺年份 + 模糊匹配正是 PR #228 污染的根因组合）。
+    """
+    ratio = _title_ratio(cand_title, title)
+    if ratio <= 0.0:
+        return False
+    if source == "arxiv":
+        return ratio >= ARXIV_MIN_RATIO
+    if ratio >= REPAIR_EXACT_RATIO:
+        return True
+    if ratio < REPAIR_MIN_RATIO:
+        return False
+    if not cand_year:
+        return False
+    return _year_gate(conf, cand_year)
+
+
 def make_lookup(source: str = "auto"):
     """构造 per-record 兜底链 ``lookup(title, conf) -> (source, work, err)``。
 
     ``auto``：OpenAlex → Crossref → arXiv。某源 ``rate_limited`` 或无候选
     （``empty_abstract``）立即落下一源，不重试当前源（每日配额型 429 重试
-    无意义）。**候选拿到但标题门控失败同样落下一源**：Crossref 的
+    无意义）。**候选拿到但完整接受判定（:func:`_candidate_accepted`：标题
+    ratio 阈值 + 按源的年份规则）失败同样落下一源**：Crossref 的
     ``query.bibliographic`` 模糊搜索对库外论文几乎总会返回"某个东西"，
-    把这种候选当终点会挡住 arXiv 兜底（2026-10-25 第二轮实测 3,817 条
-    因此滞留；年份守卫仍留在 ``evaluate_repair`` 中按源差异化执行）。
+    把这种候选当终点既会挡住 arXiv 兜底（2026-10-25 第二轮实测 3,817 条
+    因此滞留），也曾把老论文写到无关期刊 DOI（PR #228 评审）。
+    attempts 里该情形记 ``title_mismatch``（``year_mismatch`` 不在
+    REASON_ENUM，分析器只认枚举成员，故归并入 title_mismatch）。
     单源模式（``--source crossref`` 等）只查对应源。
     """
     chain = list(SOURCE_CHAIN) if source == "auto" else [source]
@@ -287,7 +358,13 @@ def make_lookup(source: str = "auto"):
         for src in chain:
             work, err = _fetch_by_source(src, title)
             if work is not None:
-                if _title_gate(_first_title(work.get("title")), title):
+                if _candidate_accepted(
+                    _first_title(work.get("title")),
+                    _candidate_year(src, work),
+                    title,
+                    conf,
+                    src,
+                ):
                     return src, work, "", attempts
                 saw_title_mismatch = True
                 attempts.append((src, "title_mismatch"))
@@ -339,18 +416,20 @@ def evaluate_repair(
       * ``crossref``：``published.date-parts[0][0]`` 年份、JATS 摘要（去标签）、
         新 URL 恒为 ``https://doi.org/<DOI>``；
       * ``arxiv``：**不过年份守卫**（老论文的 arXiv 年份是挂出年，与会议年
-        无关），新 URL 为去版本号的 abs 页。
+        无关），新 URL 为去版本号的 abs 页，且只接受归一化
+        ratio ≥ ARXIV_MIN_RATIO 的精确标题匹配（无包含捷径）。
+
+    接受判定复用 :func:`_candidate_accepted`（与链路预过滤同一套收紧规则；
+    链已预过滤时这里是纯防御，不会冲突）。
     """
     if not work:
         return None, None, "empty_abstract"
     title = (paper.get("paper_name") or "").strip()
+    conf = paper.get("conf", "")
 
     if source == "crossref":
         cand_title = _first_title(work.get("title"))
-        year = None
-        parts = (work.get("published") or {}).get("date-parts") or []
-        if parts and parts[0]:
-            year = parts[0][0]
+        year = _candidate_year(source, work)
         doi = (work.get("DOI") or "").strip()
         new_url = f"https://doi.org/{doi}" if doi else None
         abstract = clean_abstract(work.get("abstract") or "")
@@ -369,16 +448,7 @@ def evaluate_repair(
             _reconstruct_openalex_abstract(work.get("abstract_inverted_index") or {}) or ""
         )
 
-    if not _title_gate(cand_title, title):
-        return None, None, "title_mismatch"
-    # 年份守卫只约束模糊匹配：这批 wayback 记录是老会议论文（UAI/AAAI
-    # 2000-2014），OpenAlex 常把年份记为 arXiv 挂出年（2012/2013）而非会议年，
-    # 精确标题匹配下 ±1 年守卫会大面积误杀（实测 15/15 精确命中的
-    # publication_year 全部是 arXiv 年份）。ratio ≥ 0.98 视为精确匹配，
-    # 跳过年份守卫；0.85–0.98 的模糊匹配仍须过年份守卫以拦同名不同文。
-    norm = lambda t: re.sub(r"[^\w]+", "", (t or "").strip().lower())
-    ratio = difflib.SequenceMatcher(None, norm(cand_title), norm(title)).ratio()
-    if source != "arxiv" and ratio < 0.98 and not _year_gate(paper.get("conf", ""), year):
+    if not _candidate_accepted(cand_title, year, title, conf, source):
         return None, None, "title_mismatch"
     if len(abstract) < MIN_ABSTRACT_CHARS:
         abstract = None
@@ -490,6 +560,14 @@ def _repair_pass(
             continue
 
         # ---- 真正改写 ----
+        # merge 会删除原 wayback 记录；先把其原始内容捕获进日志（回滚依据）。
+        old_payload = {}
+        if action == "merge":
+            old_payload = {
+                "old_title": paper.get("paper_name", ""),
+                "old_authors": paper.get("paper_authors") or [],
+                "old_abstract": paper.get("paper_abstract") or "",
+            }
         if abstract_filled:
             paper["paper_abstract"] = abstract
         if action == "merge":
@@ -520,6 +598,7 @@ def _repair_pass(
             "action": action,
             "abstract_filled": abstract_filled,
             "source": src,
+            **old_payload,
         })
 
         # 分块落盘：长跑在挂机/崩溃/卡死被终止时只损失一个 chunk 的进度

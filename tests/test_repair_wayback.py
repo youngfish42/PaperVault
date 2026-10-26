@@ -120,11 +120,15 @@ def test_evaluate_repair_title_gate_rejects():
 
 def test_evaluate_repair_year_gate_rejects():
     paper = _paper(WAYBACK_AAAI, conf="AAAI2006")
-    # 模糊标题（包含关系但 ratio < 0.98）仍受年份守卫约束。
-    work = _work(title="Some Old Paper Revisited", year=2020, doi="https://doi.org/10.1/x")
+    # 模糊标题（ratio 落在 [0.90, 0.98) 区间）仍受年份守卫约束。
+    # "someoldpapers" vs "someoldpaper" → ratio = 24/25 = 0.96。
+    work = _work(title="Some Old Papers", year=2020, doi="https://doi.org/10.1/x")
     assert rw.evaluate_repair(work, paper)[2] == "title_mismatch"
-    work = _work(title="Some Old Paper Revisited", year=2007, doi="https://doi.org/10.1/x")  # ±1 allowed
+    work = _work(title="Some Old Papers", year=2007, doi="https://doi.org/10.1/x")  # ±1 allowed
     assert rw.evaluate_repair(work, paper)[0] == "https://doi.org/10.1/x"
+    # PR #228 收紧：包含捷径已移除——包含关系但低 ratio 的标题即便年份吻合也拒绝。
+    work = _work(title="Some Old Paper Revisited", year=2007, doi="https://doi.org/10.1/x")
+    assert rw.evaluate_repair(work, paper)[2] == "title_mismatch"
 
 
 def test_evaluate_repair_exact_title_skips_year_gate():
@@ -490,3 +494,116 @@ def test_pass_flushes_in_chunks(monkeypatch, tmp_path):
     assert write_cache.call_count == 2
     lines = (tmp_path / "log.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3
+
+
+# ---------- PR #228 评审修复的回归测试 ----------
+
+
+def test_arxiv_fetch_uses_https_endpoint(monkeypatch):
+    """Fix 1: arXiv 端点必须走 https。"""
+    captured = {}
+    def fake(method, url, **kw):
+        captured["url"] = url
+        return _resp(text=ARXIV_XML), ""
+    monkeypatch.setattr(rw, "_s2_request", fake)
+    rw._arxiv_repair_fetch("Some Old Paper")
+    assert captured["url"].startswith("https://export.arxiv.org/")
+
+
+def test_arxiv_fetch_rejects_non_arxiv_host_entry_id(monkeypatch):
+    """Fix 1: entry id 必须指向 https 的 arxiv.org，其它 host 丢弃。"""
+    bad_xml = ARXIV_XML.replace("http://arxiv.org/abs/1301.3857v1",
+                                "https://evil.example.org/abs/1301.3857")
+    monkeypatch.setattr(rw, "_s2_request", lambda *a, **k: (_resp(text=bad_xml), ""))
+    work, err = rw._arxiv_repair_fetch("Some Old Paper")
+    assert work is None and err == "empty_abstract"
+    # http（非 https）的 arxiv id 会被升级为 https 后接受（既有归一化行为）
+    monkeypatch.setattr(rw, "_s2_request", lambda *a, **k: (_resp(text=ARXIV_XML), ""))
+    work, err = rw._arxiv_repair_fetch("Some Old Paper")
+    assert work["abs_url"] == "https://arxiv.org/abs/1301.3857"
+
+
+def test_all_repair_fetchers_cap_retries_at_two(monkeypatch):
+    """Fix 2: 三个修复 fetcher 都必须传 max_retries=2（429 快失败落链）。"""
+    seen = []
+    monkeypatch.setattr(rw, "_s2_request",
+                        lambda *a, **k: (seen.append(k.get("max_retries")) or (None, "rate_limited")))
+    rw._openalex_repair_fetch("t")
+    rw._crossref_repair_fetch("t")
+    rw._arxiv_repair_fetch("t")
+    assert seen == [2, 2, 2]
+
+
+def test_arxiv_acceptance_requires_near_exact_ratio(monkeypatch):
+    """Fix 3: arXiv 源不吃包含捷径——短标题被无关长标题包含也拒绝。"""
+    paper = _paper(WAYBACK_AAAI, title="Some Old Paper")
+    work = {"title": "Some Old Paper Revisited And Extended With More Results",
+            "abs_url": "https://arxiv.org/abs/1301.3857", "summary": "x" * 100}
+    new_url, _a, reason = rw.evaluate_repair(work, paper, source="arxiv")
+    assert new_url is None and reason == "title_mismatch"
+
+
+def test_chain_falls_through_on_year_mismatch(monkeypatch):
+    """Fix 4: 模糊候选年份不符（±1 之外）也落下一源，attempts 记
+    title_mismatch（year_mismatch 不在 REASON_ENUM，归并入它）。"""
+    calls = []
+    def fake(src, title):
+        calls.append(src)
+        if src == "openalex":
+            # 模糊标题（ratio≈0.96）+ 年份 1990 vs conf 2006 → 拒绝
+            return {"title": "Some Old Papers", "publication_year": 1990}, ""
+        if src == "crossref":
+            return dict(CROSSREF_ITEM), ""
+        return None, "empty_abstract"
+    monkeypatch.setattr(rw, "_fetch_by_source", fake)
+    src, work, err, attempts = rw.make_lookup("auto")("Some Old Paper", "AAAI2006")
+    assert src == "crossref"
+    assert calls == ["openalex", "crossref"]
+    assert attempts == [("openalex", "title_mismatch")]
+
+
+def test_crossref_tightened_missing_year_fuzzy_rejected(monkeypatch):
+    """Fix 5: Crossref 候选缺年份时只有 ratio≥0.98 才放行（污染根因）。"""
+    # 模糊（0.90–0.98）+ 缺年份 → 拒绝
+    assert rw._candidate_accepted("Some Old Papers", None, "Some Old Paper", "AAAI2006", "crossref") is False
+    # 精确（≥0.98）+ 缺年份 → 放行
+    assert rw._candidate_accepted("Some Old Paper", None, "Some Old Paper", "AAAI2006", "crossref") is True
+    # 包含关系但低 ratio（旧包含捷径会放行）→ 拒绝
+    assert rw._candidate_accepted(
+        "Some Old Paper Revisited And Extended", 2006, "Some Old Paper", "AAAI2006", "crossref"
+    ) is False
+    # openalex 同样收紧：模糊 + 年份吻合 → 放行；模糊 + 缺年份 → 拒绝
+    assert rw._candidate_accepted("Some Old Papers", 2006, "Some Old Paper", "AAAI2006", "openalex") is True
+    assert rw._candidate_accepted("Some Old Papers", None, "Some Old Paper", "AAAI2006", "openalex") is False
+    # arxiv：0.96 也不够，须 ≥0.98
+    assert rw._candidate_accepted("Some Old Papers", None, "Some Old Paper", "AAAI2006", "arxiv") is False
+
+
+def test_merge_log_carries_old_record_payload(monkeypatch):
+    """Fix 6: merge 日志行必须带 old_title/old_authors/old_abstract（回滚依据）。"""
+    new_url = "https://doi.org/10.1609/aaai.v21i1.7326"
+    existing = _paper(new_url, conf="AAAI2006")
+    existing["paper_abstract"] = "existing abstract long enough to win the merge tiebreaker."
+    wayback = _paper(WAYBACK_AAAI, conf="AAAI2006")
+    wayback["paper_authors"] = ["Old Author"]
+    wayback["paper_abstract"] = "wayback side abstract"
+    papers = [existing, wayback]
+    progress = {}
+
+    import tempfile, pathlib
+    log = pathlib.Path(tempfile.mkdtemp()) / "log.jsonl"
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_LOG", log)
+    monkeypatch.setattr(rw, "_write_cache_atomic", MagicMock())
+    monkeypatch.setattr(rw, "save_progress", MagicMock())
+
+    work = _work(doi=new_url, abstract=False)  # 不顺带填摘要，old_abstract 保持原值
+    rw._repair_pass(
+        papers, progress, max_papers=None, dry_run=False,
+        lookup_fn=lambda _t, _c: ("openalex", work, "", []),
+    )
+    import json as _json
+    rec = _json.loads(log.read_text(encoding="utf-8").strip())
+    assert rec["action"] == "merge"
+    assert rec["old_title"] == "Some Old Paper"
+    assert rec["old_authors"] == ["Old Author"]
+    assert rec["old_abstract"] == "wayback side abstract"
