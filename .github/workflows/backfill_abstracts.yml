@@ -448,6 +448,7 @@ jobs:
         # summary 和 build log。
         if: inputs.wayback_repair_dry_run
         run: |
+          set -o pipefail
           python scripts/repair_wayback_urls.py --dry-run | tee "$RUNNER_TEMP/wayback_report.txt"
           {
             echo "### Wayback repair dry-run report"
@@ -476,7 +477,9 @@ jobs:
         # ensure_cache_local 登记的 parent_commit 仍然有效（乐观锁保留），
         # 上传结果显式校验、失败非零退出。
         if: ${{ !inputs.wayback_repair_dry_run }}
-        run: python scripts/repair_wayback_urls.py --write | tee "$RUNNER_TEMP/wayback_repair.log"
+        run: |
+          set -o pipefail
+          python scripts/repair_wayback_urls.py --write | tee "$RUNNER_TEMP/wayback_repair.log"
 
       - name: Setup GIT user
         if: ${{ !inputs.wayback_repair_dry_run }}

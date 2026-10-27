@@ -91,6 +91,7 @@ jobs:
         # 上传结果显式校验、失败非零退出。被限流的记录保持不变，次日定时
         # run 自然重试。
         run: |
+          set -o pipefail
           python scripts/repair_wayback_urls.py --write | tee "$RUNNER_TEMP/wayback_repair.log"
           {
             echo "### Wayback repair report (scheduled write run)"
