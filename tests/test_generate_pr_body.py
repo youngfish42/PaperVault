@@ -172,3 +172,36 @@ def test_main_writes_pr_body(tmp_path):
     body = output.read_text(encoding="utf-8")
     assert body.startswith("Automated paper collection")
     assert body.rstrip().endswith(f"[View workflow run]({RUN_URL})")
+
+
+def test_workflows_use_generated_pr_bodies_and_bounded_titles():
+    import yaml
+
+    workflow_paths = [
+        ROOT / ".github/workflows/discover_and_update.yml",
+        ROOT / ".github/workflows/collect_papers.yml",
+        ROOT / ".github/workflows/backfill_abstracts.yml",
+        ROOT / ".github/workflows/update_readme.yml",
+        ROOT / ".github/workflows/wayback_repair.yml",
+    ]
+    pr_steps = []
+    for path in workflow_paths:
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        for job in workflow["jobs"].values():
+            steps = job.get("steps", [])
+            for index, step in enumerate(steps):
+                if not str(step.get("uses", "")).startswith(
+                    "peter-evans/create-pull-request@"
+                ):
+                    continue
+                config = step["with"]
+                assert "body" not in config
+                assert config["body-path"] == "${{ runner.temp }}/pr_body.md"
+                assert len(config["title"]) <= 200
+                assert any(
+                    previous.get("name") == "Generate PR summary"
+                    for previous in steps[:index]
+                )
+                pr_steps.append((path, step["name"]))
+
+    assert len(pr_steps) == 6
