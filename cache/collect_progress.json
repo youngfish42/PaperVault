@@ -21587,7 +21587,7 @@
     },
     "DBLP::https://dblp.org/db/conf/icmcs/icme2026.html": {
       "name": "ICME2026",
-      "ts": "2026-09-23T21:29:35",
+      "ts": "2026-10-27T20:12:16",
       "empty": true
     },
     "DBLP::https://dblp.org/db/conf/isca/isca2026.html": {
@@ -23676,7 +23676,7 @@
     },
     "DBLP::https://dblp.org/db/journals/staeors/staeors18.html": {
       "name": "JSTARS2025",
-      "ts": "2026-09-24T13:08:30",
+      "ts": "2026-10-27T20:13:22",
       "empty": true
     },
     "DBLP::https://dblp.org/db/journals/staeors/staeors19.html": {
@@ -24022,6 +24022,42 @@
     "DBLP::https://dblp.org/db/conf/icse/seis2026.html": {
       "name": "ICSE2026",
       "ts": "2026-10-15T20:23:17"
+    },
+    "ACL::https://aclanthology.org/events/emnlp-2026/": {
+      "name": "EMNLP2026",
+      "ts": "2026-10-27T19:54:54"
+    },
+    "ACL::https://aclanthology.org/volumes/2026.findings-emnlp/": {
+      "name": "EMNLP2026",
+      "ts": "2026-10-27T19:59:03"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-2.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:04:30"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-3.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:05:37"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-4.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:06:43"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-5.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:07:50"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-7.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:08:56"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-11.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:10:03"
+    },
+    "DBLP::https://dblp.org/db/conf/miccai/miccai2026-17.html": {
+      "name": "MICCAI2026",
+      "ts": "2026-10-27T20:11:10"
     }
   }
 }
