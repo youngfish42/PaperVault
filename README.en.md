@@ -38,9 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-10-15
-- 🆕 **New Papers This Update**: 118
-- 📊 **Database Scale**: 714,769 papers / 129 publication series / 632,899 with abstracts / 112,135 with code
+- 📅 **Last Updated**: 2026-10-27
+- 🆕 **New Papers This Update**: 5,972
+- 📢 **New Conferences This Update**: 3
+- 📊 **Database Scale**: 719,793 papers / 129 publication series / 649,972 with abstracts / 113,338 with code
 
 <!-- recent-update-end -->
 
@@ -277,7 +278,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **CVPR** 2013-2026 (14 editions)
 - **EACL** 2003-2026 (10 editions)
 - **ECCV** 2018-2024 (4 editions)
-- **EMNLP** 2000-2025 (26 editions)
+- **EMNLP** 2000-2026 (27 editions)
 - **ICCV** 2013-2025 (7 editions)
 - **ICLR** 2019-2026 (8 editions)
 - **ICML** 2000-2025 (26 editions)
