@@ -404,3 +404,26 @@ def test_report_lists_kept_variants(tmp_path):
     out2 = tmp_path / "report2.md"
     au.write_report(rows, out2)
     assert "same-paper variant" not in out2.read_text(encoding="utf-8")
+
+
+def test_select_reverts_includes_unverifiable_hard_pattern():
+    """PR #228 review（commit 6380f997）：候选集只含 FAIL 时，unverifiable
+    的坏 pattern 子页永远进不了回滚集——select_reverts 必须把两类一起过
+    should_revert。"""
+    rows = [
+        {"verdict": "FAIL", "ratio": 0.5, "entry": {"new_url": "https://doi.org/10.1/a"}},
+        {"verdict": "FAIL", "ratio": 0.95, "entry": {"new_url": "https://doi.org/10.1/b"}},
+        {"verdict": "unverifiable", "ratio": None,
+         "entry": {"new_url": "https://doi.org/10.7717/peerj.20567/table-4"}},
+        {"verdict": "unverifiable", "ratio": None,
+         "entry": {"new_url": "http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1"}},
+        {"verdict": "PASS", "ratio": 0.99, "entry": {"new_url": "https://doi.org/10.1/c"}},
+    ]
+    to_revert, kept = au.select_reverts(rows, 0.90)
+    urls = [r["entry"]["new_url"] for r in to_revert]
+    assert "https://doi.org/10.1/a" in urls                      # FAIL 低 ratio
+    assert "https://doi.org/10.7717/peerj.20567/table-4" in urls # unverifiable 坏 pattern
+    assert "https://doi.org/10.1/b" not in urls                  # FAIL 高 ratio 保留
+    assert "http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1" not in urls  # unverifiable 无坏 pattern 保留
+    assert "https://doi.org/10.1/c" not in urls                  # PASS 永不回滚
+    assert [r["entry"]["new_url"] for r in kept] == ["https://doi.org/10.1/b"]

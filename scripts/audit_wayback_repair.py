@@ -357,6 +357,21 @@ def should_revert(row: dict, max_ratio: float = REVERT_DEFAULT_MAX_RATIO) -> boo
     return any(p in url for p in REVERT_HARD_PATTERNS) and ratio < AUDIT_MIN_RATIO
 
 
+def select_reverts(rows: List[dict], max_ratio: float) -> Tuple[List[dict], List[dict]]:
+    """把审计行分成 (to_revert, kept)。
+
+    FAIL 与 unverifiable 统一过 :func:`should_revert`——unverifiable 里的
+    坏 pattern 子页（/table- 等）必须能进回滚集（PR #228 review：此前
+    候选集只含 FAIL，should_revert 的 unverifiable 分支是死代码）。
+    ``kept`` 只含 FAIL 保留项（报告的 same-paper variant 清单语义不变）。
+    """
+    failed = [r for r in rows if r["verdict"] == "FAIL"]
+    unverifiable = [r for r in rows if r["verdict"] == "unverifiable"]
+    to_revert = [r for r in failed + unverifiable if should_revert(r, max_ratio)]
+    kept = [r for r in failed if not should_revert(r, max_ratio)]
+    return to_revert, kept
+
+
 def revert_failed(
     failed_rows: List[dict],
     all_papers: List[dict],
@@ -539,17 +554,16 @@ def main() -> None:
     rows = audit_entries(entries, current_by_key, prerepair_by_key, remote_titles)
 
     # 4. 可选回滚（先按阈值/硬规则收窄，再把"保留清单"写进报告）
-    failed = [r for r in rows if r["verdict"] == "FAIL"]
-    to_revert = [r for r in failed if should_revert(r, args.revert_max_ratio)]
-    kept = [r for r in failed if not should_revert(r, args.revert_max_ratio)]
+    to_revert, kept = select_reverts(rows, args.revert_max_ratio)
 
     counts = write_report(rows, args.output, kept_variants=kept if args.revert else None)
     print(f"[*] audit: PASS={counts['PASS']} FAIL={counts['FAIL']} "
           f"unverifiable={counts['unverifiable']} (report: {args.output})")
 
     if args.revert:
-        print(f"[*] revert selection: {len(to_revert)} of {len(failed)} FAIL entries "
-              f"(threshold ratio < {args.revert_max_ratio}; kept as same-paper variants: {len(kept)})")
+        print(f"[*] revert selection: {len(to_revert)} entries "
+              f"(FAIL + unverifiable 统一过 should_revert；阈值 ratio < {args.revert_max_ratio}; "
+              f"kept as same-paper variants: {len(kept)})")
         progress = load_progress()
         stats = revert_failed(
             to_revert, current_papers, prerepair_by_key, progress,
