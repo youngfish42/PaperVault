@@ -530,6 +530,16 @@
         "url": "https://aclanthology.org/volumes/2023.findings-emnlp/"
     },
     {
+        "name": "EMNLP2026",
+        "tag": "^2026.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2026/"
+    },
+    {
+        "name": "EMNLP2026",
+        "tag": "^2026.findings*",
+        "url": "https://aclanthology.org/volumes/2026.findings-emnlp/"
+    },
+    {
         "name": "EACL2021",
         "tag": "^2021.eacl*",
         "url": "https://aclanthology.org/events/eacl-2021/"
