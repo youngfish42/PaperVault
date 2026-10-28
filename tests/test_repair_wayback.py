@@ -607,3 +607,148 @@ def test_merge_log_carries_old_record_payload(monkeypatch):
     assert rec["old_title"] == "Some Old Paper"
     assert rec["old_authors"] == ["Old Author"]
     assert rec["old_abstract"] == "wayback side abstract"
+
+
+# ---------- 软超时与跨运行 checkpoint ------------------------------------------
+
+
+def test_soft_timeout_saves_checkpoint_and_stops_new_lookups(monkeypatch, tmp_path):
+    papers = [_paper(WAYBACK_AAAI.replace("7326", str(9000 + i))) for i in range(3)]
+    checkpoint = rw._empty_repair_checkpoint("auto")
+    now = [0.0]
+    lookups = []
+
+    def lookup(title, _conf):
+        lookups.append(title)
+        now[0] = 2.0
+        return None, None, "rate_limited", []
+
+    monkeypatch.setattr(rw.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_CHECKPOINT", tmp_path / "checkpoint.json")
+    write_cache = MagicMock()
+    save_progress = MagicMock()
+    monkeypatch.setattr(rw, "_write_cache_atomic", write_cache)
+    monkeypatch.setattr(rw, "save_progress", save_progress)
+
+    stats = rw._repair_pass(
+        papers, {}, max_papers=None, dry_run=False, lookup_fn=lookup,
+        soft_timeout=1.0, start_time=0.0, checkpoint=checkpoint,
+    )
+
+    assert len(lookups) == 1
+    assert stats["attempted"] == 1
+    assert stats["timed_out"] is True
+    assert stats["remaining"] == 2
+    write_cache.assert_not_called()
+    save_progress.assert_not_called()
+    import json as _json
+    saved = _json.loads((tmp_path / "checkpoint.json").read_text(encoding="utf-8"))
+    assert saved["complete"] is False
+    assert saved["attempted"] == [papers[0]["paper_url"]]
+
+
+def test_checkpoint_flushes_chunks_without_cache_changes(monkeypatch, tmp_path):
+    monkeypatch.setattr(rw, "REPAIR_FLUSH_EVERY", 2)
+    papers = [_paper(WAYBACK_AAAI.replace("7326", str(9100 + i))) for i in range(3)]
+    checkpoint = rw._empty_repair_checkpoint("auto")
+    write_checkpoint = MagicMock()
+    write_cache = MagicMock()
+    monkeypatch.setattr(rw, "_write_repair_checkpoint", write_checkpoint)
+    monkeypatch.setattr(rw, "_write_cache_atomic", write_cache)
+    monkeypatch.setattr(rw, "save_progress", MagicMock())
+
+    stats = rw._repair_pass(
+        papers, {}, max_papers=None, dry_run=False,
+        lookup_fn=lambda _t, _c: (None, None, "empty_abstract", []),
+        checkpoint=checkpoint,
+    )
+
+    assert stats["unchanged"] == 3
+    assert write_checkpoint.call_count == 2
+    write_cache.assert_not_called()
+
+
+def test_checkpoint_resumes_unmodified_urls_and_resets_after_full_pass(monkeypatch, tmp_path):
+    papers = [
+        _paper(WAYBACK_AAAI.replace("7326", str(9200 + i)), title=f"Paper {i}")
+        for i in range(3)
+    ]
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_CHECKPOINT", tmp_path / "checkpoint.json")
+    lookup = lambda _t, _c: (None, None, "empty_abstract", [])
+
+    first = rw._repair_pass(
+        papers, {}, max_papers=1, dry_run=False, lookup_fn=lookup,
+        checkpoint=rw._empty_repair_checkpoint("auto"),
+    )
+    assert first["remaining"] == 2
+
+    resumed = rw._load_repair_checkpoint("auto")
+    assert resumed["resumed"] == 1
+    lookups = []
+    second = rw._repair_pass(
+        papers, {}, max_papers=None, dry_run=False,
+        lookup_fn=lambda title, conf: (lookups.append(title) or lookup(title, conf)),
+        checkpoint=resumed,
+    )
+
+    assert lookups == ["Paper 1", "Paper 2"]
+    assert second["resume_skipped"] == 1
+    assert second["attempted"] == 2
+    assert second["remaining"] == 0
+    import json as _json
+    saved = _json.loads((tmp_path / "checkpoint.json").read_text(encoding="utf-8"))
+    assert saved["complete"] is True and saved["attempted"] == []
+    fresh = rw._load_repair_checkpoint("auto")
+    assert fresh["resumed"] == 0 and fresh["attempted"] == set()
+
+
+def test_dry_run_does_not_write_checkpoint(monkeypatch, tmp_path):
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_CHECKPOINT", tmp_path / "checkpoint.json")
+    checkpoint = rw._empty_repair_checkpoint("auto")
+    rw._repair_pass(
+        [_paper(WAYBACK_AAAI)], {}, max_papers=None, dry_run=True,
+        lookup_fn=lambda _t, _c: (None, None, "empty_abstract", []),
+        checkpoint=checkpoint,
+    )
+    assert not (tmp_path / "checkpoint.json").exists()
+
+
+def test_cache_upload_failure_does_not_upload_checkpoint(monkeypatch, tmp_path):
+    monkeypatch.setattr(rw, "PROGRESS_FILE", tmp_path / "missing-progress.jsonl.gz")
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_CHECKPOINT", checkpoint)
+    upload = MagicMock(return_value=[])
+    monkeypatch.setattr(rw, "upload_to_huggingface", upload)
+
+    with pytest.raises(SystemExit) as exc:
+        rw._sync_or_die(cache_changed=True)
+
+    assert exc.value.code == 1
+    assert upload.call_count == 1
+    assert upload.call_args.args[0] == [rw.CACHE_FILE]
+
+
+def test_checkpoint_only_sync_skips_large_cache(monkeypatch, tmp_path):
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_CHECKPOINT", checkpoint)
+    upload = MagicMock(return_value=["cache/wayback_repair_checkpoint.json"])
+    monkeypatch.setattr(rw, "upload_to_huggingface", upload)
+
+    rw._sync_or_die(cache_changed=False)
+
+    upload.assert_called_once()
+    assert upload.call_args.args[0] == [checkpoint]
+
+
+def test_checkpoint_upload_failure_is_fatal(monkeypatch, tmp_path):
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(rw, "WAYBACK_REPAIR_CHECKPOINT", checkpoint)
+    monkeypatch.setattr(rw, "upload_to_huggingface", MagicMock(return_value=[]))
+
+    with pytest.raises(SystemExit) as exc:
+        rw._sync_or_die(cache_changed=False)
+
+    assert exc.value.code == 1

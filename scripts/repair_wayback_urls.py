@@ -40,11 +40,17 @@ progress / 审计：
 parent_commit 乐观锁的验证式上传 ``_sync_or_die``（除非
 --no-sync/--offline/--dry-run），上传失败会以非零退出。
 
+``--soft-timeout`` 到期后停止新查询并正常保存、上传。
+``cache/wayback_repair_checkpoint.json`` 记录本轮所有已尝试 URL（包括未改写
+记录），每 ``REPAIR_FLUSH_EVERY`` 条原子落盘并随 HF 同步；下次从首个未尝试
+URL 续跑，完整一轮结束后自动重置。缓存上传失败时不会推进远端 checkpoint。
+
 用法::
 
     python scripts/repair_wayback_urls.py                      # dry-run 报告（auto 链）
     python scripts/repair_wayback_urls.py --dry-run --max-papers 10 --source crossref
     python scripts/repair_wayback_urls.py --write --no-sync    # 真正改写，本地不同步
+    python scripts/repair_wayback_urls.py --write --soft-timeout 18000
 """
 
 import argparse
@@ -89,9 +95,11 @@ from papervault.services.abstract_fetchers.base import MIN_ABSTRACT_CHARS  # noq
 
 WAYBACK_RE = re.compile(r"web\.archive\.org/web/[^/]+/(https?://.+)$")
 WAYBACK_REPAIR_LOG = Path("cache") / "wayback_repair_log.jsonl"
+WAYBACK_REPAIR_CHECKPOINT = Path("cache") / "wayback_repair_checkpoint.json"
+WAYBACK_CHECKPOINT_SCHEMA = "wayback_repair_checkpoint/v1"
 
-# 每处理 N 条目标落盘一次（cache + progress + 迁移日志）。长跑在系统休眠 /
-# 进程被终止时只损失最近一个 chunk 的进度，而不是 all-or-nothing 全丢。
+# 每处理 N 条目标落盘一次（cache + progress + 迁移日志 + checkpoint）。
+# 长跑在系统休眠 / 进程被终止时只损失最近一个 chunk 的进度。
 REPAIR_FLUSH_EVERY = 250
 
 OPENALEX_REPAIR_SELECT = (
@@ -464,6 +472,67 @@ def evaluate_repair(
     return new_url, abstract, ""
 
 
+def _empty_repair_checkpoint(source: str) -> dict:
+    return {
+        "source": source,
+        "complete": False,
+        "attempted": set(),
+        "resumed": 0,
+        "dirty": False,
+    }
+
+
+def _load_repair_checkpoint(source: str) -> dict:
+    checkpoint = _empty_repair_checkpoint(source)
+    if not WAYBACK_REPAIR_CHECKPOINT.exists():
+        return checkpoint
+    try:
+        data = json.loads(WAYBACK_REPAIR_CHECKPOINT.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"[!] Ignoring unreadable wayback repair checkpoint: {exc}")
+        return checkpoint
+    if (
+        not isinstance(data, dict)
+        or data.get("schema") != WAYBACK_CHECKPOINT_SCHEMA
+        or data.get("source") != source
+        or not isinstance(data.get("attempted"), list)
+    ):
+        print("[!] Wayback repair checkpoint schema/source changed; starting a fresh pass.")
+        return checkpoint
+    if data.get("complete"):
+        print("[*] Previous wayback repair pass completed; starting a fresh pass.")
+        return checkpoint
+    attempted = {url for url in data["attempted"] if isinstance(url, str) and url}
+    checkpoint["attempted"] = attempted
+    checkpoint["resumed"] = len(attempted)
+    print(f"[*] Resuming wayback repair: {len(attempted)} URLs already attempted.")
+    return checkpoint
+
+
+def _write_repair_checkpoint(checkpoint: dict) -> None:
+    payload = {
+        "schema": WAYBACK_CHECKPOINT_SCHEMA,
+        "source": checkpoint["source"],
+        "complete": checkpoint["complete"],
+        "attempted": sorted(checkpoint["attempted"]),
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    WAYBACK_REPAIR_CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = WAYBACK_REPAIR_CHECKPOINT.with_suffix(
+        WAYBACK_REPAIR_CHECKPOINT.suffix + ".tmp"
+    )
+    try:
+        tmp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, WAYBACK_REPAIR_CHECKPOINT)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+    checkpoint["dirty"] = False
+
+
 def _repair_pass(
     all_papers: List[dict],
     progress: Dict[str, dict],
@@ -471,6 +540,9 @@ def _repair_pass(
     max_papers: Optional[int],
     dry_run: bool,
     lookup_fn=None,
+    soft_timeout: Optional[float] = None,
+    start_time: Optional[float] = None,
+    checkpoint: Optional[dict] = None,
 ) -> dict:
     """核心 pass。dry-run 下不改任何数据。返回统计字典。
 
@@ -492,16 +564,24 @@ def _repair_pass(
             unwrapped_ok.append(p)
         else:
             unpack_fail += 1
-    targets = unwrapped_ok[:max_papers] if max_papers is not None else unwrapped_ok
+    attempted_before = checkpoint["attempted"] if checkpoint is not None else set()
+    pending = [p for p in unwrapped_ok if p["paper_url"] not in attempted_before]
+    resume_skipped = len(unwrapped_ok) - len(pending)
+    targets = pending[:max_papers] if max_papers is not None else pending
 
     stats = {
         "total_wayback": len(wayback),
         "unpack_failed": unpack_fail,
+        "attempted": 0,
         "processed": 0,
         "rewrite": 0,
         "merge": 0,
         "unchanged": 0,
         "abstract_filled": 0,
+        "resumed": checkpoint["resumed"] if checkpoint is not None else 0,
+        "resume_skipped": resume_skipped,
+        "remaining": len(pending),
+        "timed_out": False,
         "orig_hosts": {},
         "new_hosts": {},
         "reasons": {},
@@ -511,7 +591,25 @@ def _repair_pass(
     log_lines: List[dict] = []
     drop_ids = set()
 
+    def maybe_flush(i: int) -> None:
+        if not dry_run and i % REPAIR_FLUSH_EVERY == 0:
+            _flush_repair_writes(
+                all_papers, progress, drop_ids, log_lines, checkpoint=checkpoint
+            )
+            print(f"[*] flushed at record {i}/{len(targets)}")
+
     for i, paper in enumerate(targets, 1):
+        if (
+            soft_timeout is not None
+            and start_time is not None
+            and time.monotonic() - start_time >= soft_timeout
+        ):
+            print(
+                f"[!] Soft timeout ({soft_timeout}s) reached at record "
+                f"{i}/{len(targets)}. Saving checkpoint and exiting the lookup loop."
+            )
+            stats["timed_out"] = True
+            break
         old_url = paper["paper_url"]
         orig = unwrap_wayback(old_url)
         orig_host = _host_of(orig)
@@ -520,6 +618,10 @@ def _repair_pass(
         conf = paper.get("conf", "")
         print(f"[{i}/{len(targets)}] [{conf}] {title[:60]}")
         src, work, err, attempts = lookup_fn(title, conf)
+        stats["attempted"] += 1
+        if checkpoint is not None:
+            checkpoint["attempted"].add(old_url)
+            checkpoint["dirty"] = True
         # 逐源失败记录入账（每源 rate_limited 计数进报告）。
         for attempt_src, attempt_err in attempts:
             b = stats["by_source"].setdefault(
@@ -541,15 +643,18 @@ def _repair_pass(
             else:
                 src_bucket["no_candidate"] += 1
             stats["unchanged"] += 1
+            maybe_flush(i)
             continue
         new_url, abstract, reason = evaluate_repair(work, paper, source=src)
         if reason:
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
             stats["unchanged"] += 1
+            maybe_flush(i)
             continue
         if not new_url:
             stats["reasons"]["no_usable_url"] = stats["reasons"].get("no_usable_url", 0) + 1
             stats["unchanged"] += 1
+            maybe_flush(i)
             continue
 
         stats["new_hosts"][_host_of(new_url)] = stats["new_hosts"].get(_host_of(new_url), 0) + 1
@@ -566,6 +671,7 @@ def _repair_pass(
         if abstract_filled:
             stats["abstract_filled"] += 1
         if dry_run:
+            maybe_flush(i)
             continue
 
         # ---- 真正改写 ----
@@ -611,16 +717,17 @@ def _repair_pass(
             "source": src,
             **old_payload,
         })
+        maybe_flush(i)
 
-        # 分块落盘：长跑在挂机/崩溃/卡死被终止时只损失一个 chunk 的进度
-        #（2026-10-26 曾两次在长跑途中卡死，all-or-nothing 落盘丢失数小时
-        # 处理量）。写盘本身不产生新改写，故仅在有 pending 变更时触发。
-        if not dry_run and log_lines and i % REPAIR_FLUSH_EVERY == 0:
-            _flush_repair_writes(all_papers, progress, drop_ids, log_lines)
-            print(f"[*] flushed at record {i}/{len(targets)}")
-
+    stats["remaining"] = len(pending) - stats["attempted"]
+    if checkpoint is not None and not stats["timed_out"] and stats["remaining"] == 0:
+        checkpoint["attempted"].clear()
+        checkpoint["complete"] = True
+        checkpoint["dirty"] = checkpoint["dirty"] or bool(
+            stats["attempted"] or stats["resumed"]
+        )
     if not dry_run:
-        _flush_repair_writes(all_papers, progress, drop_ids, log_lines)
+        _flush_repair_writes(all_papers, progress, drop_ids, log_lines, checkpoint=checkpoint)
     return stats
 
 
@@ -629,24 +736,26 @@ def _flush_repair_writes(
     progress: Dict[str, dict],
     drop_ids: set,
     log_lines: List[dict],
+    *,
+    checkpoint: Optional[dict] = None,
 ) -> None:
-    """把累计的改写原子落盘：cache（.tmp + os.replace）+ progress + 迁移日志 append。
-
-    无 pending 变更（log_lines 为空）时不写任何文件——merge/rewrite 都会
-    产生日志行，所以空日志即代表本轮无实质改动。
-    """
-    if not log_lines:
+    """原子落盘 cache/checkpoint，并保存 progress 与迁移日志。"""
+    checkpoint_dirty = checkpoint is not None and checkpoint["dirty"]
+    if not log_lines and not checkpoint_dirty:
         return
-    if drop_ids:
-        all_papers[:] = [p for p in all_papers if id(p) not in drop_ids]
-        drop_ids.clear()
-    _write_cache_atomic(all_papers)
-    save_progress(progress)
-    WAYBACK_REPAIR_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with open(WAYBACK_REPAIR_LOG, "a", encoding="utf-8") as f:
-        for line in log_lines:
-            f.write(json.dumps(line, ensure_ascii=False) + "\n")
-    log_lines.clear()
+    if log_lines:
+        if drop_ids:
+            all_papers[:] = [p for p in all_papers if id(p) not in drop_ids]
+            drop_ids.clear()
+        _write_cache_atomic(all_papers)
+        save_progress(progress)
+        WAYBACK_REPAIR_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(WAYBACK_REPAIR_LOG, "a", encoding="utf-8") as f:
+            for line in log_lines:
+                f.write(json.dumps(line, ensure_ascii=False) + "\n")
+        log_lines.clear()
+    if checkpoint_dirty:
+        _write_repair_checkpoint(checkpoint)
 
 
 def _print_report(stats: dict, dry_run: bool) -> None:
@@ -654,6 +763,10 @@ def _print_report(stats: dict, dry_run: bool) -> None:
     print(f"\n===== wayback repair report [{mode}] =====")
     print(f"wayback records in cache : {stats['total_wayback']}")
     print(f"unpack failed            : {stats['unpack_failed']}")
+    print(f"attempted this run       : {stats['attempted']}")
+    print(f"resume skipped           : {stats['resume_skipped']}")
+    print(f"remaining for next run   : {stats['remaining']}")
+    print(f"soft timeout reached     : {'yes' if stats['timed_out'] else 'no'}")
     print(f"processed this run       : {stats['processed']}")
     print(f"  rewrite (in place)     : {stats['rewrite']}")
     print(f"  merge (dup (conf,url)) : {stats['merge']}")
@@ -694,16 +807,24 @@ def main() -> None:
     ap.add_argument("--source", choices=["auto", "openalex", "crossref", "arxiv"],
                     default="auto",
                     help="查询源：auto=OpenAlex→Crossref→arXiv 兜底链（默认）；单源则只查对应源")
+    ap.add_argument("--soft-timeout", type=float, default=None,
+                    help="停止发起新查询的秒数；到期后保存 checkpoint 并继续 HF 同步")
     ap.add_argument("--no-sync", action="store_true", help="Skip the final Hugging Face push")
     ap.add_argument("--offline", action="store_true",
                     help="Skip ensure_cache_local / ensure_progress_local AND the final sync")
     args = ap.parse_args()
+    if args.soft_timeout is not None and args.soft_timeout < 0:
+        ap.error("--soft-timeout must be non-negative")
     _install_utf8_console()
 
-    t0 = time.time()
+    t0 = time.monotonic()
     if not args.offline:
         ensure_cache_local(CACHE_FILE, refresh=True)
         ensure_progress_local(PROGRESS_FILE, refresh=True)
+        if not args.dry_run:
+            ensure_cache_local(WAYBACK_REPAIR_CHECKPOINT, refresh=True)
+    if args.soft_timeout is not None:
+        print(f"[*] Soft timeout: {args.soft_timeout}s ({args.soft_timeout / 3600:.1f}h)")
 
     all_papers: List[dict] = []
     with gzip.open(CACHE_FILE, "rt", encoding="utf-8") as f:
@@ -713,60 +834,60 @@ def main() -> None:
                 all_papers.append(json.loads(line))
     print(f"[*] Total papers in cache: {len(all_papers)}")
     progress = load_progress()
+    checkpoint = None if args.dry_run else _load_repair_checkpoint(args.source)
 
     stats = _repair_pass(
         all_papers, progress,
         max_papers=args.max_papers, dry_run=args.dry_run,
         lookup_fn=make_lookup(args.source),
+        soft_timeout=args.soft_timeout, start_time=t0,
+        checkpoint=checkpoint,
     )
     _print_report(stats, args.dry_run)
-    print(f"[*] Done in {time.time() - t0:.0f}s")
+    print(f"[*] Done in {time.monotonic() - t0:.0f}s")
 
     if args.dry_run:
-        print("[*] Dry run: no cache/progress writes, no Hugging Face sync.")
+        print("[*] Dry run: no cache/progress/checkpoint writes, no Hugging Face sync.")
         return
-    if stats["processed"] > 0 and not (args.no_sync or args.offline):
-        _sync_or_die()
-    elif stats["processed"] > 0:
+    checkpoint_changed = bool(stats["attempted"] or stats["resumed"])
+    if checkpoint_changed and not (args.no_sync or args.offline):
+        _sync_or_die(cache_changed=stats["processed"] > 0)
+    elif checkpoint_changed:
         print(
             "[*] --no-sync/--offline set; skipped Hugging Face push. "
-            "Local cache has been updated; remember to sync before any other "
-            "workflow touches HF."
+            "Local cache and repair checkpoint have been updated; remember to sync "
+            "before any other workflow touches HF."
         )
 
 
-def _sync_or_die() -> None:
-    """Verified in-process upload of cache + progress to Hugging Face.
+def _sync_or_die(cache_changed: bool = True) -> None:
+    """Verified in-process upload of repair artifacts to Hugging Face.
 
-    Two deliberate deviations from calling ``sync_cache_artifacts`` here or
-    from a follow-up ``python -c ...`` CI step (PR #221 review):
-
-    1. **Same process**: ``ensure_cache_local`` at startup registered the
-       ``parent_commit`` for the optimistic lock in this process; a separate
-       push process would upload WITHOUT any parent_commit and could
-       silently clobber a concurrent writer (no 412 retry).
-    2. **Verified**: ``sync_cache_artifacts`` prints-and-continues on upload
-       failure (by design for the 6h backfill), but here the push *is* the
-       deliverable — a silent failure would leave the migration-log PR
-       mergeable while HF still serves the unrepaired cache. We therefore
-       upload directly and exit non-zero when the cache file is not
-       confirmed uploaded.
+    Cache/progress are uploaded and verified before the checkpoint. A failed
+    cache upload therefore cannot advance the remote checkpoint past repairs
+    that were not persisted. A checkpoint-only run avoids re-uploading the
+    large cache file.
     """
-    targets = [CACHE_FILE]
-    progress_included = PROGRESS_FILE.exists()
-    if progress_included:
-        targets.append(PROGRESS_FILE)
+    commit_message = "Repair web.archive.org-wrapped dead paper URLs"
+    if cache_changed:
+        targets = [CACHE_FILE]
+        progress_included = PROGRESS_FILE.exists()
+        if progress_included:
+            targets.append(PROGRESS_FILE)
+        uploaded = upload_to_huggingface(targets, commit_message=commit_message)
+        if "cache/cache.jsonl.gz" not in uploaded:
+            print("[!] FATAL: cache.jsonl.gz was NOT confirmed uploaded to Hugging Face.")
+            sys.exit(1)
+        if progress_included and "cache/abstract_backfill_progress.jsonl.gz" not in uploaded:
+            print("[!] WARNING: progress file was not confirmed uploaded (cache is safe).")
+
+    checkpoint_path = "cache/wayback_repair_checkpoint.json"
     uploaded = upload_to_huggingface(
-        targets,
-        commit_message="Repair web.archive.org-wrapped dead paper URLs",
+        [WAYBACK_REPAIR_CHECKPOINT], commit_message=commit_message
     )
-    if "cache/cache.jsonl.gz" not in uploaded:
-        print("[!] FATAL: cache.jsonl.gz was NOT confirmed uploaded to Hugging Face.")
+    if checkpoint_path not in uploaded:
+        print("[!] FATAL: wayback repair checkpoint was NOT confirmed uploaded to Hugging Face.")
         sys.exit(1)
-    if progress_included and "cache/abstract_backfill_progress.jsonl.gz" not in uploaded:
-        # The progress ledger is event-sourced and re-derived on the next
-        # run; a missed upload is worth a loud warning, not a job failure.
-        print("[!] WARNING: progress file was not confirmed uploaded (cache is safe).")
 
 
 if __name__ == "__main__":
