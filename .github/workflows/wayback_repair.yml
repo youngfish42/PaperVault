@@ -35,8 +35,8 @@ env:
 jobs:
   wayback-repair:
     runs-on: ubuntu-latest
-    # 配额正常时全量 ~4.4k 条 × ~1.6s ≈ 2h；加上传/PR 余量给 200 分钟硬上限。
-    timeout-minutes: 200
+    # 处理阶段软超时 5h；job 硬上限 5.5h，预留约 30 分钟给落盘、HF 上传和 PR。
+    timeout-minutes: 330
     env:
       TZ: Asia/Shanghai
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -88,11 +88,11 @@ jobs:
       - name: Repair wayback-wrapped URLs (write mode, in-process verified HF push)
         # 修复脚本在同一进程内完成 HF 上传（_sync_or_die）：启动时
         # ensure_cache_local 登记的 parent_commit 仍然有效（乐观锁保留），
-        # 上传结果显式校验、失败非零退出。被限流的记录保持不变，次日定时
-        # run 自然重试。
+        # 上传结果显式校验、失败非零退出。5h 软超时后保存并上传 checkpoint，
+        # 次日从首个未尝试 URL 续跑；完整一轮结束后自动开始新一轮检查。
         run: |
           set -o pipefail
-          python scripts/repair_wayback_urls.py --write | tee "$RUNNER_TEMP/wayback_repair.log"
+          python scripts/repair_wayback_urls.py --write --soft-timeout 18000 | tee "$RUNNER_TEMP/wayback_repair.log"
           {
             echo "### Wayback repair report (scheduled write run)"
             echo ""

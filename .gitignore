@@ -20,6 +20,9 @@ cache/.*.sqlite3.*.tmp
 cache/abstract_backfill_progress.jsonl.gz
 cache/abstract_backfill_progress.jsonl.gz.tmp
 cache/abstract_backfill_progress.json
+# Wayback repair resume state is also authoritative on Hugging Face, not Git.
+cache/wayback_repair_checkpoint.json
+cache/wayback_repair_checkpoint.json.tmp
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
