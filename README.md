@@ -38,10 +38,10 @@ PaperVault 把分散在 ACL Anthology、OpenReview、CVF Open Access、NeurIPS P
 
 <!-- recent-update-start -->
 
-- 📅 **最近更新日期**: 2026-10-27
-- 🆕 **本次新增论文**: 5,972 篇
-- 📢 **本次新增会议**: 3 个
-- 📊 **数据库规模**: 719,793 篇论文 / 129 个刊物系列 / 649,972 篇含摘要 / 113,338 篇含开源代码
+- 📅 **最近更新日期**: 2026-10-29
+- 🆕 **本次新增论文**: 1,380 篇
+- 📢 **本次新增会议**: 1 个
+- 📊 **数据库规模**: 721,172 篇论文 / 129 个刊物系列 / 655,131 篇含摘要 / 114,139 篇含开源代码
 
 <!-- recent-update-end -->
 
@@ -309,7 +309,7 @@ Google Analytics、Search Console 与 Baidu Analytics 均为可选项，仓库�
 <summary><b>语音</b> (3 个系列)</summary>
 
 - **ICASSP** 2000-2025 (26 届)
-- **INTERSPEECH** 2000-2025 (26 届)
+- **INTERSPEECH** 2000-2026 (27 届)
 - **TASLP** 2000-2024 (25 届)
 
 </details>

@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-10-27
-- 🆕 **New Papers This Update**: 5,972
-- 📢 **New Conferences This Update**: 3
-- 📊 **Database Scale**: 719,793 papers / 129 publication series / 649,972 with abstracts / 113,338 with code
+- 📅 **Last Updated**: 2026-10-29
+- 🆕 **New Papers This Update**: 1,380
+- 📢 **New Conferences This Update**: 1
+- 📊 **Database Scale**: 721,172 papers / 129 publication series / 655,131 with abstracts / 114,139 with code
 
 <!-- recent-update-end -->
 
@@ -309,7 +309,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 <summary><b>Speech</b> (3 series)</summary>
 
 - **ICASSP** 2000-2025 (26 editions)
-- **INTERSPEECH** 2000-2025 (26 editions)
+- **INTERSPEECH** 2000-2026 (27 editions)
 - **TASLP** 2000-2024 (25 editions)
 
 </details>

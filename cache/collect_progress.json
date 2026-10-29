@@ -24058,6 +24058,10 @@
     "DBLP::https://dblp.org/db/conf/miccai/miccai2026-17.html": {
       "name": "MICCAI2026",
       "ts": "2026-10-27T20:11:10"
+    },
+    "DBLP::https://dblp.org/db/conf/interspeech/interspeech2026.html": {
+      "name": "INTERSPEECH2026",
+      "ts": "2026-10-29T20:28:06"
     }
   }
 }
