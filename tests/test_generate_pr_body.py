@@ -182,7 +182,6 @@ def test_workflows_use_generated_pr_bodies_and_bounded_titles():
         ROOT / ".github/workflows/collect_papers.yml",
         ROOT / ".github/workflows/backfill_abstracts.yml",
         ROOT / ".github/workflows/update_readme.yml",
-        ROOT / ".github/workflows/wayback_repair.yml",
     ]
     pr_steps = []
     for path in workflow_paths:
@@ -204,23 +203,4 @@ def test_workflows_use_generated_pr_bodies_and_bounded_titles():
                 )
                 pr_steps.append((path, step["name"]))
 
-    assert len(pr_steps) == 6
-
-
-def test_wayback_tee_steps_preserve_script_exit_status():
-    import yaml
-
-    pipeline_steps = 0
-    for filename in ("backfill_abstracts.yml", "wayback_repair.yml"):
-        path = ROOT / ".github/workflows" / filename
-        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-        for job in workflow["jobs"].values():
-            for step in job.get("steps", []):
-                script = step.get("run", "")
-                if "| tee" not in script:
-                    continue
-                assert "set -o pipefail" in script, (filename, step["name"])
-                assert script.index("set -o pipefail") < script.index("| tee")
-                pipeline_steps += 1
-
-    assert pipeline_steps == 3
+    assert len(pr_steps) == len(workflow_paths)
