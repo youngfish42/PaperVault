@@ -11,10 +11,6 @@ env:
 on:
   schedule:
     # 每 6 小时运行一次 (UTC 01:00 / 07:00 / 13:00 / 19:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）。
-    # 2026-10-24 相位平移：从 00:00/06:00/12:00/18:00 后移 1 小时——19:00 档
-    # 最坏在 00:30 前结束（330min 硬上限），给 wayback_repair.yml（UTC 00:40
-    # 开跑）让出 OpenAlex 日配额刚重置后的新鲜窗口；两个工作流共享
-    # papervault-cache 并发组串行。
     - cron: "0 1,7,13,19 * * *"
   workflow_dispatch:
     inputs:
@@ -27,16 +23,6 @@ on:
         required: false
         default: false
         type: boolean
-      run_wayback_repair:
-        description: "运行 wayback 死链修复 job（repair_wayback_urls.py），代替常规 backfill"
-        required: false
-        default: false
-        type: boolean
-      wayback_repair_dry_run:
-        description: "wayback 修复只跑 dry-run 报告（默认 true；改为 false 才真正改写缓存并开 PR）"
-        required: false
-        default: true
-        type: boolean
 
 concurrency:
   # Shared with collect_papers / update_readme to serialise every workflow
@@ -46,8 +32,6 @@ concurrency:
 
 jobs:
   backfill:
-    # 手动触发 wayback 修复时跳过常规 5h backfill pass（只跑修复 job）。
-    if: github.event_name == 'schedule' || !inputs.run_wayback_repair
     runs-on: ubuntu-latest
     timeout-minutes: 330
     env:
@@ -399,134 +383,3 @@ jobs:
         # no PR is opened back to GitHub.
         if: always()
         run: python scripts/sync_hf_readme.py --skip-cache-refresh
-
-  wayback-repair:
-    # 手动触发专用 job：修复 web.archive.org 包装的死论文链接
-    # （scripts/repair_wayback_urls.py，AAAI/UAI 2000-2014 等 ~4.4k 条）。
-    # 本 workflow 的 concurrency group `papervault-cache` 是 workflow-run 级
-    # 的，因此该 job 天然与其它 cache-mutating workflow 串行，无需额外配置。
-    #
-    # 回滚预案见 AGENTS.md "CI/CD Workflows" 小节（HF dataset 是普通 git
-    # 仓库，revert/reset 对应 commit 即可；cache/wayback_repair_log.jsonl
-    # 记录每条 旧→新 URL 映射，可据此精确反向恢复；修复幂等，重跑安全）。
-    if: github.event_name == 'workflow_dispatch' && inputs.run_wayback_repair
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      TZ: Asia/Shanghai
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
-      HF_HUB_DISABLE_XET: "1"
-      GIT_LFS_SKIP_SMUDGE: "1"
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
-        uses: actions/checkout@v4
-        with:
-          lfs: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Wayback repair (dry-run report only, no data changes)
-        # 默认路径：只出报告，不改任何数据、不推 HF。报告同时进 step
-        # summary 和 build log。
-        if: inputs.wayback_repair_dry_run
-        run: |
-          set -o pipefail
-          python scripts/repair_wayback_urls.py --dry-run | tee "$RUNNER_TEMP/wayback_report.txt"
-          {
-            echo "### Wayback repair dry-run report"
-            echo ""
-            echo '```'
-            tail -n 80 "$RUNNER_TEMP/wayback_report.txt"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Restore previous migration log (if any)
-        # 迁移日志按专用分支 auto-wayback-repair 持久化（不与本 workflow 的
-        # auto-backfill-abstracts 分支争用——同一 head 分支只能对应一个打开中
-        # 的 PR，共用会互相覆盖）。修复脚本以 append 方式写日志。
-        if: ${{ !inputs.wayback_repair_dry_run }}
-        run: |
-          if git ls-remote --exit-code --heads origin "auto-wayback-repair" >/dev/null 2>&1; then
-            git fetch --no-tags origin "auto-wayback-repair"
-            if git cat-file -e "origin/auto-wayback-repair:cache/wayback_repair_log.jsonl" 2>/dev/null; then
-              git checkout "origin/auto-wayback-repair" -- cache/wayback_repair_log.jsonl
-              echo "Restored migration log from auto-wayback-repair."
-            fi
-          fi
-
-      - name: Wayback repair (--write, in-process verified HF push)
-        # 修复脚本在同一进程内完成 HF 上传（_sync_or_die）：启动时
-        # ensure_cache_local 登记的 parent_commit 仍然有效（乐观锁保留），
-        # 上传结果显式校验、失败非零退出。
-        if: ${{ !inputs.wayback_repair_dry_run }}
-        run: |
-          set -o pipefail
-          python scripts/repair_wayback_urls.py --write | tee "$RUNNER_TEMP/wayback_repair.log"
-
-      - name: Setup GIT user
-        if: ${{ !inputs.wayback_repair_dry_run }}
-        run: |
-          git config --local user.name "youngfish42"
-          git config --local user.email "youngfish42@users.noreply.github.com"
-
-      - name: Fetch latest main
-        if: ${{ !inputs.wayback_repair_dry_run }}
-        run: git fetch origin main
-
-      - name: Generate PR summary
-        if: ${{ !inputs.wayback_repair_dry_run }}
-        run: |
-          python scripts/generate_pr_body.py wayback \
-            --log "$RUNNER_TEMP/wayback_repair.log" \
-            --output "$RUNNER_TEMP/pr_body.md" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-
-      - name: Create Pull Request with migration log
-        # 迁移日志 cache/wayback_repair_log.jsonl（每条 旧→新 URL 映射）是
-        # 回滚的依据，必须随 PR 提交。cache.jsonl.gz / progress 照旧不进 PR
-        # （它们在 Hugging Face 上，已由修复步骤在同一进程内带乐观锁推送
-        # 并校验，见文件头注释）。
-        if: ${{ !inputs.wayback_repair_dry_run }}
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(auto): repair wayback-wrapped dead paper URLs"
-          committer: youngfish42 <youngfish42@users.noreply.github.com>
-          author: youngfish42 <youngfish42@users.noreply.github.com>
-          title: "[Auto] Repair wayback-wrapped dead paper URLs"
-          body-path: ${{ runner.temp }}/pr_body.md
-          branch: "auto-wayback-repair"
-          delete-branch: false
-          add-paths: |
-            cache/wayback_repair_log.jsonl
-
-      - name: Upload repair log artifact
-        # 回滚映射的兜底留存：HF 推送先于 PR 创建（同进程保乐观锁的代价），
-        # 若 PR 步骤失败，本次运行的 旧→新 URL 映射仅靠 runner 上的日志文件
-        # 就会随 runner 销毁而丢失。artifact（if: always()）保证任何结局下
-        # 映射都可下载。与 wayback_repair.yml 的同名步骤保持一致。
-        if: ${{ always() && !inputs.wayback_repair_dry_run }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: wayback-repair-log-manual-${{ github.run_number }}
-          path: cache/wayback_repair_log.jsonl
-          if-no-files-found: ignore
-          retention-days: 30
