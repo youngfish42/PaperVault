@@ -139,3 +139,13 @@ in Multi |  |
 | IJCAI2013 | rewrite | https://web.archive.org/web/*/http://www.aaai.org/ocs/index.php/IJCAI/IJCAI13/paper/view/6271 | https://arxiv.org/abs/1507.01269 | 0.00 | Semi-supervised Multi-sensor Classification via Consensus-ba |  |
 | IJCAI2013 | rewrite | https://web.archive.org/web/*/http://www.aaai.org/ocs/index.php/IJCAI/IJCAI13/paper/view/6824 | https://arxiv.org/abs/1304.5185 | 0.87 | Temporal Description Logic for Ontology-Based Data Access (E | Temporal Description Logic for Ontology-Based Data Access |
 
+## PR #233 targeted remediation (2026-10-29)
+
+Review: https://github.com/youngfish42/PaperVault/pull/233
+
+- Reverted five distinct mappings to their original Wayback URLs: AAAI2012 paper 5422, AAAI2013 paper 7350, AAAI2014 paper 8894, IJCAI2013 paper 7, and UAI2001 article 126. The duplicate UAI2001 log entries were collapsed into one cache operation.
+- The four mappings to `10.36392/actaneerl/2024/21/1` were false positives caused by the shared generic title `Preface`; the local and remote authors differ. The UAI2001 target `10.1145/3501714.3501736` is a same-title, same-author 2022 book chapter, not an unrelated paper, but it is not the original 2001 UAI publication and was conservatively reverted.
+- Cleared the UAI2001 abstract introduced by the repair. Also cleared an unrelated 841-character oceanic/atmospheric abstract from IJCAI2013: it was backfilled after the incorrect mapping even though the repair log says `abstract_filled=false`.
+- Marked the two incorrect DOI URLs as `failed/title_mismatch` in the abstract-backfill progress ledger. No checkpoint or unrelated paper record was changed.
+- Verified the pre-fix HF revision `05cfb19db154f4a1fc55647eec6980dbcdcb96fd` against the re-downloaded post-fix revision `4e83a73981eb8f4687d8b5c736bff061a16ae958`: exactly five record diffs, with only `paper_url` changed on three records and only `paper_url` plus `paper_abstract` changed on IJCAI2013 and UAI2001.
+
