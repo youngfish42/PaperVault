@@ -24,6 +24,18 @@ def _rebase_on_main() -> None:
         )
 
 
+def _ensure_main_base() -> None:
+    _run(["fetch", "origin", "main"])
+    result = _run(
+        ["merge-base", "--is-ancestor", "HEAD", "origin/main"], check=False
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Refusing to push automated changes: the checked-out ref contains "
+            "commits that are not on origin/main. Run this workflow from main."
+        )
+
+
 def commit_and_push(
     *,
     message: str,
@@ -35,6 +47,8 @@ def commit_and_push(
     if max_attempts < 1:
         raise ValueError("max_attempts must be at least 1.")
 
+    _ensure_main_base()
+    _run(["reset"])
     _run(["add", "-A", "--", *paths])
     diff = _run(["diff", "--cached", "--quiet"], check=False)
     if diff.returncode == 0:

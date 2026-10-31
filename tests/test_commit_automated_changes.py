@@ -72,6 +72,7 @@ def test_commit_whitelists_paths_and_skips_noop(
     remote, repo = _new_clone(tmp_path)
     (repo / "artifacts" / "progress.json").write_text('{"count": 1}\n', encoding="utf-8")
     (repo / "unrelated.txt").write_text("do not commit\n", encoding="utf-8")
+    _git(repo, "add", "unrelated.txt")
     monkeypatch.chdir(repo)
 
     assert commit_and_push(message="automated update", paths=["artifacts"])
@@ -127,3 +128,23 @@ def test_conflict_fails_without_overwriting_remote(
     assert "conflicting upstream update" in _git(remote, "log", "-1", "--format=%s", "main")
     assert not (repo / ".git" / "rebase-merge").exists()
     assert not (repo / ".git" / "rebase-apply").exists()
+
+
+def test_refuses_to_include_commits_from_non_main_ref(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    remote, repo = _new_clone(tmp_path)
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "branch-only.txt").write_text("not for main\n", encoding="utf-8")
+    _git(repo, "add", "branch-only.txt")
+    _git(repo, "commit", "-m", "unmerged branch commit")
+    remote_head = _git(remote, "rev-parse", "main")
+    (repo / "artifacts" / "progress.json").write_text('{"count": 3}\n', encoding="utf-8")
+    monkeypatch.chdir(repo)
+
+    with pytest.raises(RuntimeError, match="checked-out ref"):
+        commit_and_push(message="automated update", paths=["artifacts"])
+
+    assert _git(remote, "rev-parse", "main") == remote_head
+    assert _git(repo, "log", "-1", "--format=%s") == "unmerged branch commit"
+    assert "branch-only.txt" not in _git(remote, "ls-tree", "-r", "--name-only", "main")
