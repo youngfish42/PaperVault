@@ -113,9 +113,9 @@ python scripts/fetch_abstracts.py --batch --chunk-size 500
 ```
 
 仓库里的 `backfill_abstracts` 自动工作流按优先级批量处理，并从 Hugging Face 同步最新
-cache 与摘要进度。回填后的 GitHub 进度报告和统计图直接提交到 `main`，不再恢复自动分支
-或等待 PR 合并；四个维护工作流使用独立 concurrency group，避免长任务使其他工作流在
-排队时被取消，跨工作流冲突由 Git rebase 与 Hugging Face 乐观锁处理。
+cache 与摘要进度。回填后的 GitHub 进度报告直接提交到 `main`，不再重复生成统计 SVG。
+四个维护工作流使用独立 concurrency group 避免排队替换；Collect、Backfill 和 README
+重建通过共享 Git-ref HF 写锁严格串行，优先保证 HF 论文元数据不会因快照竞争而丢失。
 
 #### 方式 4：按 Phase 处理（全局模式，仍保留）
 
@@ -202,7 +202,7 @@ git commit -m "chore: abstract backfill phase X completed"
 
 **注意**：
 - 确认环境变量 `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` 已配置，否则脚本只会修改本地副本而无法同步到权威源
-- 如果同时有 GitHub Actions 在跑（如 `backfill_abstracts.yml`），不要并发执行同一脚本；每个维护工作流仅通过独立并发组避免自身重复运行，本地手工运行与其他工作流之间的 HF 冲突由 `parent_commit` 乐观锁处理
+- 如果同时有 GitHub Actions 在跑（如 `backfill_abstracts.yml`），不要并发执行同一脚本；三个 HF 写入工作流通过共享 Git-ref 写锁串行，本地手工运行不受该锁保护，其 HF 版本冲突仅由 `parent_commit` 乐观锁兜底
 - 离线/无 HF 凭据时可设 `PAPERVAULT_OFFLINE=1` 跳过远端同步（仅写本地副本，事后再手工 `python -c "from data_artifacts import sync_cache_artifacts; sync_cache_artifacts(commit_message='...')"` 上传）
 
 ---

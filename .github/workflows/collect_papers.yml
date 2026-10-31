@@ -33,7 +33,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  acquire_lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    outputs:
+      lock_commit: ${{ steps.acquire.outputs.lock_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Acquire HF writer lock
+        id: acquire
+        run: |
+          lock_commit=$(python scripts/maintenance_lock.py acquire)
+          echo "lock_commit=$lock_commit" >> "$GITHUB_OUTPUT"
+
   collect:
+    needs: acquire_lock
     runs-on: ubuntu-latest
     timeout-minutes: 330
     env:
@@ -238,3 +256,19 @@ jobs:
         # without a GitHub artifact diff the HF page gets the latest update line.
         if: always()
         run: python scripts/sync_hf_readme.py --skip-cache-refresh
+
+  release_lock:
+    needs: [acquire_lock, collect]
+    if: always() && needs.acquire_lock.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Release HF writer lock
+        run: |
+          python scripts/maintenance_lock.py release \
+            --lock-commit "${{ needs.acquire_lock.outputs.lock_commit }}"

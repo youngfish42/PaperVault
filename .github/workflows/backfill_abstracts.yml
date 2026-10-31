@@ -5,7 +5,7 @@ env:
   # cache/cache.jsonl.gz AND cache/abstract_backfill_progress.jsonl.gz are
   # intentionally excluded from the direct main commit: both live on Hugging Face
   # (PAPERVAULT_HF_REPO_ID) and are pushed via data_artifacts.sync_cache_artifacts.
-  AUTO_BACKFILL_FILES: "docs/abstract_backfill_progress.md pics/stats/stats_overview.svg"
+  AUTO_BACKFILL_FILES: "docs/abstract_backfill_progress.md"
 
 on:
   schedule:
@@ -30,7 +30,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  acquire_lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    outputs:
+      lock_commit: ${{ steps.acquire.outputs.lock_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Acquire HF writer lock
+        id: acquire
+        run: |
+          lock_commit=$(python scripts/maintenance_lock.py acquire)
+          echo "lock_commit=$lock_commit" >> "$GITHUB_OUTPUT"
+
   backfill:
+    needs: acquire_lock
     runs-on: ubuntu-latest
     timeout-minutes: 330
     env:
@@ -205,23 +223,6 @@ jobs:
         # `paper_code` field in sync whenever new abstracts are introduced.
         run: python scripts/fetch_code_links.py --year all --retry-failed
 
-      - name: Regenerate stats overview chart
-        run: |
-          mkdir -p pics/stats
-
-          python - <<'PY'
-          from maintain import cache_path, load_cache, compute_stats, generate_overview_svg
-          import os
-
-          if not os.path.exists(cache_path):
-              raise SystemExit(f"Cache file not found: {cache_path}")
-
-          cache_data = load_cache(cache_path)
-          stats = compute_stats(cache_data)
-          generate_overview_svg(stats)
-          print("Regenerated stats_overview.svg from latest cache.")
-          PY
-
       - name: Check for changes
         id: check_changes
         # Two gates must both hold for a direct main commit to be created:
@@ -350,3 +351,19 @@ jobs:
         # no GitHub artifact diff is produced.
         if: always()
         run: python scripts/sync_hf_readme.py --skip-cache-refresh
+
+  release_lock:
+    needs: [acquire_lock, backfill]
+    if: always() && needs.acquire_lock.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Release HF writer lock
+        run: |
+          python scripts/maintenance_lock.py release \
+            --lock-commit "${{ needs.acquire_lock.outputs.lock_commit }}"

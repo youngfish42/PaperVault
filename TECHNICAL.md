@@ -305,7 +305,7 @@ export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
 
 ### 6.4 工作流并发控制
 
-四个自动维护工作流分别使用独立的 concurrency group（`papervault-discover`、`papervault-collect`、`papervault-backfill`、`papervault-readme`），且 `cancel-in-progress: false`，避免长时间 backfill 导致其他工作流在排队时被取消。跨工作流的 Git 推送通过共享工具先 rebase 再重试，冲突时安全失败；HF 上传层使用 `parent_commit` 乐观锁处理并发写入。
+四个自动维护工作流分别使用独立的 concurrency group（`papervault-discover`、`papervault-collect`、`papervault-backfill`、`papervault-readme`），避免长时间 backfill 导致其他工作流在排队时被取消。Collect、Backfill 和 README 重建还必须通过 `scripts/maintenance_lock.py` 获得同一个 Git-ref HF 写锁；等待锁在独立 job 中执行，主处理 job 保留 330 分钟上限，释放 job 使用 lease 防止误删新锁，12 小时陈旧锁可被回收。Discovery 不写 HF，无需该锁。Git 推送通过共享工具先 rebase 再重试，HF 的 `parent_commit` 乐观锁作为额外防线。
 
 ---
 

@@ -217,3 +217,48 @@ def test_workflows_commit_artifacts_directly_with_isolated_locks_and_summaries()
     ).read_text(encoding="utf-8")
     assert "--inherit-branch" not in discovery_text
     assert "gh workflow run collect_papers.yml --ref main" in discovery_text
+
+
+def test_hf_writer_workflows_share_external_lock_and_backfill_skips_stats():
+    import yaml
+
+    main_jobs = {
+        "collect_papers.yml": "collect",
+        "backfill_abstracts.yml": "backfill",
+        "update_readme.yml": "rebuild",
+    }
+    for filename, main_job in main_jobs.items():
+        workflow = yaml.safe_load(
+            (ROOT / ".github/workflows" / filename).read_text(encoding="utf-8")
+        )
+        jobs = workflow["jobs"]
+        assert jobs[main_job]["needs"] == "acquire_lock"
+        assert jobs[main_job]["timeout-minutes"] == 330
+        assert jobs["acquire_lock"]["timeout-minutes"] == 360
+        assert jobs["release_lock"]["needs"] == ["acquire_lock", main_job]
+        assert "always()" in jobs["release_lock"]["if"]
+        assert "needs.acquire_lock.result == 'success'" in jobs["release_lock"]["if"]
+
+        acquire_steps = jobs["acquire_lock"]["steps"]
+        release_steps = jobs["release_lock"]["steps"]
+        assert any(
+            "scripts/maintenance_lock.py acquire" in step.get("run", "")
+            for step in acquire_steps
+        )
+        assert any(
+            "scripts/maintenance_lock.py release" in step.get("run", "")
+            for step in release_steps
+        )
+
+    backfill_text = (
+        ROOT / ".github/workflows/backfill_abstracts.yml"
+    ).read_text(encoding="utf-8")
+    assert "Regenerate stats overview chart" not in backfill_text
+    assert "pics/stats/stats_overview.svg" not in backfill_text
+
+    discovery = yaml.safe_load(
+        (ROOT / ".github/workflows/discover_and_update.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "acquire_lock" not in discovery["jobs"]
