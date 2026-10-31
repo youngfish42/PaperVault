@@ -41,15 +41,15 @@
 脚本入口：`python maintain.py collect`
 
 **触发方式**：
-1. **定时触发**：每周一北京时间 03:00（UTC 周日 19:00）自动运行增量收集。
-2. **Push 触发**：当 `main` 分支的 `conf/**` 文件被修改时（如 discover PR 合并后）自动触发。
+1. **定时触发**：按 `collect_papers.yml` 中的 cron 计划自动运行增量收集。
+2. **Push 触发**：当人工推送修改 `main` 分支的 `conf/**` 文件时自动触发；自动发现工作流直接提交配置后会显式派发本工作流，因为 `GITHUB_TOKEN` 的 push 不会再次触发 workflow。
 3. **手动触发**：支持 `workflow_dispatch`，可选择 `incremental`（默认）或 `force` 模式。
 
 **行为**：
 - 自动检测 `conf/*.json` 中有但 `cache/cache.jsonl.gz` 中没有的会议。
 - 只收集缺失的会议，保留已有缓存数据不变。
 - 收集完成后自动更新 README 会议列表。
-- 通过 PR 提交到 `auto-collect-papers` 分支，人工 review 后合并。
+- 将白名单内的进度、README 和统计产物直接提交并推送到 `main`，不再创建 PR。
 
 **本地手动执行**：
 ```bash
@@ -112,9 +112,10 @@ python scripts/fetch_abstracts.py --batch --top 5 --chunk-size 500
 python scripts/fetch_abstracts.py --batch --chunk-size 500
 ```
 
-对于仓库里的 `backfill_abstracts` 自动工作流，默认每轮只处理 `--top 1`，并且会先恢复
-`auto-backfill-abstracts` 分支上的最新进度文件与 cache，再继续选择**新的**最高优先级 conf，
-避免在 PR 未合并时反复从 `main` 重新处理同一批会议/期刊。
+仓库里的 `backfill_abstracts` 自动工作流按优先级批量处理，并从 Hugging Face 同步最新
+cache 与摘要进度。回填后的 GitHub 进度报告直接提交到 `main`，不再重复生成统计 SVG。
+四个维护工作流使用独立 concurrency group 避免排队替换；Collect、Backfill 和 README
+重建通过共享 Git-ref HF 写锁严格串行，优先保证 HF 论文元数据不会因快照竞争而丢失。
 
 #### 方式 4：按 Phase 处理（全局模式，仍保留）
 
@@ -201,7 +202,7 @@ git commit -m "chore: abstract backfill phase X completed"
 
 **注意**：
 - 确认环境变量 `HF_TOKEN` / `PAPERVAULT_HF_REPO_ID` 已配置，否则脚本只会修改本地副本而无法同步到权威源
-- 如果同时有 GitHub Actions 在跑（如 `backfill_abstracts.yml`），不要并发执行同一脚本；工作流之间已通过 `papervault-cache` 并发组互斥，但本地手工运行不在该组内
+- 如果同时有 GitHub Actions 在跑（如 `backfill_abstracts.yml`），不要并发执行同一脚本；三个 HF 写入工作流通过共享 Git-ref 写锁串行，本地手工运行不受该锁保护，其 HF 版本冲突仅由 `parent_commit` 乐观锁兜底
 - 离线/无 HF 凭据时可设 `PAPERVAULT_OFFLINE=1` 跳过远端同步（仅写本地副本，事后再手工 `python -c "from data_artifacts import sync_cache_artifacts; sync_cache_artifacts(commit_message='...')"` 上传）
 
 ---

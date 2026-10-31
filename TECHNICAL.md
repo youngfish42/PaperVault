@@ -305,7 +305,7 @@ export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
 
 ### 6.4 工作流并发控制
 
-所有会修改 `cache.jsonl.gz` 的 GitHub Actions 工作流（`collect_papers.yml`、`backfill_abstracts.yml`、`update_readme.yml`）共用同一个 concurrency group `papervault-cache`，且 `cancel-in-progress: false`，从而保证它们串行执行、不会互相覆盖。即便如此，本地手工运行 + 自动工作流仍可能并发，因此上传层额外使用 `parent_commit` 乐观锁兜底。
+四个自动维护工作流分别使用独立的 concurrency group（`papervault-discover`、`papervault-collect`、`papervault-backfill`、`papervault-readme`），避免长时间 backfill 导致其他工作流在排队时被取消。Collect、Backfill 和 README 重建还必须通过 `scripts/maintenance_lock.py` 获得同一个 Git-ref HF 写锁；等待锁在独立 job 中执行，主处理 job 保留 330 分钟上限，释放 job 使用 lease 防止误删新锁，12 小时陈旧锁可被回收。Discovery 不写 HF，无需该锁。Git 推送通过共享工具先 rebase 再重试，HF 的 `parent_commit` 乐观锁作为额外防线。
 
 ---
 
@@ -313,5 +313,5 @@ export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
 
 | 工作流 | 触发条件 | 行为 |
 |--------|----------|------|
-| `discover_and_update.yml` | 每日定时 / 手动触发 | 自动发现新会议配置并创建 PR |
-| `update_readme.yml` | 手动触发 | 运行 `maintain.py force`，更新 README 会议列表 |
+| `discover_and_update.yml` | 每日定时 / 手动触发 | 自动发现新会议配置并直接提交到 `main`，随后显式派发收集 |
+| `update_readme.yml` | 手动触发 | 运行 `maintain.py` 或 `maintain.py force`，更新 README 会议列表并直接提交产物 |

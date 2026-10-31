@@ -48,7 +48,7 @@ def _render(
     lines.extend(["", f"[View workflow run]({run_url})"])
     body = "\n".join(lines)
     if len(body) > MAX_BODY_CHARS:
-        raise ValueError(f"PR body exceeds {MAX_BODY_CHARS} characters: {len(body)}")
+        raise ValueError(f"run summary exceeds {MAX_BODY_CHARS} characters: {len(body)}")
     return body
 
 
@@ -81,7 +81,7 @@ def build_discovery_body(
         ],
         run_url,
         details=details,
-        note="Review the source URLs before merging.",
+        note="Configurations were committed to main automatically with their source URLs.",
     )
 
 
@@ -232,7 +232,7 @@ def _common_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate concise automatic PR descriptions")
+    parser = argparse.ArgumentParser(description="Generate concise automated run summaries")
     commands = parser.add_subparsers(dest="command", required=True)
 
     discovery = commands.add_parser("discovery")
@@ -297,7 +297,7 @@ def main(argv: list[str] | None = None) -> None:
     else:
         body = build_wayback_body(args.log.read_text(encoding="utf-8"), args.run_url)
     args.output.write_text(body + "\n", encoding="utf-8")
-    print(f"[+] Wrote PR body to {args.output} ({len(body)} characters)")
+    print(f"[+] Wrote run summary to {args.output} ({len(body)} characters)")
 
 
 if __name__ == "__main__":

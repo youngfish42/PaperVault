@@ -315,9 +315,9 @@ papervault/
 
 ### 阶段 3 — 增量加固（CI 路径过滤 + 真数据测试）
 
-在最小工程化基线上又补了两件"防回退"的事，目的是让 CI 既不被自动 PR 滥触发，又能真正测到 v1 API 的业务行为：
+在最小工程化基线上又补了两件"防回退"的事，目的是让 CI 既不被自动维护提交滥触发，又能真正测到 v1 API 的业务行为：
 
-1. **`ci.yml` 加 paths 白名单**：`push` / `pull_request` 触发仅在以下路径变更时生效，避免 `update_readme.yml` / `collect_papers.yml` / `backfill_abstracts.yml` 等自动 PR（改 `README.md` / `cache/*.json` / `pics/**` / `conf/**`）持续消耗 Action 配额：
+1. **`ci.yml` 加 paths 白名单**：`push` / `pull_request` 触发仅在以下路径变更时生效，避免 `update_readme.yml` / `collect_papers.yml` / `backfill_abstracts.yml` 等自动维护提交（改 `README.md` / `cache/*.json` / `pics/**` / `conf/**`）持续消耗 Action 配额：
    - `papervault/**`、`tests/**`、`web-vue/**`
    - `app.py`、`data_artifacts.py`、`requirements.txt`、`pytest.ini`
    - `.github/workflows/ci.yml` 自身（保证下次改 CI 配置时能触发自检）

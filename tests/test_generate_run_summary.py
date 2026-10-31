@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts import generate_pr_body as pr  # noqa: E402
+from scripts import generate_run_summary as pr  # noqa: E402
 
 RUN_URL = "https://github.com/example/PaperVault/actions/runs/123"
 
@@ -144,10 +144,10 @@ processed this run       : 5
     assert "Unchanged: **9**" in body
 
 
-def test_main_writes_pr_body(tmp_path):
+def test_main_writes_run_summary(tmp_path):
     meta = tmp_path / "readme_meta.json"
     failures = tmp_path / "collect_failures.json"
-    output = tmp_path / "pr_body.md"
+    output = tmp_path / "run_summary.md"
     _write_json(meta, {"new_papers": 1, "new_conferences": 0})
     _write_json(failures, [])
 
@@ -174,33 +174,91 @@ def test_main_writes_pr_body(tmp_path):
     assert body.rstrip().endswith(f"[View workflow run]({RUN_URL})")
 
 
-def test_workflows_use_generated_pr_bodies_and_bounded_titles():
+def test_workflows_commit_artifacts_directly_with_isolated_locks_and_summaries():
     import yaml
 
-    workflow_paths = [
-        ROOT / ".github/workflows/discover_and_update.yml",
-        ROOT / ".github/workflows/collect_papers.yml",
-        ROOT / ".github/workflows/backfill_abstracts.yml",
-        ROOT / ".github/workflows/update_readme.yml",
-    ]
-    pr_steps = []
-    for path in workflow_paths:
-        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-        for job in workflow["jobs"].values():
-            steps = job.get("steps", [])
-            for index, step in enumerate(steps):
-                if not str(step.get("uses", "")).startswith(
-                    "peter-evans/create-pull-request@"
-                ):
-                    continue
-                config = step["with"]
-                assert "body" not in config
-                assert config["body-path"] == "${{ runner.temp }}/pr_body.md"
-                assert len(config["title"]) <= 200
-                assert any(
-                    previous.get("name") == "Generate PR summary"
-                    for previous in steps[:index]
-                )
-                pr_steps.append((path, step["name"]))
+    workflow_groups = {
+        "discover_and_update.yml": "papervault-discover",
+        "collect_papers.yml": "papervault-collect",
+        "backfill_abstracts.yml": "papervault-backfill",
+        "update_readme.yml": "papervault-readme",
+    }
+    for filename, expected_group in workflow_groups.items():
+        path = ROOT / ".github/workflows" / filename
+        text = path.read_text(encoding="utf-8")
+        workflow = yaml.safe_load(text)
+        assert "peter-evans/create-pull-request" not in text
+        assert "generate_pr_body.py" not in text
+        assert workflow["concurrency"] == {
+            "group": expected_group,
+            "cancel-in-progress": False,
+        }
 
-    assert len(pr_steps) == len(workflow_paths)
+        steps = [
+            step
+            for job in workflow["jobs"].values()
+            for step in job.get("steps", [])
+        ]
+        commit_steps = [
+            step
+            for step in steps
+            if "scripts/commit_automated_changes.py" in step.get("run", "")
+        ]
+        assert len(commit_steps) == 1
+        assert any("Generate run summary" == step.get("name") for step in steps)
+        assert any(
+            '>> "$GITHUB_STEP_SUMMARY"' in step.get("run", "") for step in steps
+        )
+        for job in workflow["jobs"].values():
+            assert "pull-requests" not in job.get("permissions", {})
+
+    discovery_text = (
+        ROOT / ".github/workflows/discover_and_update.yml"
+    ).read_text(encoding="utf-8")
+    assert "--inherit-branch" not in discovery_text
+    assert "gh workflow run collect_papers.yml --ref main" in discovery_text
+
+
+def test_hf_writer_workflows_share_external_lock_and_backfill_skips_stats():
+    import yaml
+
+    main_jobs = {
+        "collect_papers.yml": "collect",
+        "backfill_abstracts.yml": "backfill",
+        "update_readme.yml": "rebuild",
+    }
+    for filename, main_job in main_jobs.items():
+        workflow = yaml.safe_load(
+            (ROOT / ".github/workflows" / filename).read_text(encoding="utf-8")
+        )
+        jobs = workflow["jobs"]
+        assert jobs[main_job]["needs"] == "acquire_lock"
+        assert jobs[main_job]["timeout-minutes"] == 330
+        assert jobs["acquire_lock"]["timeout-minutes"] == 360
+        assert jobs["release_lock"]["needs"] == ["acquire_lock", main_job]
+        assert "always()" in jobs["release_lock"]["if"]
+        assert "needs.acquire_lock.result == 'success'" in jobs["release_lock"]["if"]
+
+        acquire_steps = jobs["acquire_lock"]["steps"]
+        release_steps = jobs["release_lock"]["steps"]
+        assert any(
+            "scripts/maintenance_lock.py acquire" in step.get("run", "")
+            for step in acquire_steps
+        )
+        assert any(
+            "scripts/maintenance_lock.py release" in step.get("run", "")
+            for step in release_steps
+        )
+
+    backfill_text = (
+        ROOT / ".github/workflows/backfill_abstracts.yml"
+    ).read_text(encoding="utf-8")
+    assert "Regenerate stats overview chart" not in backfill_text
+    assert "pics/stats/stats_overview.svg" not in backfill_text
+
+    discovery = yaml.safe_load(
+        (ROOT / ".github/workflows/discover_and_update.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "acquire_lock" not in discovery["jobs"]

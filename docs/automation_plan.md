@@ -1,6 +1,6 @@
 # PaperVault 自动化获取论文清单规划文档
 
-> 目标：将现有"手动维护 conf/*.json → 人工触发采集"的流程，升级为"自动发现新会议 → 自动生成配置 → 定时/手动触发采集"的半自动化流程。
+> 目标：将现有"手动维护 conf/*.json → 人工触发采集"的流程，升级为"自动发现新会议 → 自动生成配置 → 自动采集与数据增强"的全自动化流程。
 > 分支：`analyze-sources`
 
 ---
@@ -9,7 +9,7 @@
 
 1. **最小侵入**：尽量保留 `collector.py` 中成熟的 5 类采集函数，不破坏现有解析逻辑。
 2. **配置即代码**：将静态的 `conf/*.json` 升级为"模板 + 生成脚本"，新会议通过脚本自动发现。
-3. **可回滚**：自动生成的配置需经过人工 review（PR/MR），不直接写入生产分支。
+3. **可回滚**：自动生成的配置和元数据通过普通 Git 提交直接写入 `main`，保留完整历史，可逐提交 revert，不再依赖人工合并 PR。
 4. **渐进式**：先实现配置自动发现，再逐步补充 abstract 补全、代码链接优化等增强功能。
 
 ---
@@ -130,12 +130,12 @@
 
 ### Phase 2: 集成与优化（后续迭代）
 
-- [x] **Step 2.1**: 在 GitHub Actions 中新增 `discover_and_update.yml`，每日运行一次自动发现，生成 PR。
+- [x] **Step 2.1**: 在 GitHub Actions 中新增 `discover_and_update.yml`，每日运行一次自动发现，并将配置直接提交到 `main`。
 - [ ] **Step 2.2**: 接入 Semantic Scholar / OpenAlex API，批量补全 DBLP 来源论文的 abstract。
 - [ ] **Step 2.3**: 接入 PapersWithCode API，替换现有的 GitHub Markdown 代码链接匹配逻辑。
 - [x] **Step 2.4**: 优化增量更新粒度，支持单会议强制刷新。
   - 新增 `maintain.py collect` 命令，只收集 conf 中有但 cache 中没有的会议。
-  - 新增 GitHub Actions 工作流 `collect_papers.yml`：每周定时 + conf 文件 push 触发 + 手动触发，自动增量收集并创建 PR。
+  - 新增 GitHub Actions 工作流 `collect_papers.yml`：定时 + conf 文件 push 触发 + 手动触发；自动发现提交后显式派发收集，产物直接提交到 `main`。
 
 ---
 
@@ -153,6 +153,6 @@
 
 ## 6. 预期收益
 
-1. **维护成本**：每年新增会议从"人工 2-4 小时查找 URL"降至"运行脚本 5 分钟 + review 10 分钟"。
+1. **维护成本**：每年新增会议从"人工 2-4 小时查找 URL"降至工作流自动发现、提交与收集，无需逐次人工复核合并。
 2. **覆盖度**：大幅降低遗漏新会议的概率（如 Findings 系列、OpenReview 新 venue）。
 3. **数据质量**：为后续 abstract 补全、代码链接优化打下框架基础。
