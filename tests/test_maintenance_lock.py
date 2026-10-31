@@ -176,3 +176,30 @@ def test_lock_release_during_timestamp_read_retries(
 
     assert _git(remote, "rev-parse", LOCK_REF) == second_lock
     assert maintenance_lock.release_lock(second_lock, ref=LOCK_REF)
+
+
+def test_persistent_timestamp_failure_honors_timeout_and_poll_interval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _remote, first, second = _new_repositories(tmp_path)
+    monkeypatch.chdir(first)
+    first_lock = maintenance_lock.acquire_lock(
+        ref=LOCK_REF, timeout=1, poll_interval=0.01
+    )
+    monkeypatch.chdir(second)
+    sleeps = []
+
+    def fail_timestamp(*_args):
+        raise subprocess.CalledProcessError(1, ["git", "fetch"])
+
+    monkeypatch.setattr(maintenance_lock, "_lock_timestamp", fail_timestamp)
+    monkeypatch.setattr(maintenance_lock.time, "sleep", sleeps.append)
+    with pytest.raises(TimeoutError):
+        maintenance_lock.acquire_lock(
+            ref=LOCK_REF, timeout=0.5, poll_interval=0.01
+        )
+
+    assert sleeps
+    assert set(sleeps) == {0.01}
+    monkeypatch.chdir(first)
+    assert maintenance_lock.release_lock(first_lock, ref=LOCK_REF)

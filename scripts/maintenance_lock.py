@@ -108,17 +108,17 @@ def acquire_lock(
                     "[*] HF writer lock changed while reading it; retrying.",
                     file=sys.stderr,
                 )
-                continue
-            if age > stale_after:
-                print(
-                    f"[!] Removing stale HF writer lock {remote_commit}",
-                    file=sys.stderr,
-                )
-                try:
-                    _delete_lock(ref, remote_commit)
-                except subprocess.CalledProcessError:
-                    pass
-                continue
+            else:
+                if age > stale_after:
+                    print(
+                        f"[!] Removing stale HF writer lock {remote_commit}",
+                        file=sys.stderr,
+                    )
+                    try:
+                        _delete_lock(ref, remote_commit)
+                    except subprocess.CalledProcessError:
+                        pass
+                    continue
 
         if time.monotonic() >= deadline:
             raise TimeoutError(f"Timed out waiting for HF writer lock {ref}")
