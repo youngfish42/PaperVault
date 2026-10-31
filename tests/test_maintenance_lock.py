@@ -203,3 +203,37 @@ def test_persistent_timestamp_failure_honors_timeout_and_poll_interval(
     assert set(sleeps) == {0.01}
     monkeypatch.chdir(first)
     assert maintenance_lock.release_lock(first_lock, ref=LOCK_REF)
+
+
+def test_stale_lock_delete_failure_honors_timeout_and_poll_interval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _remote, first, second = _new_repositories(tmp_path)
+    monkeypatch.chdir(first)
+    first_lock = maintenance_lock.acquire_lock(
+        ref=LOCK_REF, timeout=1, poll_interval=0.01
+    )
+    monkeypatch.chdir(second)
+    sleeps = []
+
+    monkeypatch.setattr(maintenance_lock, "_lock_timestamp", lambda *_args: 0)
+
+    def fail_delete(*_args):
+        raise subprocess.CalledProcessError(1, ["git", "push"])
+
+    real_delete = maintenance_lock._delete_lock
+    monkeypatch.setattr(maintenance_lock, "_delete_lock", fail_delete)
+    monkeypatch.setattr(maintenance_lock.time, "sleep", sleeps.append)
+    with pytest.raises(TimeoutError):
+        maintenance_lock.acquire_lock(
+            ref=LOCK_REF,
+            stale_after=1,
+            timeout=0.5,
+            poll_interval=0.01,
+        )
+
+    assert sleeps
+    assert set(sleeps) == {0.01}
+    monkeypatch.setattr(maintenance_lock, "_delete_lock", real_delete)
+    monkeypatch.chdir(first)
+    assert maintenance_lock.release_lock(first_lock, ref=LOCK_REF)

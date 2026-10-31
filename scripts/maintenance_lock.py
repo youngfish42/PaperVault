@@ -118,7 +118,8 @@ def acquire_lock(
                         _delete_lock(ref, remote_commit)
                     except subprocess.CalledProcessError:
                         pass
-                    continue
+                    else:
+                        continue
 
         if time.monotonic() >= deadline:
             raise TimeoutError(f"Timed out waiting for HF writer lock {ref}")

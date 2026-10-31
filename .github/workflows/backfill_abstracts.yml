@@ -295,8 +295,8 @@ jobs:
           # Manual workflow_dispatch bypass (symmetric with collect_papers.yml).
           # When an operator triggers the workflow by hand -- especially with a
           # specific --conf target -- they usually want the resulting progress
-          # bookkeeping (failed_attempts increments, abstract_backfill_progress.md,
-          # regenerated stats SVG) to be pushed even if zero new abstracts were
+          # bookkeeping (failed_attempts increments and abstract_backfill_progress.md)
+          # to be pushed even if zero new abstracts were
           # actually merged in (e.g. every targeted paper failed lookup on all
           # four sources). Without this bypass those manual runs would never
           # produce a commit and the bookkeeping would be lost on the next cron.

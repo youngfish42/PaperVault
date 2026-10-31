@@ -2,7 +2,6 @@ import gzip
 import os
 import shutil
 import time
-import traceback
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, Union
@@ -336,7 +335,6 @@ def upload_to_huggingface(paths: Iterable[PathLike], commit_message: str) -> Lis
     repo_type = _hf_repo_type()
 
     uploaded: List[str] = []
-    failed: List[str] = []
     max_attempts = max(1, HF_UPLOAD_MAX_ATTEMPTS)
     backoff = max(0.0, HF_UPLOAD_RETRY_BACKOFF)
 
@@ -406,17 +404,11 @@ def upload_to_huggingface(paths: Iterable[PathLike], commit_message: str) -> Lis
                     time.sleep(sleep_for)
 
         if last_exc is not None:
-            failed.append(path_in_repo)
-            print(
-                f"[!] Giving up on Hugging Face upload for {path_in_repo} "
+            raise RuntimeError(
+                f"Hugging Face upload failed for {path_in_repo} "
                 f"after {max_attempts} attempts."
-            )
+            ) from last_exc
 
-    if failed:
-        print(
-            f"[!] Hugging Face upload completed with failures: {failed}. "
-            "Workflow will continue without aborting."
-        )
     return uploaded
 
 
@@ -470,7 +462,8 @@ def sync_cache_artifacts(
 
     ``cache_path`` 一定上传；``progress_path`` 若存在则一并上传，使
     abstract backfill 进度文件与主缓存保持同一次提交语义。传入 ``None``
-    可显式关闭进度文件上传（例如只想推主缓存）。
+    可显式关闭进度文件上传（例如只想推主缓存）。上传失败会抛出异常，
+    避免主缓存未更新时仍推进摘要进度。
     """
     cache_path = Path(cache_path)
     targets: List[Path] = [cache_path]
@@ -480,14 +473,7 @@ def sync_cache_artifacts(
             targets.append(progress_path)
 
     if upload:
-        try:
-            upload_to_huggingface(
-                targets,
-                commit_message=commit_message,
-            )
-        except Exception as exc:
-            print(
-                "[!] Hugging Face sync raised an unexpected error; continuing workflow. "
-                f"Error: {exc}"
-            )
-            traceback.print_exc()
+        upload_to_huggingface(
+            targets,
+            commit_message=commit_message,
+        )
