@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts import generate_pr_body as pr  # noqa: E402
+from scripts import generate_run_summary as pr  # noqa: E402
 
 RUN_URL = "https://github.com/example/PaperVault/actions/runs/123"
 
@@ -144,10 +144,10 @@ processed this run       : 5
     assert "Unchanged: **9**" in body
 
 
-def test_main_writes_pr_body(tmp_path):
+def test_main_writes_run_summary(tmp_path):
     meta = tmp_path / "readme_meta.json"
     failures = tmp_path / "collect_failures.json"
-    output = tmp_path / "pr_body.md"
+    output = tmp_path / "run_summary.md"
     _write_json(meta, {"new_papers": 1, "new_conferences": 0})
     _write_json(failures, [])
 
@@ -174,7 +174,7 @@ def test_main_writes_pr_body(tmp_path):
     assert body.rstrip().endswith(f"[View workflow run]({RUN_URL})")
 
 
-def test_workflows_use_generated_pr_bodies_and_bounded_titles():
+def test_workflows_commit_artifacts_directly_with_shared_lock_and_summaries():
     import yaml
 
     workflow_paths = [
@@ -183,24 +183,34 @@ def test_workflows_use_generated_pr_bodies_and_bounded_titles():
         ROOT / ".github/workflows/backfill_abstracts.yml",
         ROOT / ".github/workflows/update_readme.yml",
     ]
-    pr_steps = []
     for path in workflow_paths:
-        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-        for job in workflow["jobs"].values():
-            steps = job.get("steps", [])
-            for index, step in enumerate(steps):
-                if not str(step.get("uses", "")).startswith(
-                    "peter-evans/create-pull-request@"
-                ):
-                    continue
-                config = step["with"]
-                assert "body" not in config
-                assert config["body-path"] == "${{ runner.temp }}/pr_body.md"
-                assert len(config["title"]) <= 200
-                assert any(
-                    previous.get("name") == "Generate PR summary"
-                    for previous in steps[:index]
-                )
-                pr_steps.append((path, step["name"]))
+        text = path.read_text(encoding="utf-8")
+        workflow = yaml.safe_load(text)
+        assert "peter-evans/create-pull-request" not in text
+        assert "generate_pr_body.py" not in text
+        assert workflow["concurrency"] == {
+            "group": "papervault-auto-maintenance",
+            "cancel-in-progress": False,
+        }
 
-    assert len(pr_steps) == len(workflow_paths)
+        steps = [
+            step
+            for job in workflow["jobs"].values()
+            for step in job.get("steps", [])
+        ]
+        commit_steps = [
+            step
+            for step in steps
+            if "scripts/commit_automated_changes.py" in step.get("run", "")
+        ]
+        assert len(commit_steps) == 1
+        assert any("Generate run summary" == step.get("name") for step in steps)
+        assert any(
+            '>> "$GITHUB_STEP_SUMMARY"' in step.get("run", "") for step in steps
+        )
+        for job in workflow["jobs"].values():
+            assert "pull-requests" not in job.get("permissions", {})
+
+    discovery_text = workflow_paths[0].read_text(encoding="utf-8")
+    assert "--inherit-branch" not in discovery_text
+    assert "gh workflow run collect_papers.yml --ref main" in discovery_text

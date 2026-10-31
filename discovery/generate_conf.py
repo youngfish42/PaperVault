@@ -168,8 +168,7 @@ def _resolve_inherit_refs(branch: str) -> list:
       - fetch 因 "couldn't find remote ref" 失败：远程尚无该分支（首次运行）
         或已删除，属于合法场景，返回 [f"origin/{branch}", branch] 优雅降级。
       - fetch 因网络/远端/权限等其它原因失败：抛出 InheritBranchError 终止
-        流程（fail-fast），防止 create-pull-request 在保护未生效时覆盖
-        未合并发现。
+        流程（fail-fast），防止后续自动提交覆盖指定分支上的未合并发现。
     - 无 origin 远程且本地无该分支时，返回 [branch]，由调用方按“不存在”降级。
     """
     if "/" in branch:
@@ -267,8 +266,7 @@ def run(
             continue
         grouped.setdefault(filename, []).append(cls)
 
-    # 若存在未合并的自动发现分支，先把其中的会议清单合并进来，
-    # 避免 create-pull-request 重置分支后覆盖旧发现。
+    # 手工指定继承分支时先合并其中的会议清单，避免后续自动提交覆盖旧发现。
     if inherit_branch:
         inherit_from_branch(inherit_branch, dry_run=dry_run)
 

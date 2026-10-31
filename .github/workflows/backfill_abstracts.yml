@@ -2,9 +2,8 @@ name: Backfill Abstracts
 
 env:
   PYTHON_VERSION: "3.10"
-  AUTO_BACKFILL_BRANCH: "auto-backfill-abstracts"
   # cache/cache.jsonl.gz AND cache/abstract_backfill_progress.jsonl.gz are
-  # intentionally excluded from the auto-PR: both live on Hugging Face
+  # intentionally excluded from the direct main commit: both live on Hugging Face
   # (PAPERVAULT_HF_REPO_ID) and are pushed via data_artifacts.sync_cache_artifacts.
   AUTO_BACKFILL_FILES: "docs/abstract_backfill_progress.md pics/stats/stats_overview.svg"
 
@@ -25,9 +24,8 @@ on:
         type: boolean
 
 concurrency:
-  # Shared with collect_papers / update_readme to serialise every workflow
-  # that mutates cache.jsonl.gz on Hugging Face.
-  group: papervault-cache
+  # Serialise every workflow that writes generated artifacts to main or HF.
+  group: papervault-auto-maintenance
   cancel-in-progress: false
 
 jobs:
@@ -50,8 +48,6 @@ jobs:
       GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
-      pull-requests: write
-      actions: write
     steps:
       - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
         uses: actions/checkout@v4
@@ -74,42 +70,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Restore in-progress auto backfill state
+      - name: Snapshot tracked artifact baseline
         run: |
-          write_hashes() {
-            local output_file="$1"
-            : > "$output_file"
-            for file in ${{ env.AUTO_BACKFILL_FILES }}; do
-              if [ -f "$file" ]; then
-                sha256sum "$file" >> "$output_file"
-              else
-                printf 'missing  %s\n' "$file" >> "$output_file"
-              fi
-            done
-          }
-
-          if git ls-remote --exit-code --heads origin "${{ env.AUTO_BACKFILL_BRANCH }}" >/dev/null 2>&1; then
-            git fetch --no-tags origin "${{ env.AUTO_BACKFILL_BRANCH }}"
-            for file in ${{ env.AUTO_BACKFILL_FILES }}; do
-              if git cat-file -e "origin/${{ env.AUTO_BACKFILL_BRANCH }}:$file" 2>/dev/null; then
-                git checkout "origin/${{ env.AUTO_BACKFILL_BRANCH }}" -- "$file"
-              else
-                echo "Skip missing tracked file from ${{ env.AUTO_BACKFILL_BRANCH }}: $file"
-              fi
-            done
-            echo "Restored latest auto backfill state from ${{ env.AUTO_BACKFILL_BRANCH }}."
-          else
-            echo "No existing auto backfill branch found; starting from main."
-          fi
-
-          write_hashes "$RUNNER_TEMP/backfill_baseline.sha256"
+          : > "$RUNNER_TEMP/backfill_baseline.sha256"
+          for file in ${{ env.AUTO_BACKFILL_FILES }}; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> "$RUNNER_TEMP/backfill_baseline.sha256"
+            else
+              printf 'missing  %s\n' "$file" >> "$RUNNER_TEMP/backfill_baseline.sha256"
+            fi
+          done
 
       - name: Snapshot cache.jsonl.gz abstract baseline (from Hugging Face)
         # Pull the authoritative cache from HF and count how many records
         # currently have a non-empty paper_abstract BEFORE the backfill runs.
-        # We gate PR creation on this number growing, so a no-op backfill
+        # We gate direct commit on this number growing, so a no-op backfill
         # (every targeted paper failed lookup, or all targets were already
-        # covered) does not open a bandwidth-wasting PR just because
+        # covered) does not create a bandwidth-wasting commit just because
         # progress JSON timestamps moved.
         run: |
           python - <<'PY'
@@ -246,11 +223,11 @@ jobs:
 
       - name: Check for changes
         id: check_changes
-        # Two gates must both hold for a PR to be opened:
+        # Two gates must both hold for a direct main commit to be created:
         #   1. The number of records carrying a non-empty paper_abstract grew
         #      (i.e. the backfill actually merged in at least one new abstract),
         #   2. At least one tracked progress/stats file changed.
-        # Gate (1) prevents the bandwidth-wasting "ghost PR" pattern where
+        # Gate (1) prevents the bandwidth-wasting "ghost commit" pattern where
         # only timestamps inside the progress ledger moved
         # while no new abstract content was added to the authoritative
         # cache.jsonl.gz on Hugging Face.
@@ -320,7 +297,7 @@ jobs:
           # regenerated stats SVG) to be pushed even if zero new abstracts were
           # actually merged in (e.g. every targeted paper failed lookup on all
           # four sources). Without this bypass those manual runs would never
-          # produce a PR and the bookkeeping would be lost on the next cron.
+          # produce a commit and the bookkeeping would be lost on the next cron.
           force_mode=false
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             force_mode=true
@@ -333,7 +310,7 @@ jobs:
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
-              echo "[*] cache.jsonl.gz gained no new abstracts; skipping PR creation to save bandwidth."
+              echo "[*] cache.jsonl.gz gained no new abstracts; skipping direct commit to save bandwidth."
             fi
           fi
 
@@ -342,44 +319,33 @@ jobs:
           git config --local user.name "youngfish42"
           git config --local user.email "youngfish42@users.noreply.github.com"
 
-      - name: Fetch latest main
-        run: git fetch origin main
-
-      - name: Generate PR summary
+      - name: Generate run summary
         if: steps.check_changes.outputs.changed == 'true'
         env:
           TARGET_CONF: ${{ github.event.inputs.target_conf }}
         run: |
           read -r baseline_abs baseline_total < "$RUNNER_TEMP/cache_baseline.count"
           read -r current_abs current_total < "$RUNNER_TEMP/cache_current.count"
-          python scripts/generate_pr_body.py backfill \
+          python scripts/generate_run_summary.py backfill \
             --baseline "${baseline_abs:-0}" \
             --current "${current_abs:-0}" \
             --total "${current_total:-0}" \
             --target "$TARGET_CONF" \
-            --output "$RUNNER_TEMP/pr_body.md" \
+            --output "$RUNNER_TEMP/run_summary.md" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat "$RUNNER_TEMP/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create Pull Request
+      - name: Commit and push to main
         if: steps.check_changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(auto): backfill abstracts"
-          committer: youngfish42 <youngfish42@users.noreply.github.com>
-          author: youngfish42 <youngfish42@users.noreply.github.com>
-          title: "[Auto] Backfill paper abstracts"
-          body-path: ${{ runner.temp }}/pr_body.md
-          branch: ${{ env.AUTO_BACKFILL_BRANCH }}
-          delete-branch: false
-          add-paths: |
-            docs/abstract_backfill_progress.md
-            pics/stats/stats_overview.svg
+        run: |
+          python scripts/commit_automated_changes.py \
+            --message "chore(auto): backfill abstracts" \
+            --paths ${{ env.AUTO_BACKFILL_FILES }}
 
       - name: Sync Hugging Face dataset README
         # Render docs/HF_README.md with the just-updated cache stats and push
         # it to the HF dataset repo root as README.md. Runs unconditionally so
         # the HF landing page reflects the latest abstract coverage even when
-        # no PR is opened back to GitHub.
+        # no GitHub artifact diff is produced.
         if: always()
         run: python scripts/sync_hf_readme.py --skip-cache-refresh

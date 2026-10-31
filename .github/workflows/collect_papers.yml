@@ -2,7 +2,6 @@ name: Collect Papers
 
 env:
   PYTHON_VERSION: "3.10"
-  AUTO_COLLECT_BRANCH: "auto-collect-papers"
   # cache/cache.jsonl.gz is intentionally excluded: it is now stored on
   # Hugging Face (PAPERVAULT_HF_REPO_ID) and pulled via data_artifacts.ensure_cache_local.
   # cache/readme_meta.json drives the README "recent update" brief and MUST stay
@@ -28,11 +27,10 @@ on:
       - "conf/**"
 
 concurrency:
-  # Shared across collect_papers / backfill_abstracts / update_readme to
-  # serialise every workflow that mutates cache.jsonl.gz on Hugging Face.
+  # Serialise every workflow that writes generated artifacts to main or HF.
   # cancel-in-progress is false so already-running jobs finish gracefully
   # (each holds a snapshot of the cache and an in-flight HF push).
-  group: papervault-cache
+  group: papervault-auto-maintenance
   cancel-in-progress: false
 
 jobs:
@@ -47,19 +45,11 @@ jobs:
       # protocol has been observed to stall on some networks and there is no
       # benefit to it for our single ~250MB cache file.
       HF_HUB_DISABLE_XET: "1"
-      # cache/cache.jsonl.gz and cache/abstract_backfill_progress.jsonl.gz
-      # are no longer maintained via Git LFS (both live on Hugging Face).
-      # However, historical commits on auto-created branches may still contain
-      # LFS pointers, so we keep this flag to be safe: any internal
-      # `git checkout` (either in the in-progress restore step or inside
-      # peter-evans/create-pull-request) would otherwise invoke the LFS
-      # smudge filter and fail once the repository's LFS bandwidth budget
-      # is exhausted.
+      # The large cache files live on Hugging Face. Keep the LFS smudge filter
+      # disabled in case a historical rule is reintroduced accidentally.
       GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
-      pull-requests: write
-      actions: write
     steps:
       - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
         uses: actions/checkout@v4
@@ -85,40 +75,21 @@ jobs:
           sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
           rm -rf ~/.cache/matplotlib
 
-      - name: Restore in-progress auto collect state
+      - name: Snapshot tracked artifact baseline
         run: |
-          write_hashes() {
-            local output_file="$1"
-            : > "$output_file"
-            for file in ${{ env.AUTO_COLLECT_FILES }}; do
-              if [ -f "$file" ]; then
-                sha256sum "$file" >> "$output_file"
-              else
-                printf 'missing  %s\n' "$file" >> "$output_file"
-              fi
-            done
-          }
-
-          if git ls-remote --exit-code --heads origin "${{ env.AUTO_COLLECT_BRANCH }}" >/dev/null 2>&1; then
-            git fetch --no-tags origin "${{ env.AUTO_COLLECT_BRANCH }}"
-            for file in ${{ env.AUTO_COLLECT_FILES }}; do
-              if git cat-file -e "origin/${{ env.AUTO_COLLECT_BRANCH }}:$file" 2>/dev/null; then
-                git checkout "origin/${{ env.AUTO_COLLECT_BRANCH }}" -- "$file"
-              else
-                echo "Skip missing tracked file from ${{ env.AUTO_COLLECT_BRANCH }}: $file"
-              fi
-            done
-            echo "Restored latest auto collect state from ${{ env.AUTO_COLLECT_BRANCH }}."
-          else
-            echo "No existing auto collect branch found; starting from main."
-          fi
-
-          write_hashes "$RUNNER_TEMP/collect_baseline.sha256"
+          : > "$RUNNER_TEMP/collect_baseline.sha256"
+          for file in ${{ env.AUTO_COLLECT_FILES }}; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> "$RUNNER_TEMP/collect_baseline.sha256"
+            else
+              printf 'missing  %s\n' "$file" >> "$RUNNER_TEMP/collect_baseline.sha256"
+            fi
+          done
 
       - name: Snapshot cache.jsonl.gz baseline (from Hugging Face)
         # Pull the authoritative cache from HF and count its records BEFORE
-        # any collection runs. We gate PR creation on this count so PRs are
-        # only opened when cache.jsonl.gz actually grew (i.e. real new
+        # any collection runs. We gate direct commit on this count so commits are
+        # only created when cache.jsonl.gz actually grew (i.e. real new
         # papers were merged in). Record-count is the invariant signal:
         # save_cache always rewrites the gzip (so sha256 alone is noisy),
         # but the line count only grows when new papers are appended.
@@ -157,11 +128,11 @@ jobs:
 
       - name: Check for changes
         id: check_changes
-        # Two gates must both hold for a PR to be opened:
+        # Two gates must both hold for a direct main commit to be created:
         #   1. cache.jsonl.gz gained at least one new record (real new papers),
         #   2. at least one tracked progress/README file changed.
         # The first gate is the important one: it prevents bandwidth-wasting
-        # PRs like #77 where progress JSON timestamps moved but zero new
+        # commits like #77 where progress JSON timestamps moved but zero new
         # papers were added to the authoritative cache on Hugging Face.
         # Force-mode runs (manual workflow_dispatch with mode=force) bypass
         # the cache-count gate because a full rebuild legitimately wants to
@@ -227,7 +198,7 @@ jobs:
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
-              echo "[*] cache.jsonl.gz gained no new records; skipping PR creation to save bandwidth."
+              echo "[*] cache.jsonl.gz gained no new records; skipping direct commit to save bandwidth."
             fi
           fi
 
@@ -236,60 +207,35 @@ jobs:
           git config --local user.name "youngfish42"
           git config --local user.email "youngfish42@users.noreply.github.com"
 
-      - name: Fetch latest main
-        run: git fetch origin main
-
-      - name: Generate PR summary
+      - name: Generate run summary
         if: steps.check_changes.outputs.changed == 'true'
         env:
           COLLECT_MODE: ${{ github.event.inputs.mode }}
         run: |
           baseline_count=$(tr -d '[:space:]' < "$RUNNER_TEMP/cache_baseline.count")
           current_count=$(tr -d '[:space:]' < "$RUNNER_TEMP/cache_current.count")
-          python scripts/generate_pr_body.py collect \
+          python scripts/generate_run_summary.py collect \
             --mode "${COLLECT_MODE:-incremental}" \
             --baseline "${baseline_count:-0}" \
             --current "${current_count:-0}" \
             --meta cache/readme_meta.json \
             --failures cache/collect_failures.json \
-            --output "$RUNNER_TEMP/pr_body.md" \
+            --output "$RUNNER_TEMP/run_summary.md" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat "$RUNNER_TEMP/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create Pull Request
+      - name: Commit and push to main
         if: steps.check_changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(auto): collect papers for new conferences"
-          committer: youngfish42 <youngfish42@users.noreply.github.com>
-          author: youngfish42 <youngfish42@users.noreply.github.com>
-          title: "[Auto] Collect papers for new conferences"
-          body-path: ${{ runner.temp }}/pr_body.md
-          branch: ${{ env.AUTO_COLLECT_BRANCH }}
-          delete-branch: false
-          # Defensive whitelist: never let cache/cache.jsonl.gz sneak into the PR.
-          # The authoritative copy lives on Hugging Face (PAPERVAULT_HF_REPO_ID)
-          # and is uploaded by data_artifacts.sync_cache_artifacts; only the
-          # collection progress + rendered README/stats artefacts should be
-          # committed back to git. cache/readme_meta.json must stay in this
-          # list: it is the source of the README "recent update" brief, and
-          # dropping it lets readme-only runs regress the date/new-paper count.
-          add-paths: |
-            cache/collect_progress.json
-            cache/collect_failures.json
-            cache/readme_meta.json
-            README.md
-            README.en.md
-            docs/stats.html
-            pics/stats/stats_overview.svg
-            pics/stats/papers_by_category.svg
-            pics/stats/papers_by_year.svg
-            pics/stats/wordcloud.svg
+        # The large cache stays on Hugging Face. readme_meta.json must remain
+        # whitelisted with the rendered README to preserve its recent-update brief.
+        run: |
+          python scripts/commit_automated_changes.py \
+            --message "chore(auto): collect papers for new conferences" \
+            --paths ${{ env.AUTO_COLLECT_FILES }}
 
       - name: Sync Hugging Face dataset README
         # Render docs/HF_README.md with the just-updated cache stats and push
         # it to the HF dataset repo root as README.md. Always-run so that even
-        # if the PR-creation step is skipped (no new papers), the HF page
-        # still gets the latest "last updated" line.
+        # without a GitHub artifact diff the HF page gets the latest update line.
         if: always()
         run: python scripts/sync_hf_readme.py --skip-cache-refresh

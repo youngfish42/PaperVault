@@ -4,8 +4,8 @@ env:
   PYTHON_VERSION: "3.10"
 
 concurrency:
-  # 防止多个 discover 实例并发读写 auto-discover-confs 分支，避免竞态覆盖未合并发现
-  group: papervault-discover
+  # Discovery also commits to main, so it shares the full maintenance queue.
+  group: papervault-auto-maintenance
   cancel-in-progress: false
 
 on:
@@ -29,16 +29,10 @@ jobs:
     timeout-minutes: 330
     env:
       TZ: Asia/Shanghai
-      # cache/cache.jsonl.gz is no longer maintained via Git LFS (it now lives
-      # on Hugging Face). However, historical commits on auto-created branches
-      # such as auto-discover-confs may still contain LFS pointers. Without
-      # this flag, peter-evans/create-pull-request's internal `git checkout`
-      # would invoke the LFS smudge filter and fail once the repository's LFS
-      # bandwidth budget is exhausted.
       GIT_LFS_SKIP_SMUDGE: "1"
     permissions:
       contents: write
-      pull-requests: write
+      # Required to dispatch Collect after a GITHUB_TOKEN-authored main push.
       actions: write
     steps:
       - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
@@ -81,7 +75,7 @@ jobs:
           if [ -n "${{ github.event.inputs.end_year }}" ]; then
             END_ARG="--end-year ${{ github.event.inputs.end_year }}"
           fi
-          python -m discovery.generate_conf $START_ARG $END_ARG --soft-timeout 18000 --inherit-branch auto-discover-confs
+          python -m discovery.generate_conf $START_ARG $END_ARG --soft-timeout 18000
           echo "changed=$(git diff --name-only -- conf/ | wc -l)" >> "$GITHUB_OUTPUT"
 
       - name: Setup GIT user
@@ -89,25 +83,25 @@ jobs:
           git config --local user.name "youngfish42"
           git config --local user.email "youngfish42@users.noreply.github.com"
 
-      - name: Fetch latest main
-        run: git fetch origin main
-
-      - name: Generate PR summary
+      - name: Generate run summary
         if: steps.discover.outputs.changed != '0'
         run: |
-          python scripts/generate_pr_body.py discovery \
-            --output "$RUNNER_TEMP/pr_body.md" \
+          python scripts/generate_run_summary.py discovery \
+            --output "$RUNNER_TEMP/run_summary.md" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat "$RUNNER_TEMP/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create Pull Request
+      - name: Commit and push to main
         if: steps.discover.outputs.changed != '0'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(auto): discover new conference configs"
-          committer: youngfish42 <youngfish42@users.noreply.github.com>
-          author: youngfish42 <youngfish42@users.noreply.github.com>
-          title: "[Auto] Discover new conference configs"
-          body-path: ${{ runner.temp }}/pr_body.md
-          branch: auto-discover-confs
-          delete-branch: true
+        run: |
+          python scripts/commit_automated_changes.py \
+            --message "chore(auto): discover new conference configs" \
+            --paths conf
+
+      - name: Dispatch paper collection
+        # A GITHUB_TOKEN-authored push does not emit another workflow-triggering
+        # push event, so explicitly preserve the discovery -> collection chain.
+        if: steps.discover.outputs.changed != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run collect_papers.yml --ref main

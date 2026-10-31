@@ -1761,7 +1761,7 @@ def _load_jsonl_gz(path: Path) -> Tuple[Dict[str, dict], int]:
         # case that two processes race into corruption recovery within
         # the same wall-clock second the second ``os.replace`` will
         # clobber the first backup. Not fixing today because (a) all
-        # cache-mutating workflows already share the ``papervault-cache``
+        # maintenance workflows already share ``papervault-auto-maintenance``
         # concurrency group so this is impossible in CI and (b) local
         # dev virtually never hits corruption. If we ever loosen the
         # concurrency guard, switch to ``time.time_ns()`` or a uuid4
