@@ -6,8 +6,13 @@ import subprocess
 import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
-from scripts.commit_automated_changes import ensure_main_base
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.commit_automated_changes import ensure_main_base  # noqa: E402
 
 DEFAULT_REF = "refs/heads/papervault-hf-writer-lock"
 DEFAULT_STALE_AFTER = 43200
@@ -96,7 +101,14 @@ def acquire_lock(
                 print(f"[+] Acquired HF writer lock {ref}", file=sys.stderr)
                 return lock_commit
         else:
-            age = time.time() - _lock_timestamp(ref, remote_commit)
+            try:
+                age = time.time() - _lock_timestamp(ref, remote_commit)
+            except subprocess.CalledProcessError:
+                print(
+                    "[*] HF writer lock changed while reading it; retrying.",
+                    file=sys.stderr,
+                )
+                continue
             if age > stale_after:
                 print(
                     f"[!] Removing stale HF writer lock {remote_commit}",

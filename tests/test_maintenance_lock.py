@@ -110,3 +110,69 @@ def test_non_main_ref_cannot_acquire_hf_writer_lock(
     with pytest.raises(RuntimeError, match="checked-out ref"):
         maintenance_lock.acquire_lock(ref=LOCK_REF, timeout=1, poll_interval=0.01)
     assert _git(remote, "for-each-ref", LOCK_REF) == ""
+
+
+def test_cli_acquire_and_release_use_direct_script_entrypoint(tmp_path: Path):
+    _remote, first, _second = _new_repositories(tmp_path)
+    script = ROOT / "scripts" / "maintenance_lock.py"
+    acquired = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "acquire",
+            "--ref",
+            LOCK_REF,
+            "--timeout",
+            "1",
+            "--poll-interval",
+            "0.01",
+        ],
+        cwd=first,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    lock_commit = acquired.stdout.strip()
+    assert lock_commit
+
+    released = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "release",
+            "--ref",
+            LOCK_REF,
+            "--lock-commit",
+            lock_commit,
+        ],
+        cwd=first,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert released.returncode == 0
+
+
+def test_lock_release_during_timestamp_read_retries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    remote, first, second = _new_repositories(tmp_path)
+    monkeypatch.chdir(first)
+    first_lock = maintenance_lock.acquire_lock(
+        ref=LOCK_REF, timeout=1, poll_interval=0.01
+    )
+    monkeypatch.chdir(second)
+
+    def release_then_fail(*_args):
+        monkeypatch.chdir(first)
+        maintenance_lock.release_lock(first_lock, ref=LOCK_REF)
+        monkeypatch.chdir(second)
+        raise subprocess.CalledProcessError(1, ["git", "fetch"])
+
+    monkeypatch.setattr(maintenance_lock, "_lock_timestamp", release_then_fail)
+    second_lock = maintenance_lock.acquire_lock(
+        ref=LOCK_REF, timeout=1, poll_interval=0.01
+    )
+
+    assert _git(remote, "rev-parse", LOCK_REF) == second_lock
+    assert maintenance_lock.release_lock(second_lock, ref=LOCK_REF)
