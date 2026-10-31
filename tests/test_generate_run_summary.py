@@ -174,22 +174,23 @@ def test_main_writes_run_summary(tmp_path):
     assert body.rstrip().endswith(f"[View workflow run]({RUN_URL})")
 
 
-def test_workflows_commit_artifacts_directly_with_shared_lock_and_summaries():
+def test_workflows_commit_artifacts_directly_with_isolated_locks_and_summaries():
     import yaml
 
-    workflow_paths = [
-        ROOT / ".github/workflows/discover_and_update.yml",
-        ROOT / ".github/workflows/collect_papers.yml",
-        ROOT / ".github/workflows/backfill_abstracts.yml",
-        ROOT / ".github/workflows/update_readme.yml",
-    ]
-    for path in workflow_paths:
+    workflow_groups = {
+        "discover_and_update.yml": "papervault-discover",
+        "collect_papers.yml": "papervault-collect",
+        "backfill_abstracts.yml": "papervault-backfill",
+        "update_readme.yml": "papervault-readme",
+    }
+    for filename, expected_group in workflow_groups.items():
+        path = ROOT / ".github/workflows" / filename
         text = path.read_text(encoding="utf-8")
         workflow = yaml.safe_load(text)
         assert "peter-evans/create-pull-request" not in text
         assert "generate_pr_body.py" not in text
         assert workflow["concurrency"] == {
-            "group": "papervault-auto-maintenance",
+            "group": expected_group,
             "cancel-in-progress": False,
         }
 
@@ -211,6 +212,8 @@ def test_workflows_commit_artifacts_directly_with_shared_lock_and_summaries():
         for job in workflow["jobs"].values():
             assert "pull-requests" not in job.get("permissions", {})
 
-    discovery_text = workflow_paths[0].read_text(encoding="utf-8")
+    discovery_text = (
+        ROOT / ".github/workflows/discover_and_update.yml"
+    ).read_text(encoding="utf-8")
     assert "--inherit-branch" not in discovery_text
     assert "gh workflow run collect_papers.yml --ref main" in discovery_text

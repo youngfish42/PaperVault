@@ -305,7 +305,7 @@ export PAPERVAULT_HF_REPO_ID=<your-namespace>/<dataset-repo>
 
 ### 6.4 工作流并发控制
 
-四个自动维护工作流（`discover_and_update.yml`、`collect_papers.yml`、`backfill_abstracts.yml`、`update_readme.yml`）共用 concurrency group `papervault-auto-maintenance`，且 `cancel-in-progress: false`，从而保证直接推送 `main` 与 HF 写入串行执行。Git 推送通过共享工具先 rebase 再重试，冲突时安全失败；本地手工运行仍可能与自动工作流并发，因此 HF 上传层额外使用 `parent_commit` 乐观锁兜底。
+四个自动维护工作流分别使用独立的 concurrency group（`papervault-discover`、`papervault-collect`、`papervault-backfill`、`papervault-readme`），且 `cancel-in-progress: false`，避免长时间 backfill 导致其他工作流在排队时被取消。跨工作流的 Git 推送通过共享工具先 rebase 再重试，冲突时安全失败；HF 上传层使用 `parent_commit` 乐观锁处理并发写入。
 
 ---
 

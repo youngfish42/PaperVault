@@ -1758,11 +1758,11 @@ def _load_jsonl_gz(path: Path) -> Tuple[Dict[str, dict], int]:
     except (OSError, EOFError, gzip.BadGzipFile) as exc:
         # TODO(review #8, fourth pass): ``backup`` embeds an integer
         # ``time.time()`` for uniqueness. In the extraordinarily unlikely
-        # case that two processes race into corruption recovery within
+        # case that two backfill processes race into corruption recovery within
         # the same wall-clock second the second ``os.replace`` will
-        # clobber the first backup. Not fixing today because (a) all
-        # maintenance workflows already share ``papervault-auto-maintenance``
-        # concurrency group so this is impossible in CI and (b) local
+        # clobber the first backup. Not fixing today because (a) backfill runs
+        # already share the ``papervault-backfill`` concurrency group so this
+        # is impossible in CI and (b) local
         # dev virtually never hits corruption. If we ever loosen the
         # concurrency guard, switch to ``time.time_ns()`` or a uuid4
         # suffix.

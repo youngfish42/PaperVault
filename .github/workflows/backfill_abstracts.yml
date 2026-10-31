@@ -24,8 +24,9 @@ on:
         type: boolean
 
 concurrency:
-  # Serialise every workflow that writes generated artifacts to main or HF.
-  group: papervault-auto-maintenance
+  # Long backfills only replace superseded runs of the same workflow, never
+  # queued discovery/collection/README runs; HF retains its optimistic lock.
+  group: papervault-backfill
   cancel-in-progress: false
 
 jobs:

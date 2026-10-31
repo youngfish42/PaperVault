@@ -27,10 +27,9 @@ on:
       - "conf/**"
 
 concurrency:
-  # Serialise every workflow that writes generated artifacts to main or HF.
-  # cancel-in-progress is false so already-running jobs finish gracefully
-  # (each holds a snapshot of the cache and an in-flight HF push).
-  group: papervault-auto-maintenance
+  # Serialise duplicate collection runs without allowing another maintenance
+  # workflow to replace a queued collection; HF retains its optimistic lock.
+  group: papervault-collect
   cancel-in-progress: false
 
 jobs:

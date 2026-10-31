@@ -4,8 +4,9 @@ env:
   PYTHON_VERSION: "3.10"
 
 concurrency:
-  # Discovery also commits to main, so it shares the full maintenance queue.
-  group: papervault-auto-maintenance
+  # Isolate duplicate discovery runs without letting a long backfill cancel
+  # this workflow while it waits; direct pushes rebase onto the latest main.
+  group: papervault-discover
   cancel-in-progress: false
 
 on:

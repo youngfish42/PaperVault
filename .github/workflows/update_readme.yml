@@ -12,9 +12,9 @@ on:
         default: "readme"
 
 concurrency:
-  # Even readme-only runs join the maintenance queue so generated files on
-  # main and the HF cache cannot be overwritten by a concurrent workflow.
-  group: papervault-auto-maintenance
+  # Avoid duplicate README rebuilds without blocking unrelated maintenance
+  # workflows; direct pushes rebase and HF uploads use optimistic locking.
+  group: papervault-readme
   cancel-in-progress: false
 
 jobs:
