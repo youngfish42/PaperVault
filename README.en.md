@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-10-29
-- 🆕 **New Papers This Update**: 1,380
+- 📅 **Last Updated**: 2026-10-31
+- 🆕 **New Papers This Update**: 137
 - 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 721,172 papers / 129 publication series / 655,131 with abstracts / 114,139 with code
+- 📊 **Database Scale**: 721,309 papers / 129 publication series / 657,091 with abstracts / 114,160 with code
 
 <!-- recent-update-end -->
 
@@ -206,7 +206,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **ICSE** 2000-2026 (27 editions)
 - **ISSTA** 2000-2024 (22 editions)
 - **OOPSLA** 2000-2016 (17 editions)
-- **OSDI** 2000-2025 (16 editions)
+- **OSDI** 2000-2026 (17 editions)
 - **PLDI** 2000-2022 (23 editions)
 - **POPL** 2000-2017 (18 editions)
 - **SOSP** 2001-2025 (14 editions)
