@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head><title>JMLR hybrid short-modern fixture</title></head>
+<body>
+<div id="content">
+  <h2>Fixture Hybrid Paper Title</h2>
+  <p><b><i>Alice Fixture, Bob Placeholder</i></b>; 12(Jan):1--30, 2011.</p>
+  <!--
+    Some rehosted pages carry an empty <p class="abstract"> shell up
+    top (from the modern template) but the *real* prose still lives
+    as legacy raw-text siblings of the <h3>Abstract</h3> heading
+    below. The fetcher's modern selector will match the empty shell;
+    the fallback branch must then walk the legacy siblings and
+    override with the longer real prose.
+  -->
+  <p class="abstract">TBD</p>
+  <hr />
+  <h3>Abstract</h3>
+  This is a legacy-layout abstract that sits as raw text nodes and
+  should override the near-empty modern shell above so the fetcher
+  reports a healthy successful extraction well past the sixty-character
+  minimum length gate enforced by MIN_ABSTRACT_CHARS.
+  <font color="gray"><p>[abs]</p></font>
+  [<a href="http://www.jmlr.org/papers/volume12/hybrid01/hybrid01.pdf">pdf</a>]
+</div>
+</body>
+</html>

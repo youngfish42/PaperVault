@@ -1,0 +1,369 @@
+name: Backfill Abstracts
+
+env:
+  PYTHON_VERSION: "3.10"
+  # cache/cache.jsonl.gz AND cache/abstract_backfill_progress.jsonl.gz are
+  # intentionally excluded from the direct main commit: both live on Hugging Face
+  # (PAPERVAULT_HF_REPO_ID) and are pushed via data_artifacts.sync_cache_artifacts.
+  AUTO_BACKFILL_FILES: "docs/abstract_backfill_progress.md"
+
+on:
+  schedule:
+    # 每 6 小时运行一次 (UTC 01:00 / 07:00 / 13:00 / 19:00)，运行时长由 --soft-timeout 控制（约5小时后自动保存进度退出）。
+    - cron: "0 1,7,13,19 * * *"
+  workflow_dispatch:
+    inputs:
+      target_conf:
+        description: "手动指定 conf（如 AAAI2020），留空则自动处理最高优先级论文，直到时间耗尽"
+        required: false
+        default: ""
+      force:
+        description: "强制获取摘要：即使论文之前获取摘要失败也继续尝试（默认关闭；不会覆盖已有摘要）"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  # Long backfills only replace superseded runs of the same workflow, never
+  # queued discovery/collection/README runs; HF retains its optimistic lock.
+  group: papervault-backfill
+  cancel-in-progress: false
+
+jobs:
+  acquire_lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    outputs:
+      lock_commit: ${{ steps.acquire.outputs.lock_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Acquire HF writer lock
+        id: acquire
+        run: |
+          lock_commit=$(python scripts/maintenance_lock.py acquire)
+          echo "lock_commit=$lock_commit" >> "$GITHUB_OUTPUT"
+
+  backfill:
+    needs: acquire_lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TZ: Asia/Shanghai
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
+      # Force the classic HTTPS/LFS download path on the runner; the Xet
+      # protocol has been observed to stall on some networks and there is no
+      # benefit to it for our single ~250MB cache file.
+      HF_HUB_DISABLE_XET: "1"
+      # cache/cache.jsonl.gz and cache/abstract_backfill_progress.jsonl.gz
+      # are no longer maintained via Git LFS (they live on Hugging Face).
+      # GIT_LFS_SKIP_SMUDGE remains set as a safety belt: if a residual LFS
+      # rule sneaks back in, the smudge filter would otherwise consume our
+      # exhausted LFS bandwidth budget.
+      GIT_LFS_SKIP_SMUDGE: "1"
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Snapshot tracked artifact baseline
+        run: |
+          : > "$RUNNER_TEMP/backfill_baseline.sha256"
+          for file in ${{ env.AUTO_BACKFILL_FILES }}; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> "$RUNNER_TEMP/backfill_baseline.sha256"
+            else
+              printf 'missing  %s\n' "$file" >> "$RUNNER_TEMP/backfill_baseline.sha256"
+            fi
+          done
+
+      - name: Snapshot cache.jsonl.gz abstract baseline (from Hugging Face)
+        # Pull the authoritative cache from HF and count how many records
+        # currently have a non-empty paper_abstract BEFORE the backfill runs.
+        # We gate direct commit on this number growing, so a no-op backfill
+        # (every targeted paper failed lookup, or all targets were already
+        # covered) does not create a bandwidth-wasting commit just because
+        # progress JSON timestamps moved.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import json
+          import os
+
+          from data_artifacts import ensure_cache_local, DEFAULT_CACHE_PATH
+
+          cache_path, _ = ensure_cache_local(DEFAULT_CACHE_PATH)
+          cache_path = Path(cache_path)
+
+          total = 0
+          with_abstract = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      line = line.strip()
+                      if not line:
+                          continue
+                      total += 1
+                      try:
+                          record = json.loads(line)
+                      except json.JSONDecodeError:
+                          continue
+                      if (record.get("paper_abstract") or "").strip():
+                          with_abstract += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_baseline.count"
+          out.write_text(f"{with_abstract} {total}\n", encoding="utf-8")
+          print(f"[+] cache baseline abstracts={with_abstract}/{total}")
+          PY
+
+      - name: Run abstract backfill
+        run: |
+          force_flag=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            force_flag="--force"
+          fi
+          if [ -n "${{ github.event.inputs.target_conf }}" ]; then
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3 $force_flag
+          else
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3 $force_flag
+          fi
+
+      - name: Retry recoverable failures (--reason-in whitelist)
+        # After the main pass we spend up to one extra hour retrying only
+        # the failure reasons that *can* actually recover on a re-attempt
+        # (transient upstream state). Structural failures such as
+        # ``no_doi`` / ``doi_not_found`` / ``venue_index`` /
+        # ``delegated_to_specialised_fetcher`` are permanently skipped by
+        # this whitelist so the retry budget is not wasted on them.
+        #
+        # ``--no-include-legacy`` (fourth review pass, issue #5): the
+        # default ``--include-legacy`` semantics let every v3 record
+        # (which has no ``reason`` field) into the retry set — that
+        # completely defeats the whitelist for our current progress
+        # ledger (which is still mostly v3). Forcing the strict form
+        # here means only records that we *know* failed with a
+        # recoverable reason (v4 records with an in-whitelist ``reason``
+        # field) are retried, matching the workflow's stated intent.
+        #
+        # ``timeout-minutes: 70`` is a hard step-level cap that matches
+        # ``--soft-timeout 3600`` (60 min) plus 10 min slack for the
+        # graceful save / HF upload. See review issue #10 for the
+        # rationale (defence-in-depth against a wedged HTTP client).
+        #
+        # ``--max-papers 10000`` caps each scheduled retry pass so the workflow
+        # does not spend the whole 60 min retry budget chewing through a large
+        # backlog of transient failures. The backlog is drained gradually
+        # across multiple runs while keeping the total runtime close to the
+        # pre-merge ~10 min baseline. When the run is manually triggered with
+        # ``force=true`` the cap is removed so an operator can still perform a
+        # full unbounded retry.
+        #
+        # See spec AC-7 / Task 7 and Task 11 for the design rationale.
+        if: success() || failure()
+        timeout-minutes: 70
+        run: |
+          force_flag=""
+          max_papers_flag="--max-papers 10000"
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            force_flag="--force"
+            max_papers_flag=""
+          fi
+          if [ -n "${{ github.event.inputs.target_conf }}" ]; then
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy $max_papers_flag $force_flag
+          else
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 3600 --max-failed-attempts 3 --retry-failed --reason-in "rate_limited,timeout,network,empty_abstract" --no-include-legacy $max_papers_flag $force_flag
+          fi
+
+      - name: Backfill CVF Open Access abstracts
+        # DOI-less venues (CVPR / ICCV / WACV) fall outside the
+        # Crossref → Semantic Scholar → arXiv → OpenAlex cascade run above.
+        # This step scrapes the openaccess.thecvf.com detail pages directly
+        # to fill their <div id="abstract"> content. Runs strictly after the
+        # generic backfill so both writers to cache.jsonl.gz are serialised
+        # within the same job. `--soft-timeout 2400` (40 min) keeps the total
+        # workflow well under the 330 min hard cap.
+        run: |
+          force_flag=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            force_flag="--force"
+          fi
+          if [ -n "${{ github.event.inputs.target_conf }}" ]; then
+            read -r -a confs <<< "${{ github.event.inputs.target_conf }}"
+            python scripts/fetch_cvf_abstracts.py --conf "${confs[@]}" --soft-timeout 2400 $force_flag
+          else
+            python scripts/fetch_cvf_abstracts.py --soft-timeout 2400 $force_flag
+          fi
+
+      - name: Scan GitHub code links from newly backfilled abstracts
+        # Pure regex pass over all abstracts; cheap I/O-bound step that keeps the
+        # `paper_code` field in sync whenever new abstracts are introduced.
+        run: python scripts/fetch_code_links.py --year all --retry-failed
+
+      - name: Check for changes
+        id: check_changes
+        # Two gates must both hold for a direct main commit to be created:
+        #   1. The number of records carrying a non-empty paper_abstract grew
+        #      (i.e. the backfill actually merged in at least one new abstract),
+        #   2. At least one tracked progress/stats file changed.
+        # Gate (1) prevents the bandwidth-wasting "ghost commit" pattern where
+        # only timestamps inside the progress ledger moved
+        # while no new abstract content was added to the authoritative
+        # cache.jsonl.gz on Hugging Face.
+        run: |
+          : > "$RUNNER_TEMP/backfill_current.sha256"
+          for file in ${{ env.AUTO_BACKFILL_FILES }}; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> "$RUNNER_TEMP/backfill_current.sha256"
+            else
+              printf 'missing  %s\n' "$file" >> "$RUNNER_TEMP/backfill_current.sha256"
+            fi
+          done
+
+          progress_changed=false
+          if ! cmp --silent "$RUNNER_TEMP/backfill_baseline.sha256" "$RUNNER_TEMP/backfill_current.sha256"; then
+            progress_changed=true
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import json
+          import os
+
+          cache_path = Path("cache/cache.jsonl.gz")
+          total = 0
+          with_abstract = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      line = line.strip()
+                      if not line:
+                          continue
+                      total += 1
+                      try:
+                          record = json.loads(line)
+                      except json.JSONDecodeError:
+                          continue
+                      if (record.get("paper_abstract") or "").strip():
+                          with_abstract += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_current.count"
+          out.write_text(f"{with_abstract} {total}\n", encoding="utf-8")
+          print(f"[+] cache current abstracts={with_abstract}/{total}")
+          PY
+
+          baseline_abs=$(awk '{print $1}' "$RUNNER_TEMP/cache_baseline.count")
+          current_abs=$(awk '{print $1}' "$RUNNER_TEMP/cache_current.count")
+          # Defensive defaults: if either snapshot file was unreadable
+          # (HF outage, disk full, etc.) treat the count as 0 so the
+          # bash arithmetic test below cannot blow up with "unary
+          # operator expected" and abort the workflow before we have a
+          # chance to print a useful skip message.
+          baseline_abs=${baseline_abs:-0}
+          current_abs=${current_abs:-0}
+          echo "baseline_abstracts=$baseline_abs current_abstracts=$current_abs"
+
+          cache_changed=false
+          if [ "$current_abs" -gt "$baseline_abs" ]; then
+            cache_changed=true
+          fi
+
+          # Manual workflow_dispatch bypass (symmetric with collect_papers.yml).
+          # When an operator triggers the workflow by hand -- especially with a
+          # specific --conf target -- they usually want the resulting progress
+          # bookkeeping (failed_attempts increments and abstract_backfill_progress.md)
+          # to be pushed even if zero new abstracts were
+          # actually merged in (e.g. every targeted paper failed lookup on all
+          # four sources). Without this bypass those manual runs would never
+          # produce a commit and the bookkeeping would be lost on the next cron.
+          force_mode=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            force_mode=true
+          fi
+
+          echo "progress_changed=$progress_changed cache_changed=$cache_changed force_mode=$force_mode"
+
+          if [ "$progress_changed" = "true" ] && { [ "$cache_changed" = "true" ] || [ "$force_mode" = "true" ]; }; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
+              echo "[*] cache.jsonl.gz gained no new abstracts; skipping direct commit to save bandwidth."
+            fi
+          fi
+
+      - name: Setup GIT user
+        run: |
+          git config --local user.name "youngfish42"
+          git config --local user.email "youngfish42@users.noreply.github.com"
+
+      - name: Generate run summary
+        if: steps.check_changes.outputs.changed == 'true'
+        env:
+          TARGET_CONF: ${{ github.event.inputs.target_conf }}
+        run: |
+          read -r baseline_abs baseline_total < "$RUNNER_TEMP/cache_baseline.count"
+          read -r current_abs current_total < "$RUNNER_TEMP/cache_current.count"
+          python scripts/generate_run_summary.py backfill \
+            --baseline "${baseline_abs:-0}" \
+            --current "${current_abs:-0}" \
+            --total "${current_total:-0}" \
+            --target "$TARGET_CONF" \
+            --output "$RUNNER_TEMP/run_summary.md" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat "$RUNNER_TEMP/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push to main
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          python scripts/commit_automated_changes.py \
+            --message "chore(auto): backfill abstracts" \
+            --paths ${{ env.AUTO_BACKFILL_FILES }}
+
+      - name: Sync Hugging Face dataset README
+        # Render docs/HF_README.md with the just-updated cache stats and push
+        # it to the HF dataset repo root as README.md. Runs unconditionally so
+        # the HF landing page reflects the latest abstract coverage even when
+        # no GitHub artifact diff is produced.
+        if: always()
+        run: python scripts/sync_hf_readme.py --skip-cache-refresh
+
+  release_lock:
+    needs: [acquire_lock, backfill]
+    if: always() && needs.acquire_lock.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Release HF writer lock
+        run: |
+          python scripts/maintenance_lock.py release \
+            --lock-commit "${{ needs.acquire_lock.outputs.lock_commit }}"

@@ -1,0 +1,274 @@
+name: Collect Papers
+
+env:
+  PYTHON_VERSION: "3.10"
+  # cache/cache.jsonl.gz is intentionally excluded: it is now stored on
+  # Hugging Face (PAPERVAULT_HF_REPO_ID) and pulled via data_artifacts.ensure_cache_local.
+  # cache/readme_meta.json drives the README "recent update" brief and MUST stay
+  # committed alongside README.md — otherwise a later readme-only run of
+  # maintain.py re-renders the brief from a frozen snapshot and regresses the
+  # date / new-paper count (see 2026-09-19 incident).
+  AUTO_COLLECT_FILES: "cache/collect_progress.json cache/collect_failures.json cache/readme_meta.json README.md README.en.md docs/stats.html pics/stats/stats_overview.svg pics/stats/papers_by_category.svg pics/stats/papers_by_year.svg pics/stats/wordcloud.svg"
+
+on:
+  schedule:
+    # 每月 15 号 16:00 (UTC) 运行一次，与 backfill_abstracts 错开
+    - cron: "0 16 15 * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "收集模式: incremental (默认增量) 或 force (全量重建)"
+        required: false
+        default: "incremental"
+  push:
+    branches:
+      - main
+    paths:
+      - "conf/**"
+
+concurrency:
+  # Serialise duplicate collection runs without allowing another maintenance
+  # workflow to replace a queued collection; HF retains its optimistic lock.
+  group: papervault-collect
+  cancel-in-progress: false
+
+jobs:
+  acquire_lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    outputs:
+      lock_commit: ${{ steps.acquire.outputs.lock_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Acquire HF writer lock
+        id: acquire
+        run: |
+          lock_commit=$(python scripts/maintenance_lock.py acquire)
+          echo "lock_commit=$lock_commit" >> "$GITHUB_OUTPUT"
+
+  collect:
+    needs: acquire_lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TZ: Asia/Shanghai
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
+      # Force the classic HTTPS/LFS download path on the runner; the Xet
+      # protocol has been observed to stall on some networks and there is no
+      # benefit to it for our single ~250MB cache file.
+      HF_HUB_DISABLE_XET: "1"
+      # The large cache files live on Hugging Face. Keep the LFS smudge filter
+      # disabled in case a historical rule is reintroduced accidentally.
+      GIT_LFS_SKIP_SMUDGE: "1"
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+          rm -rf ~/.cache/matplotlib
+
+      - name: Snapshot tracked artifact baseline
+        run: |
+          : > "$RUNNER_TEMP/collect_baseline.sha256"
+          for file in ${{ env.AUTO_COLLECT_FILES }}; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> "$RUNNER_TEMP/collect_baseline.sha256"
+            else
+              printf 'missing  %s\n' "$file" >> "$RUNNER_TEMP/collect_baseline.sha256"
+            fi
+          done
+
+      - name: Snapshot cache.jsonl.gz baseline (from Hugging Face)
+        # Pull the authoritative cache from HF and count its records BEFORE
+        # any collection runs. We gate direct commit on this count so commits are
+        # only created when cache.jsonl.gz actually grew (i.e. real new
+        # papers were merged in). Record-count is the invariant signal:
+        # save_cache always rewrites the gzip (so sha256 alone is noisy),
+        # but the line count only grows when new papers are appended.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import os
+
+          from data_artifacts import ensure_cache_local, DEFAULT_CACHE_PATH
+
+          cache_path, _ = ensure_cache_local(DEFAULT_CACHE_PATH)
+          cache_path = Path(cache_path)
+
+          count = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      if line.strip():
+                          count += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_baseline.count"
+          out.write_text(f"{count}\n", encoding="utf-8")
+          print(f"[+] cache baseline record count={count}")
+          PY
+
+      - name: Run paper collection
+        run: |
+          if [ "${{ github.event.inputs.mode }}" == "force" ]; then
+            echo "[*] Force mode: full cache rebuild"
+            python maintain.py force
+          else
+            echo "[*] Incremental mode: collecting only missing conferences"
+            python maintain.py collect --soft-timeout 18000
+          fi
+
+      - name: Check for changes
+        id: check_changes
+        # Two gates must both hold for a direct main commit to be created:
+        #   1. cache.jsonl.gz gained at least one new record (real new papers),
+        #   2. at least one tracked progress/README file changed.
+        # The first gate is the important one: it prevents bandwidth-wasting
+        # commits like #77 where progress JSON timestamps moved but zero new
+        # papers were added to the authoritative cache on Hugging Face.
+        # Force-mode runs (manual workflow_dispatch with mode=force) bypass
+        # the cache-count gate because a full rebuild legitimately wants to
+        # refresh the README/stats artefacts regardless of net record delta.
+        run: |
+          : > "$RUNNER_TEMP/collect_current.sha256"
+          for file in ${{ env.AUTO_COLLECT_FILES }}; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> "$RUNNER_TEMP/collect_current.sha256"
+            else
+              printf 'missing  %s\n' "$file" >> "$RUNNER_TEMP/collect_current.sha256"
+            fi
+          done
+
+          progress_changed=false
+          if ! cmp --silent "$RUNNER_TEMP/collect_baseline.sha256" "$RUNNER_TEMP/collect_current.sha256"; then
+            progress_changed=true
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+          import gzip
+          import os
+
+          cache_path = Path("cache/cache.jsonl.gz")
+          count = 0
+          if cache_path.exists():
+              with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+                  for line in handle:
+                      if line.strip():
+                          count += 1
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "cache_current.count"
+          out.write_text(f"{count}\n", encoding="utf-8")
+          print(f"[+] cache current record count={count}")
+          PY
+
+          baseline_count=$(cat "$RUNNER_TEMP/cache_baseline.count" | tr -d '[:space:]')
+          current_count=$(cat "$RUNNER_TEMP/cache_current.count" | tr -d '[:space:]')
+          # Defensive defaults: if either snapshot file was unreadable
+          # (HF outage, disk full, etc.) treat the count as 0 so the
+          # bash arithmetic test below cannot blow up with "unary
+          # operator expected" and abort the workflow before we have a
+          # chance to print a useful skip message.
+          baseline_count=${baseline_count:-0}
+          current_count=${current_count:-0}
+          echo "baseline_count=$baseline_count current_count=$current_count"
+
+          cache_changed=false
+          if [ "$current_count" -gt "$baseline_count" ]; then
+            cache_changed=true
+          fi
+
+          force_mode=false
+          if [ "${{ github.event.inputs.mode }}" = "force" ]; then
+            force_mode=true
+          fi
+
+          echo "progress_changed=$progress_changed cache_changed=$cache_changed force_mode=$force_mode"
+
+          if [ "$progress_changed" = "true" ] && { [ "$cache_changed" = "true" ] || [ "$force_mode" = "true" ]; }; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            if [ "$cache_changed" != "true" ] && [ "$force_mode" != "true" ]; then
+              echo "[*] cache.jsonl.gz gained no new records; skipping direct commit to save bandwidth."
+            fi
+          fi
+
+      - name: Setup GIT user
+        run: |
+          git config --local user.name "youngfish42"
+          git config --local user.email "youngfish42@users.noreply.github.com"
+
+      - name: Generate run summary
+        if: steps.check_changes.outputs.changed == 'true'
+        env:
+          COLLECT_MODE: ${{ github.event.inputs.mode }}
+        run: |
+          baseline_count=$(tr -d '[:space:]' < "$RUNNER_TEMP/cache_baseline.count")
+          current_count=$(tr -d '[:space:]' < "$RUNNER_TEMP/cache_current.count")
+          python scripts/generate_run_summary.py collect \
+            --mode "${COLLECT_MODE:-incremental}" \
+            --baseline "${baseline_count:-0}" \
+            --current "${current_count:-0}" \
+            --meta cache/readme_meta.json \
+            --failures cache/collect_failures.json \
+            --output "$RUNNER_TEMP/run_summary.md" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat "$RUNNER_TEMP/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push to main
+        if: steps.check_changes.outputs.changed == 'true'
+        # The large cache stays on Hugging Face. readme_meta.json must remain
+        # whitelisted with the rendered README to preserve its recent-update brief.
+        run: |
+          python scripts/commit_automated_changes.py \
+            --message "chore(auto): collect papers for new conferences" \
+            --paths ${{ env.AUTO_COLLECT_FILES }}
+
+      - name: Sync Hugging Face dataset README
+        # Render docs/HF_README.md with the just-updated cache stats and push
+        # it to the HF dataset repo root as README.md. Always-run so that even
+        # without a GitHub artifact diff the HF page gets the latest update line.
+        if: always()
+        run: python scripts/sync_hf_readme.py --skip-cache-refresh
+
+  release_lock:
+    needs: [acquire_lock, collect]
+    if: always() && needs.acquire_lock.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Release HF writer lock
+        run: |
+          python scripts/maintenance_lock.py release \
+            --lock-commit "${{ needs.acquire_lock.outputs.lock_commit }}"

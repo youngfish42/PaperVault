@@ -1,0 +1,264 @@
+from __future__ import annotations
+
+import gzip
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from scripts import generate_run_summary as pr  # noqa: E402
+
+RUN_URL = "https://github.com/example/PaperVault/actions/runs/123"
+
+
+def _write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value), encoding="utf-8")
+
+
+def test_discovery_changes_reads_only_new_unique_names(monkeypatch):
+    outputs = iter(
+        [
+            "conf/acl_conf.json\nconf/dblp_conf.json\n",
+            '''+++ b/conf/acl_conf.json
++    "name": "ACL2027",
++    "name": "ACL2027",
+-    "name": "ACL2025",
++    "name": "A \\"quoted\\" venue",
+''',
+        ]
+    )
+
+    class Result:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    monkeypatch.setattr(pr.subprocess, "run", lambda *args, **kwargs: Result(next(outputs)))
+
+    changed, entries = pr._discovery_changes()
+
+    assert changed == ["conf/acl_conf.json", "conf/dblp_conf.json"]
+    assert entries == ["ACL2027", 'A "quoted" venue']
+
+
+def test_discovery_body_bounds_optional_details():
+    files = [f"conf/source_{index}.json" for index in range(20)]
+    entries = [f"CONF{index}{'X' * 200}" for index in range(20)]
+
+    body = pr.build_discovery_body(files, entries, RUN_URL)
+
+    assert len(body) <= pr.MAX_BODY_CHARS
+    assert "Config files changed: **20**" in body
+    assert "Pending conference/year entries: **20**" in body
+    assert "… and 5 more files" in body
+    assert "… and 5 more entries" in body
+    assert "CONF15" not in body
+    assert "X" * 121 not in body
+    assert RUN_URL in body
+
+
+def test_collect_body_uses_meta_and_signed_net_delta(tmp_path):
+    meta = tmp_path / "readme_meta.json"
+    failures = tmp_path / "collect_failures.json"
+    _write_json(meta, {"new_papers": 12, "new_conferences": 2})
+    _write_json(failures, [{"url": "https://example.org"}])
+
+    body = pr.build_collect_body(
+        mode="force",
+        baseline=110,
+        current=100,
+        meta_path=meta,
+        failures_path=failures,
+        run_url=RUN_URL,
+    )
+
+    assert "Mode: **force**" in body
+    assert "New papers: **12**" in body
+    assert "110 → 100" in body
+    assert "**-10 net**" in body
+    assert "Collection failures pending retry: **1**" in body
+
+
+def test_backfill_body_reports_zero_delta_and_bounds_target():
+    body = pr.build_backfill_body(
+        baseline=50,
+        current=50,
+        total=100,
+        target="A" * 500,
+        run_url=RUN_URL,
+    )
+
+    assert "**+0 this run**" in body
+    assert "Coverage: **50.00% → 50.00%**" in body
+    assert "A" * 121 not in body
+    assert "A" * 119 + "…" in body
+
+
+def test_readme_body_counts_cache_and_distinguishes_modes(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    records = [
+        {"paper_abstract": "abstract", "paper_code": "https://github.com/example/repo"},
+        {"paper_abstract": "", "paper_code": "#"},
+        {"paper_abstract": None, "paper_code": ""},
+    ]
+    with gzip.open(cache, "wt", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record) + "\n")
+    meta = tmp_path / "readme_meta.json"
+    _write_json(
+        meta,
+        {"last_update": "2026-10-27", "new_papers": 7, "new_conferences": 1},
+    )
+
+    force = pr.build_readme_body(
+        mode="force", cache_path=cache, meta_path=meta, run_url=RUN_URL
+    )
+    readme = pr.build_readme_body(
+        mode="readme", cache_path=cache, meta_path=meta, run_url=RUN_URL
+    )
+
+    assert "Papers: **3**" in force
+    assert "With abstracts: **1**" in force
+    assert "With code links: **1**" in force
+    assert "New papers this run: **7**" in force
+    assert "Latest collection snapshot: **2026-10-27**" in readme
+    assert "New papers this run" not in readme
+
+
+def test_wayback_body_parses_report_counts():
+    report = """
+===== wayback repair report [WRITE] =====
+processed this run       : 5
+  rewrite (in place)     : 3
+  merge (dup (conf,url)) : 2
+  unchanged              : 9
+  abstracts backfilled   : 4
+"""
+
+    body = pr.build_wayback_body(report, RUN_URL)
+
+    assert "Repaired URLs: **5**" in body
+    assert "Rewritten in place: **3**; duplicates merged: **2**" in body
+    assert "Abstracts also filled: **4**" in body
+    assert "Unchanged: **9**" in body
+
+
+def test_main_writes_run_summary(tmp_path):
+    meta = tmp_path / "readme_meta.json"
+    failures = tmp_path / "collect_failures.json"
+    output = tmp_path / "run_summary.md"
+    _write_json(meta, {"new_papers": 1, "new_conferences": 0})
+    _write_json(failures, [])
+
+    pr.main(
+        [
+            "collect",
+            "--baseline",
+            "10",
+            "--current",
+            "11",
+            "--meta",
+            str(meta),
+            "--failures",
+            str(failures),
+            "--output",
+            str(output),
+            "--run-url",
+            RUN_URL,
+        ]
+    )
+
+    body = output.read_text(encoding="utf-8")
+    assert body.startswith("Automated paper collection")
+    assert body.rstrip().endswith(f"[View workflow run]({RUN_URL})")
+
+
+def test_workflows_commit_artifacts_directly_with_isolated_locks_and_summaries():
+    import yaml
+
+    workflow_groups = {
+        "discover_and_update.yml": "papervault-discover",
+        "collect_papers.yml": "papervault-collect",
+        "backfill_abstracts.yml": "papervault-backfill",
+        "update_readme.yml": "papervault-readme",
+    }
+    for filename, expected_group in workflow_groups.items():
+        path = ROOT / ".github/workflows" / filename
+        text = path.read_text(encoding="utf-8")
+        workflow = yaml.safe_load(text)
+        assert "peter-evans/create-pull-request" not in text
+        assert "generate_pr_body.py" not in text
+        assert workflow["concurrency"] == {
+            "group": expected_group,
+            "cancel-in-progress": False,
+        }
+
+        steps = [
+            step
+            for job in workflow["jobs"].values()
+            for step in job.get("steps", [])
+        ]
+        commit_steps = [
+            step
+            for step in steps
+            if "scripts/commit_automated_changes.py" in step.get("run", "")
+        ]
+        assert len(commit_steps) == 1
+        assert any("Generate run summary" == step.get("name") for step in steps)
+        assert any(
+            '>> "$GITHUB_STEP_SUMMARY"' in step.get("run", "") for step in steps
+        )
+        for job in workflow["jobs"].values():
+            assert "pull-requests" not in job.get("permissions", {})
+
+    discovery_text = (
+        ROOT / ".github/workflows/discover_and_update.yml"
+    ).read_text(encoding="utf-8")
+    assert "--inherit-branch" not in discovery_text
+    assert "gh workflow run collect_papers.yml --ref main" in discovery_text
+
+
+def test_hf_writer_workflows_share_external_lock_and_backfill_skips_stats():
+    import yaml
+
+    main_jobs = {
+        "collect_papers.yml": "collect",
+        "backfill_abstracts.yml": "backfill",
+        "update_readme.yml": "rebuild",
+    }
+    for filename, main_job in main_jobs.items():
+        workflow = yaml.safe_load(
+            (ROOT / ".github/workflows" / filename).read_text(encoding="utf-8")
+        )
+        jobs = workflow["jobs"]
+        assert jobs[main_job]["needs"] == "acquire_lock"
+        assert jobs[main_job]["timeout-minutes"] == 330
+        assert jobs["acquire_lock"]["timeout-minutes"] == 360
+        assert jobs["release_lock"]["needs"] == ["acquire_lock", main_job]
+        assert "always()" in jobs["release_lock"]["if"]
+        assert "needs.acquire_lock.result == 'success'" in jobs["release_lock"]["if"]
+
+        acquire_steps = jobs["acquire_lock"]["steps"]
+        release_steps = jobs["release_lock"]["steps"]
+        assert any(
+            "scripts/maintenance_lock.py acquire" in step.get("run", "")
+            for step in acquire_steps
+        )
+        assert any(
+            "scripts/maintenance_lock.py release" in step.get("run", "")
+            for step in release_steps
+        )
+
+    backfill_text = (
+        ROOT / ".github/workflows/backfill_abstracts.yml"
+    ).read_text(encoding="utf-8")
+    assert "Regenerate stats overview chart" not in backfill_text
+    assert "pics/stats/stats_overview.svg" not in backfill_text
+
+    discovery = yaml.safe_load(
+        (ROOT / ".github/workflows/discover_and_update.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "acquire_lock" not in discovery["jobs"]
