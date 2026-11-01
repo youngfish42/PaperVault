@@ -24066,6 +24066,10 @@
     "DBLP::https://dblp.org/db/conf/osdi/osdi2026.html": {
       "name": "OSDI2026",
       "ts": "2026-10-31T10:01:43"
+    },
+    "DBLP::https://dblp.org/db/conf/dac/dac2026.html": {
+      "name": "DAC2026",
+      "ts": "2026-11-02T06:05:09"
     }
   }
 }

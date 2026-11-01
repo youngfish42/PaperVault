@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-10-31
-- 🆕 **New Papers This Update**: 137
+- 📅 **Last Updated**: 2026-11-02
+- 🆕 **New Papers This Update**: 593
 - 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 721,309 papers / 129 publication series / 657,091 with abstracts / 114,160 with code
+- 📊 **Database Scale**: 721,902 papers / 129 publication series / 657,622 with abstracts / 114,167 with code
 
 <!-- recent-update-end -->
 
@@ -154,7 +154,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 
 - **ASPLOS** 2000-2026 (23 editions)
 - **ATC** 2007-2025 (19 editions)
-- **DAC** 2000-2025 (26 editions)
+- **DAC** 2000-2026 (27 editions)
 - **EUROSYS** 2006-2026 (21 editions)
 - **FAST** 2002-2026 (24 editions)
 - **HPCA** 2000-2026 (27 editions)
