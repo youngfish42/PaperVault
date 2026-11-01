@@ -45,6 +45,7 @@
   "overrides": {
     "brace-expansion@>=2.0.0 <2.1.4": "^2.1.4",
     "brace-expansion@>=1.0.0 <1.1.18": "^1.1.18",
+    "minimatch": "^11.0.1",
     "nanoid": "^3.3.18"
   }
 }
