@@ -1,8 +1,8 @@
 """
 为 cache/cache.jsonl 中的论文批量补充 abstract。
 
-参考 FL-paper-update-tracker 的多源策略：
-    Crossref (DOI) → Semantic Scholar (DOI) → arXiv (title) → OpenAlex (DOI)
+多源策略：站点专用 fetcher → Crossref / Semantic Scholar / OpenAlex
+（DOI 并发）→ arXiv（标题）→ PDF（直链最后兜底）。
 
 用法:
     python scripts/fetch_abstracts.py              # 默认处理 DOI 论文 (Phase 1)
@@ -501,17 +501,43 @@ def _reconstruct_openalex_abstract(inverted_index: dict) -> Optional[str]:
         return None
 
 
+def _openalex_headers() -> dict:
+    headers = dict(HEADERS)
+    api_key = os.getenv("OPENALEX_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
 def fetch_openalex_abstract(
     doi: str, last_time: float, min_interval: float = 1.5, max_retries: int = 3
 ) -> Tuple[Optional[str], Optional[str], float]:
-    mailto = f"&mailto={requests.utils.quote(CONTACT_EMAIL)}" if CONTACT_EMAIL else ""
-    url = f"https://api.openalex.org/works/doi:{doi}?select=display_name,abstract_inverted_index{mailto}"
+    url = f"https://api.openalex.org/works/doi:{doi}"
+    params = {"select": "display_name,abstract_inverted_index"}
+    if CONTACT_EMAIL:
+        params["mailto"] = CONTACT_EMAIL
     for attempt in range(1, max_retries + 1):
         try:
             resp, last_time = _rate_limited_request(
-                url, last_time, min_interval=min_interval
+                url,
+                last_time,
+                min_interval=min_interval,
+                params=params,
+                headers=_openalex_headers(),
             )
-            if resp.status_code in (404, 403):
+            if resp.status_code == 404:
+                return None, None, last_time
+            if resp.status_code in (401, 403):
+                code = ""
+                try:
+                    code = str(resp.json().get("code") or "")
+                except (ValueError, AttributeError):
+                    pass
+                detail = f" ({code})" if code else ""
+                print(
+                    f"    [!] OpenAlex authentication failed: HTTP {resp.status_code}{detail}. "
+                    "Check OPENALEX_API_KEY and its email activation."
+                )
                 return None, None, last_time
             if resp.status_code == 429:
                 time.sleep(min(60, 2 ** attempt))
@@ -949,7 +975,7 @@ def fetch_abstract_for_paper(
 # * ``--s2-title-match``：无 DOI 的长尾失败记录（dl.acm.org / vldb.org /
 #   web.archive.org / auai.org / ceur-ws.org / ieeexplore.ieee.org …）→
 #   S2 ``/paper/search/match`` 按标题精确匹配。
-# * ``--openalex-title``：同上但走 OpenAlex ``/works?search=``（匿名配额更宽松，
+# * ``--openalex-title``：同上但走 OpenAlex ``/works?search.title=``（匿名配额更宽松，
 #   3 rps 保守限速），摘要从 ``abstract_inverted_index`` 重建；排除集去掉了
 #   ndss-symposium.org（该站页面本身无摘要，只能靠外部索引）。
 #
@@ -1247,11 +1273,11 @@ def _evaluate_s2_batch_item(item: Optional[dict], paper: dict) -> Tuple[Optional
 # ---------- OpenAlex 标题匹配（--openalex-title） ----------
 #
 # S2 的 search/match 端点匿名配额极紧（本机持续 429）；OpenAlex 的
-# ``/works?search=`` 对标题匹配的召回相当（ACL Anthology 老年份收录尤其全），
-# 且 polite pool（mailto）允许 10 rps。结构完全仿照 --s2-title-match。
+# 标题作用域检索对标题匹配的召回相当（ACL Anthology 老年份收录尤其全）。
+# 结构完全仿照 --s2-title-match，但逐条评估候选，而非只接受首条结果。
 
 OPENALEX_SEARCH_ENDPOINT = "https://api.openalex.org/works"
-# OpenAlex polite pool 允许 10 rps；用 3 rps 保守值。
+# 官方当前允许匿名 10 rps、免费 Key 30 rps；统一使用更保守的 3 rps。
 OPENALEX_MIN_INTERVAL = 1.0 / 3
 # NDSS 页面本身不含摘要（正文只有短描述），无法靠 fetcher 重试补——
 # OpenAlex 模式把它从排除集中拿掉，允许标题匹配兜底。
@@ -1260,34 +1286,29 @@ OPENALEX_TITLE_EXCLUDED_HOSTS = S2_TITLE_EXCLUDED_HOSTS - {"ndss-symposium.org"}
 _openalex_rate_state = {"last_time": 0.0}
 
 
-def _openalex_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
-    """GET /works?search=<title>，返回 (首个候选 work dict, error_reason)。
-
-    无候选（空 results）归类为 ``empty_abstract``，与 S2 match 404 的语义一致。
-    """
-    params = {
-        "search": title,
-        "per-page": 3,
-        "select": "title,abstract_inverted_index,publication_year,doi",
-    }
+def _openalex_title_search(
+    title: str, select: str, max_retries: int = 5
+) -> Tuple[Optional[List[dict]], str]:
+    params = {"search.title": title, "per_page": 10, "select": select}
     if CONTACT_EMAIL:
         params["mailto"] = CONTACT_EMAIL
-    # OpenAlex 匿名配额按出口 IP 共享且会耗尽（Retry-After 可达次日）；
-    # 有 key 时走 api_key 参数。
-    api_key = os.getenv("OPENALEX_API_KEY", "").strip()
-    if api_key:
-        params["api_key"] = api_key
     resp, err = _s2_request(
         "get",
         OPENALEX_SEARCH_ENDPOINT,
         params=params,
         timeout=30,
         min_interval=OPENALEX_MIN_INTERVAL,
-        headers=HEADERS,  # 不带 S2 的 x-api-key
+        headers=_openalex_headers(),
         rate_state=_openalex_rate_state,
+        max_retries=max_retries,
     )
     if err or resp is None:
         return None, err or "network"
+    if resp.status_code in (401, 403):
+        print(
+            f"    [!] OpenAlex authentication failed: HTTP {resp.status_code}. "
+            "Check OPENALEX_API_KEY and its email activation."
+        )
     if resp.status_code != 200:
         return None, _s2_status_reason(resp.status_code)
     try:
@@ -1295,31 +1316,45 @@ def _openalex_title_match_fetch(title: str) -> Tuple[Optional[dict], str]:
     except ValueError:
         return None, "network"
     results = data.get("results") if isinstance(data, dict) else None
-    if not results:
+    if not isinstance(results, list):
+        return None, "network"
+    candidates = [item for item in results if isinstance(item, dict)]
+    if not candidates:
         return None, "empty_abstract"
-    first = results[0]
-    if not isinstance(first, dict):
-        return None, "empty_abstract"
-    return first, ""
+    return candidates, ""
 
 
-def _evaluate_openalex_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
-    """单条 OpenAlex work 的回填门控（标题 + 年份守卫 + inverted-index 摘要
-    重建 + 长度），返回 (abstract, "") 或 (None, reason)。"""
-    if not data:
-        return None, "empty_abstract"
-    api_title = (data.get("title") or "").strip()
-    local_title = (paper.get("paper_name") or "").strip()
-    if not _title_gate(api_title, local_title):
-        return None, "title_mismatch"
-    if not _year_gate(paper.get("conf", ""), data.get("publication_year")):
-        return None, "title_mismatch"
-    abstract = clean_abstract(
-        _reconstruct_openalex_abstract(data.get("abstract_inverted_index") or {}) or ""
+def _openalex_title_match_fetch(title: str) -> Tuple[Optional[List[dict]], str]:
+    """GET /works?search.title=<title>，返回候选列表和错误原因。"""
+    return _openalex_title_search(
+        title, "title,abstract_inverted_index,publication_year,doi"
     )
-    if len(abstract) < S2_MIN_ABSTRACT_CHARS:
+
+
+def _evaluate_openalex_title_item(
+    candidates: Optional[List[dict]], paper: dict
+) -> Tuple[Optional[str], str]:
+    """逐条应用标题、年份、摘要重建和长度门控，返回首个有效摘要。"""
+    if not candidates:
         return None, "empty_abstract"
-    return abstract, ""
+    local_title = (paper.get("paper_name") or "").strip()
+    saw_identity_match = False
+    for candidate in candidates:
+        api_title = (candidate.get("title") or "").strip()
+        if not _title_gate(api_title, local_title):
+            continue
+        if not _year_gate(paper.get("conf", ""), candidate.get("publication_year")):
+            continue
+        saw_identity_match = True
+        abstract = clean_abstract(
+            _reconstruct_openalex_abstract(
+                candidate.get("abstract_inverted_index") or {}
+            )
+            or ""
+        )
+        if len(abstract) >= S2_MIN_ABSTRACT_CHARS:
+            return abstract, ""
+    return None, "empty_abstract" if saw_identity_match else "title_mismatch"
 
 
 def _evaluate_s2_title_item(data: Optional[dict], paper: dict) -> Tuple[Optional[str], str]:
@@ -1492,8 +1527,16 @@ def _run_title_match_pass(
         data, err = fetch_fn(title)
         if data is None:
             reason = err or "network"
-            if not dry_run:
-                _s2_record_failure(progress, paper, reason, source)
+            if dry_run:
+                print(f"  [dry-run] MISS [{paper.get('conf')}] {title[:60]} ({reason})")
+            else:
+                _s2_record_failure(
+                    progress,
+                    paper,
+                    reason,
+                    source,
+                    count_attempt=reason not in {"rate_limited", "timeout", "network"},
+                )
             failed += 1
         else:
             abstract, reason = evaluate_fn(data, paper)
@@ -1505,7 +1548,9 @@ def _run_title_match_pass(
                     cache_dirty = True
                 success += 1
             else:
-                if not dry_run:
+                if dry_run:
+                    print(f"  [dry-run] MISS [{paper.get('conf')}] {title[:60]} ({reason})")
+                else:
                     _s2_record_failure(progress, paper, reason, source)
                 failed += 1
         processed += 1
@@ -1598,8 +1643,9 @@ def run_s2(
         f"[*] S2 mode: {mode}, chunk_size={chunk_size}, "
         f"max_papers={max_papers or 'unlimited'}, dry_run={dry_run}"
     )
-    api_key_note = "set" if os.getenv("S2_API_KEY", "").strip() else "not set (anonymous quota)"
-    print(f"[*] S2_API_KEY: {api_key_note}")
+    key_name = "OPENALEX_API_KEY" if mode == "openalex" else "S2_API_KEY"
+    api_key_note = "set" if os.getenv(key_name, "").strip() else "not set (anonymous quota)"
+    print(f"[*] {key_name}: {api_key_note}")
     if soft_timeout:
         print(f"[*] Soft timeout: {soft_timeout}s ({soft_timeout/3600:.1f}h)")
 
@@ -2646,7 +2692,7 @@ if __name__ == "__main__":
         action="store_true",
         help=(
             "Dedicated pass: like --s2-title-match but via OpenAlex "
-            "/works?search=<title> (3 rps, inverted-index abstract rebuild). "
+            "/works?search.title=<title> (3 rps, inverted-index abstract rebuild). "
             "The excluded-host set drops ndss-symposium.org (its pages carry no "
             "abstract, so an external index is the only source). Mutually "
             "exclusive with --s2-batch/--s2-title-match; bypasses the --phase flow."

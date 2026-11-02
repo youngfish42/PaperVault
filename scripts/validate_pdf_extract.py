@@ -2,7 +2,7 @@
 
 方法：从 cache 分层抽样缺摘要的 .pdf 直链记录（ceur-ws / vldb / ndss /
 usenix / 其他 host，层内尽量铺开年份），下载 PDF 并抽取；用标题查
-OpenAlex（``/works?search=``，过 ``_title_gate`` ≥0.85 + ``_year_gate`` ±1
+OpenAlex（``/works?search.title=``，过 ``_title_gate`` ≥0.85 + ``_year_gate`` ±1
 门控）拿参考摘要，OpenAlex 无结果时退化到 S2 ``search/match``；归一化后
 用 SequenceMatcher ratio + 前 200 字符包含关系判定 PASS / REVIEW / FAIL。
 
@@ -29,8 +29,8 @@ sys.path.insert(0, str(ROOT))
 from scripts.fetch_abstracts import (  # noqa: E402
     CACHE_FILE,
     _download_pdf_bytes,
+    _evaluate_openalex_title_item,
     _openalex_title_match_fetch,
-    _reconstruct_openalex_abstract,
     _s2_title_match_fetch,
     _title_gate,
     _year_gate,
@@ -118,12 +118,10 @@ def _reference_abstract(paper: dict) -> tuple:
     """
     title = (paper.get("paper_name") or "").strip()
     conf = paper.get("conf", "")
-    data, _err = _openalex_title_match_fetch(title)
-    if data:
-        if _title_gate(data.get("title") or "", title) and _year_gate(conf, data.get("publication_year")):
-            ref = clean_abstract(_reconstruct_openalex_abstract(data.get("abstract_inverted_index") or {}) or "")
-            if ref:
-                return ref, "openalex"
+    candidates, _err = _openalex_title_match_fetch(title)
+    ref, _reason = _evaluate_openalex_title_item(candidates, paper)
+    if ref:
+        return ref, "openalex"
     data, _err = _s2_title_match_fetch(title)
     if data:
         if _title_gate(data.get("title") or "", title) and _year_gate(conf, data.get("year")):

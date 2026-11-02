@@ -402,6 +402,27 @@ def test_lookup_auto_chain_openalex_first(monkeypatch):
     assert calls == ["openalex"]  # 命中即停
 
 
+def test_lookup_openalex_skips_invalid_first_candidate(monkeypatch):
+    good = {"title": "Some Old Paper", "publication_year": 2006}
+    candidates = [
+        {"title": "A Completely Different Paper", "publication_year": 2006},
+        {"title": "Some Old Papers", "publication_year": 1990},
+        good,
+    ]
+    monkeypatch.setattr(
+        rw, "_fetch_by_source", lambda _src, _title: (candidates, "")
+    )
+
+    src, work, err, attempts = rw.make_lookup("openalex")(
+        "Some Old Paper", "AAAI2006"
+    )
+
+    assert src == "openalex"
+    assert work is good
+    assert err == ""
+    assert attempts == []
+
+
 def test_lookup_auto_falls_through_on_rate_limited(monkeypatch):
     calls = []
     def fake(src, title):
@@ -527,6 +548,8 @@ def test_all_repair_fetchers_cap_retries_at_two(monkeypatch):
     """Fix 2: 三个修复 fetcher 都必须传 max_retries=2（429 快失败落链）。"""
     seen = []
     monkeypatch.setattr(rw, "_s2_request",
+                        lambda *a, **k: (seen.append(k.get("max_retries")) or (None, "rate_limited")))
+    monkeypatch.setattr(rw, "_openalex_title_search",
                         lambda *a, **k: (seen.append(k.get("max_retries")) or (None, "rate_limited")))
     rw._openalex_repair_fetch("t")
     rw._crossref_repair_fetch("t")
