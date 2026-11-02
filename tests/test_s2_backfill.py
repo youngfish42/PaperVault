@@ -441,20 +441,79 @@ def _inverted_index(text: str) -> dict:
     return idx
 
 
-def test_openalex_title_fetch_unwraps_results(monkeypatch):
-    """OpenAlex returns ``{"results": [work, ...]}`` — the fetcher must take
-    the first candidate; empty results mean "no candidate" (empty_abstract)."""
+def test_openalex_headers_use_optional_bearer_key(monkeypatch):
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    anonymous = fa._openalex_headers()
+    assert "Authorization" not in anonymous
+    assert "x-api-key" not in anonymous
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "test-openalex-secret")
+    authenticated = fa._openalex_headers()
+    assert authenticated["Authorization"] == "Bearer test-openalex-secret"
+    assert "x-api-key" not in authenticated
+
+
+def test_openalex_doi_fetch_uses_params_and_bearer_auth(monkeypatch):
+    monkeypatch.setenv("OPENALEX_API_KEY", "test-openalex-secret")
+    response = _s2_response({
+        "display_name": "Paper Hit",
+        "abstract_inverted_index": _inverted_index(LONG_ABSTRACT),
+    })
+    request = MagicMock(return_value=(response, 12.0))
+    monkeypatch.setattr(fa, "_rate_limited_request", request)
+
+    abstract, title, last_time = fa.fetch_openalex_abstract("10.1234/example", 0.0)
+
+    assert abstract == LONG_ABSTRACT
+    assert title == "Paper Hit"
+    assert last_time == 12.0
+    call = request.call_args
+    assert call.args[0] == "https://api.openalex.org/works/doi:10.1234/example"
+    assert call.kwargs["params"] == {
+        "select": "display_name,abstract_inverted_index",
+        "mailto": fa.CONTACT_EMAIL,
+    }
+    assert call.kwargs["headers"]["Authorization"] == "Bearer test-openalex-secret"
+    assert "api_key" not in call.kwargs["params"]
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_openalex_doi_auth_errors_are_diagnostic(monkeypatch, capsys, status):
+    response = _s2_response({"code": "key_not_activated"}, status=status)
+    request = MagicMock(return_value=(response, 1.0))
+    monkeypatch.setattr(fa, "_rate_limited_request", request)
+
+    assert fa.fetch_openalex_abstract("10.1234/example", 0.0) == (None, None, 1.0)
+    assert request.call_count == 1
+    assert "OpenAlex authentication failed" in capsys.readouterr().out
+
+
+def test_openalex_doi_404_is_not_an_auth_error(monkeypatch, capsys):
+    response = _s2_response({}, status=404)
+    request = MagicMock(return_value=(response, 1.0))
+    monkeypatch.setattr(fa, "_rate_limited_request", request)
+
+    assert fa.fetch_openalex_abstract("10.1234/missing", 0.0) == (None, None, 1.0)
+    assert request.call_count == 1
+    assert "authentication failed" not in capsys.readouterr().out
+
+
+def test_openalex_title_fetch_returns_all_candidates(monkeypatch):
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
     work = {"title": "Paper Hit", "abstract_inverted_index": _inverted_index(LONG_ABSTRACT), "publication_year": 2022}
     monkeypatch.setattr(fa, "_s2_request", MagicMock(return_value=(_s2_response({"results": [work]}), "")))
     data, err = fa._openalex_title_match_fetch("Paper Hit")
     assert err == ""
-    assert data == work
-    # 3 rps 保守限速 + 独立 rate_state + 不带 S2 key 的 headers。
+    assert data == [work]
+    # 3 rps 保守限速 + 独立 rate_state + 标题作用域，不把 Key 放进 URL。
     call = fa._s2_request.call_args
     assert call.kwargs["min_interval"] == fa.OPENALEX_MIN_INTERVAL
     assert call.kwargs["rate_state"] is fa._openalex_rate_state
-    assert call.kwargs["headers"] is fa.HEADERS
-    assert call.kwargs["params"]["per-page"] == 3
+    assert "x-api-key" not in call.kwargs["headers"]
+    assert "Authorization" not in call.kwargs["headers"]
+    assert call.kwargs["params"]["search.title"] == "Paper Hit"
+    assert call.kwargs["params"]["per_page"] == 10
+    assert "api_key" not in call.kwargs["params"]
 
     monkeypatch.setattr(fa, "_s2_request", MagicMock(return_value=(_s2_response({"results": []}), "")))
     data, err = fa._openalex_title_match_fetch("nothing matches")
@@ -469,19 +528,36 @@ def test_openalex_evaluate_gates():
         "abstract_inverted_index": _inverted_index(LONG_ABSTRACT),
         "publication_year": 2023,
     }
-    abstract, reason = fa._evaluate_openalex_title_item(work, paper)
+    abstract, reason = fa._evaluate_openalex_title_item([work], paper)
     assert abstract == LONG_ABSTRACT  # inverted-index 重建 + 年份差 1 放行
     assert reason == ""
 
     # 标题不一致
     bad_title = dict(work, title="Completely Unrelated Work")
-    assert fa._evaluate_openalex_title_item(bad_title, paper)[1] == "title_mismatch"
+    assert fa._evaluate_openalex_title_item([bad_title], paper)[1] == "title_mismatch"
     # 年份差 3
     bad_year = dict(work, publication_year=2019)
-    assert fa._evaluate_openalex_title_item(bad_year, paper)[1] == "title_mismatch"
+    assert fa._evaluate_openalex_title_item([bad_year], paper)[1] == "title_mismatch"
     # 无 inverted index → empty_abstract
     no_abs = dict(work, abstract_inverted_index=None)
-    assert fa._evaluate_openalex_title_item(no_abs, paper)[1] == "empty_abstract"
+    assert fa._evaluate_openalex_title_item([no_abs], paper)[1] == "empty_abstract"
+
+
+def test_openalex_evaluate_skips_invalid_candidates():
+    paper = _paper("https://dl.acm.org/doi/10.1145/x", title="Paper Hit", conf="BMVC2022")
+    good = {
+        "title": "Paper Hit",
+        "abstract_inverted_index": _inverted_index(LONG_ABSTRACT),
+        "publication_year": 2022,
+    }
+    wrong_title = dict(good, title="Completely Unrelated Work")
+    wrong_year = dict(good, publication_year=2019)
+    no_abstract = dict(good, abstract_inverted_index=None)
+
+    assert fa._evaluate_openalex_title_item([wrong_title, good], paper) == (LONG_ABSTRACT, "")
+    assert fa._evaluate_openalex_title_item([wrong_year, good], paper) == (LONG_ABSTRACT, "")
+    assert fa._evaluate_openalex_title_item([no_abstract, good], paper) == (LONG_ABSTRACT, "")
+    assert fa._evaluate_openalex_title_item([wrong_title, wrong_year], paper)[1] == "title_mismatch"
 
 
 def test_openalex_excluded_hosts_drop_ndss():
@@ -512,7 +588,7 @@ def test_openalex_title_pass_success_and_dry_run(monkeypatch):
 
     def _fake_fetch(title):
         if title == "Paper Hit":
-            return work, ""
+            return [work], ""
         return None, "empty_abstract"
 
     monkeypatch.setattr(fa, "_openalex_title_match_fetch", MagicMock(side_effect=_fake_fetch))
@@ -534,7 +610,7 @@ def test_openalex_title_pass_success_and_dry_run(monkeypatch):
     p2 = _paper("https://www.ndss-symposium.org/ndss2000/some-paper/", title="Paper Hit", conf="NDSS2000")
     progress2 = _failed_progress(p2["paper_url"])
     snapshot = {u: dict(m) for u, m in progress2.items()}
-    monkeypatch.setattr(fa, "_openalex_title_match_fetch", MagicMock(return_value=(work, "")))
+    monkeypatch.setattr(fa, "_openalex_title_match_fetch", MagicMock(return_value=([work], "")))
     writes2 = _stub_no_disk(monkeypatch)
     success, failed, _ = fa._run_openalex_title_pass(
         [p2], progress2,
@@ -545,6 +621,64 @@ def test_openalex_title_pass_success_and_dry_run(monkeypatch):
     assert p2["paper_abstract"] == ""
     assert progress2 == snapshot
     assert writes2 == {"save": 0, "cache": 0}
+
+
+@pytest.mark.parametrize(
+    "reason, expected_attempts",
+    [("rate_limited", 1), ("timeout", 1), ("network", 1), ("empty_abstract", 2)],
+)
+def test_openalex_title_failure_attempt_accounting(
+    monkeypatch, reason, expected_attempts
+):
+    paper = _paper("https://dl.acm.org/doi/10.1145/x")
+    progress = _failed_progress(paper["paper_url"])
+    monkeypatch.setattr(
+        fa, "_openalex_title_match_fetch", MagicMock(return_value=(None, reason))
+    )
+    _stub_no_disk(monkeypatch)
+
+    fa._run_openalex_title_pass(
+        [paper], progress,
+        chunk_size=500, max_papers=None, soft_timeout=None,
+        start_time=__import__("time").time(), dry_run=False,
+    )
+
+    assert progress[paper["paper_url"]]["attempts"] == expected_attempts
+
+
+def test_openalex_title_dry_run_logs_miss_reason(monkeypatch, capsys):
+    paper = _paper("https://dl.acm.org/doi/10.1145/x", title="Paper Hit")
+    progress = _failed_progress(paper["paper_url"])
+    snapshot = {u: dict(m) for u, m in progress.items()}
+    wrong_work = {"title": "Completely Unrelated Work", "publication_year": 2022}
+    monkeypatch.setattr(
+        fa, "_openalex_title_match_fetch", MagicMock(return_value=([wrong_work], ""))
+    )
+    writes = _stub_no_disk(monkeypatch)
+
+    fa._run_openalex_title_pass(
+        [paper], progress,
+        chunk_size=500, max_papers=None, soft_timeout=None,
+        start_time=__import__("time").time(), dry_run=True,
+    )
+
+    output = capsys.readouterr().out
+    assert "[dry-run] MISS" in output
+    assert "title_mismatch" in output
+    assert progress == snapshot
+    assert writes == {"save": 0, "cache": 0}
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_openalex_title_auth_errors_are_diagnostic(monkeypatch, capsys, status):
+    response = _s2_response({"code": "key_not_activated"}, status=status)
+    monkeypatch.setattr(fa, "_s2_request", MagicMock(return_value=(response, "")))
+
+    candidates, reason = fa._openalex_title_match_fetch("Paper Hit")
+
+    assert candidates is None
+    assert reason == "network"
+    assert "OpenAlex authentication failed" in capsys.readouterr().out
 
 
 def test_s2_batch_targets_dedupe_by_doi():

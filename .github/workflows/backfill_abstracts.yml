@@ -55,6 +55,8 @@ jobs:
       TZ: Asia/Shanghai
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PAPERVAULT_HF_REPO_ID: ${{ vars.PAPERVAULT_HF_REPO_ID }}
+      # Optional: empty until the repository secret is configured; anonymous access remains supported.
+      OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
       # Force the classic HTTPS/LFS download path on the runner; the Xet
       # protocol has been observed to stall on some networks and there is no
       # benefit to it for our single ~250MB cache file.

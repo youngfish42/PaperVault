@@ -4,7 +4,7 @@
 ``https://web.archive.org/web/<ts>/<原始 URL>``，原始站已死。本脚本按标题做
 **逐条兜底链**查询（``--source auto`` 默认）：
 
-1. **OpenAlex** ``/works?search=``（3 rps）——覆盖最全但匿名配额按 IP/日
+1. **OpenAlex** ``/works?search.title=``（3 rps）——覆盖最全但匿名配额按 IP/日
    发放且极小（实测全量跑 270 条即 429 断供，Retry-After 数万秒）；
 2. **Crossref** ``/works?query.bibliographic=``（2 rps，独立 rate_state）——
    OpenAlex rate_limited / 无候选时落这里；命中即得 ``https://doi.org/<DOI>``；
@@ -62,7 +62,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,10 +78,9 @@ from scripts.fetch_abstracts import (  # noqa: E402
     CACHE_FILE,
     CONTACT_EMAIL,
     HEADERS,
-    OPENALEX_MIN_INTERVAL,
     PROGRESS_FILE,
     _install_utf8_console,
-    _openalex_rate_state,
+    _openalex_title_search,
     _reconstruct_openalex_abstract,
     _s2_request,
     _s2_status_reason,
@@ -144,45 +143,9 @@ def _host_of(url: str) -> str:
     return host
 
 
-def _openalex_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
-    """GET /works?search=<title>（repair 专用 select，含 doi/primary_location）。
-
-    复用 fetch_abstracts 的限速请求设施：OpenAlex 独立 rate_state（3 rps）、
-    普通 HEADERS（不带 S2 key）。返回 (首个候选 work dict, error_reason)。
-    """
-    params = {"search": title, "per-page": 3, "select": OPENALEX_REPAIR_SELECT}
-    if CONTACT_EMAIL:
-        params["mailto"] = CONTACT_EMAIL
-    # OpenAlex 匿名配额按出口 IP 共享且会耗尽（Retry-After 可达次日）；
-    # 有 key 时走 api_key 参数（与 ?mailto 可叠加）。
-    api_key = os.getenv("OPENALEX_API_KEY", "").strip()
-    if api_key:
-        params["api_key"] = api_key
-    resp, err = _s2_request(
-        "get",
-        "https://api.openalex.org/works",
-        params=params,
-        timeout=30,
-        min_interval=OPENALEX_MIN_INTERVAL,
-        headers=HEADERS,
-        rate_state=_openalex_rate_state,
-        max_retries=2,  # 日配额型 429 重试一次即放弃，快速落下一源
-    )
-    if err or resp is None:
-        return None, err or "network"
-    if resp.status_code != 200:
-        return None, _s2_status_reason(resp.status_code)
-    try:
-        data = resp.json()
-    except ValueError:
-        return None, "network"
-    results = data.get("results") if isinstance(data, dict) else None
-    if not results:
-        return None, "empty_abstract"
-    first = results[0]
-    if not isinstance(first, dict):
-        return None, "empty_abstract"
-    return first, ""
+def _openalex_repair_fetch(title: str) -> Tuple[Optional[List[dict]], str]:
+    """返回标题检索候选，由兜底链逐条应用修复门控。"""
+    return _openalex_title_search(title, OPENALEX_REPAIR_SELECT, max_retries=2)
 
 
 def _crossref_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
@@ -281,7 +244,9 @@ def _arxiv_repair_fetch(title: str) -> Tuple[Optional[dict], str]:
     }, ""
 
 
-def _fetch_by_source(source: str, title: str) -> Tuple[Optional[dict], str]:
+def _fetch_by_source(
+    source: str, title: str
+) -> Tuple[Optional[Union[dict, List[dict]]], str]:
     if source == "openalex":
         return _openalex_repair_fetch(title)
     if source == "crossref":
@@ -373,16 +338,22 @@ def make_lookup(source: str = "auto"):
         last_err = ""
         saw_title_mismatch = False
         for src in chain:
-            work, err = _fetch_by_source(src, title)
-            if work is not None:
-                if _candidate_accepted(
-                    _first_title(work.get("title")),
-                    _candidate_year(src, work),
-                    title,
-                    conf,
-                    src,
-                ):
-                    return src, work, "", attempts
+            result, err = _fetch_by_source(src, title)
+            candidates = (
+                result
+                if isinstance(result, list)
+                else ([result] if isinstance(result, dict) else [])
+            )
+            if candidates:
+                for work in candidates:
+                    if _candidate_accepted(
+                        _first_title(work.get("title")),
+                        _candidate_year(src, work),
+                        title,
+                        conf,
+                        src,
+                    ):
+                        return src, work, "", attempts
                 saw_title_mismatch = True
                 attempts.append((src, "title_mismatch"))
                 continue
