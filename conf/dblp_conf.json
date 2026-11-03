@@ -6692,6 +6692,10 @@
         "url": "https://dblp.org/db/conf/bmvc/bmvc2024.html"
     },
     {
+        "name": "BMVC2025",
+        "url": "https://dblp.org/db/conf/bmvc/bmvc2025.html"
+    },
+    {
         "name": "SIGCOMM2000",
         "url": "https://dblp.org/db/conf/sigcomm/sigcomm2000.html"
     },
@@ -17026,6 +17030,10 @@
     {
         "name": "UIST2025",
         "url": "https://dblp.org/db/conf/uist/uist2025.html"
+    },
+    {
+        "name": "UIST2026",
+        "url": "https://dblp.org/db/conf/uist/uist2026.html"
     },
     {
         "name": "RTSS2000",
