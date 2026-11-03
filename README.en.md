@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-11-03
-- 🆕 **New Papers This Update**: 62
-- 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 721,964 papers / 129 publication series / 658,401 with abstracts / 114,198 with code
+- 📅 **Last Updated**: 2026-11-04
+- 🆕 **New Papers This Update**: 529
+- 📢 **New Conferences This Update**: 2
+- 📊 **Database Scale**: 722,493 papers / 129 publication series / 659,219 with abstracts / 114,203 with code
 
 <!-- recent-update-end -->
 
@@ -254,7 +254,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 <details>
 <summary><b>Computer Graphics & Multimedia</b> (11 series)</summary>
 
-- **BMVC** 2000-2024 (25 editions)
+- **BMVC** 2000-2025 (26 editions)
 - **ICME** 2000-2026 (26 editions)
 - **IEEEVIS** 2000-2024 (13 editions)
 - **MICCAI** 2000-2026 (27 editions)
@@ -302,7 +302,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **CSCW** 2000-2017 (13 editions)
 - **TOCHI** 2000-2026 (27 editions)
 - **UBICOMP** 2000-2019 (19 editions)
-- **UIST** 2000-2025 (26 editions)
+- **UIST** 2000-2026 (27 editions)
 
 </details>
 <details>

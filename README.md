@@ -38,10 +38,10 @@ PaperVault 把分散在 ACL Anthology、OpenReview、CVF Open Access、NeurIPS P
 
 <!-- recent-update-start -->
 
-- 📅 **最近更新日期**: 2026-11-03
-- 🆕 **本次新增论文**: 62 篇
-- 📢 **本次新增会议**: 1 个
-- 📊 **数据库规模**: 721,964 篇论文 / 129 个刊物系列 / 658,401 篇含摘要 / 114,198 篇含开源代码
+- 📅 **最近更新日期**: 2026-11-04
+- 🆕 **本次新增论文**: 529 篇
+- 📢 **本次新增会议**: 2 个
+- 📊 **数据库规模**: 722,493 篇论文 / 129 个刊物系列 / 659,219 篇含摘要 / 114,203 篇含开源代码
 
 <!-- recent-update-end -->
 
@@ -254,7 +254,7 @@ Google Analytics、Search Console 与 Baidu Analytics 均为可选项，仓库�
 <details>
 <summary><b>计算机图形学与多媒体</b> (11 个系列)</summary>
 
-- **BMVC** 2000-2024 (25 届)
+- **BMVC** 2000-2025 (26 届)
 - **ICME** 2000-2026 (26 届)
 - **IEEEVIS** 2000-2024 (13 届)
 - **MICCAI** 2000-2026 (27 届)
@@ -302,7 +302,7 @@ Google Analytics、Search Console 与 Baidu Analytics 均为可选项，仓库�
 - **CSCW** 2000-2017 (13 届)
 - **TOCHI** 2000-2026 (27 届)
 - **UBICOMP** 2000-2019 (19 届)
-- **UIST** 2000-2025 (26 届)
+- **UIST** 2000-2026 (27 届)
 
 </details>
 <details>

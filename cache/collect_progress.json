@@ -24074,6 +24074,14 @@
     "DBLP::https://dblp.org/db/conf/sosp/sosp2026.html": {
       "name": "SOSP2026",
       "ts": "2026-11-03T08:59:33"
+    },
+    "DBLP::https://dblp.org/db/conf/bmvc/bmvc2025.html": {
+      "name": "BMVC2025",
+      "ts": "2026-11-04T07:14:31"
+    },
+    "DBLP::https://dblp.org/db/conf/uist/uist2026.html": {
+      "name": "UIST2026",
+      "ts": "2026-11-04T07:15:15"
     }
   }
 }
