@@ -24070,6 +24070,10 @@
     "DBLP::https://dblp.org/db/conf/dac/dac2026.html": {
       "name": "DAC2026",
       "ts": "2026-11-02T06:05:09"
+    },
+    "DBLP::https://dblp.org/db/conf/sosp/sosp2026.html": {
+      "name": "SOSP2026",
+      "ts": "2026-11-03T08:59:33"
     }
   }
 }
