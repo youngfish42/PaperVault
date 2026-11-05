@@ -155,7 +155,7 @@ def test_dblp_post_run_hook_tracks_collected_name(
 
     captured: Dict[str, Any] = {}
 
-    def _spy_merge(new_res, cache_res, multi_volume_dblp_names, collected_dblp_names):
+    def _spy_merge(new_res, cache_res, multi_volume_dblp_names, collected_dblp_names, **kwargs):
         captured["collected_dblp_names"] = set(collected_dblp_names)
         return new_res
 
@@ -168,3 +168,53 @@ def test_dblp_post_run_hook_tracks_collected_name(
         f"DBLP post-run hook must add the name to collected_dblp_names, "
         f"got: {captured['collected_dblp_names']!r}"
     )
+
+
+
+def test_miccai_recollects_cached_conf_once_then_uses_url_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    conf = {"name": "MICCAI2026", "url": "https://papers.miccai.org/miccai-2026/"}
+    _install_stub_confs(monkeypatch, {"miccai_conf.json": [conf]})
+    progress_sink: List[Dict[str, Any]] = []
+    _neuter_pkg_side_effects(monkeypatch, tmp_path, progress_sink)
+    progress_state = {}
+    monkeypatch.setattr(collector, "load_collect_progress", lambda: progress_state)
+
+    cached = {
+        "paper_name": "Official Paper",
+        "paper_url": "https://doi.org/10.1007/official",
+        "paper_authors": ["A"],
+        "paper_abstract": "",
+        "paper_code": "#",
+    }
+    monkeypatch.setattr(collector, "load_cache", lambda _p: {"MICCAI2026": [cached]})
+    cache_file = tmp_path / "cache.jsonl.gz"
+    cache_file.touch()
+    calls = []
+
+    def _stub_miccai(url, name, res):
+        calls.append(url)
+        res.setdefault(name, []).append({
+            "paper_name": "Official Paper",
+            "paper_url": "https://papers.miccai.org/miccai-2026/0001.html",
+            "paper_authors": ["A"],
+            "paper_abstract": "Official abstract",
+            "paper_code": "https://github.com/official/repo",
+        })
+        return res
+
+    monkeypatch.setattr(collector, "search_from_miccai", _stub_miccai)
+    result = collector.collect(cache_file=str(cache_file))
+
+    assert calls == [conf["url"]]
+    progress = progress_state
+    assert progress["MICCAI::" + conf["url"]]["name"] == "MICCAI2026"
+    assert "legacy" not in progress["MICCAI::" + conf["url"]]
+    assert len(result["MICCAI2026"]) == 1
+    assert result["MICCAI2026"][0]["paper_url"] == cached["paper_url"]
+    assert result["MICCAI2026"][0]["paper_abstract"] == "Official abstract"
+
+    calls.clear()
+    collector.collect(cache_file=None)
+    assert calls == []

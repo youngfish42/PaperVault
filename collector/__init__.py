@@ -40,6 +40,7 @@ from .sources.nips import search_abs_from_nips, search_from_nips
 from .sources.acl import _parse_acl_volume, _is_acl_volume_entry, search_from_acl
 from .sources.dblp import search_abs_from_dblp, search_from_dblp
 from .sources.thecvf import search_abs_from_thecvf, search_from_thecvf
+from .sources.miccai import search_from_miccai
 
 from .pipeline import collect, do_collect
 

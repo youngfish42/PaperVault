@@ -55,7 +55,13 @@ def _merge_paper_record(existing: dict, incoming: dict) -> None:
     )
 
 
-def _merge_with_cache(new_res, cache_res, multi_volume_names, collected_dblp_names):
+def _merge_with_cache(
+    new_res,
+    cache_res,
+    multi_volume_names,
+    collected_dblp_names,
+    title_merge_records=None,
+):
     """Merge ``cache_res`` (loaded from cache.jsonl.gz) into ``new_res``.
 
     Historically this function only deduped URLs for multi-volume DBLP confs,
@@ -104,4 +110,12 @@ def _merge_with_cache(new_res, cache_res, multi_volume_names, collected_dblp_nam
                 url_index[paper_url] = p
             else:
                 _merge_paper_record(prior, p)
+
+    if title_merge_records:
+        from collector.sources.miccai import merge_miccai_records
+
+        for conf_name in set(title_merge_records) & new_res.keys() & result.keys():
+            result[conf_name] = merge_miccai_records(
+                result[conf_name], title_merge_records[conf_name]
+            )
     return result

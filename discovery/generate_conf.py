@@ -16,6 +16,7 @@ from discovery import (
     MLSysDiscovery,
     OpenReviewDiscovery,
     DBLPDiscovery,
+    MICCAIDiscovery,
 )
 
 CONF_DIR = Path("conf")
@@ -256,6 +257,7 @@ def run(
         ("nips_conf.json", NeurIPSDiscovery),
         ("nips_conf.json", MLSysDiscovery),  # 合并到 nips_conf.json
         ("iclr_conf.json", OpenReviewDiscovery),
+        ("miccai_conf.json", MICCAIDiscovery),
         ("dblp_conf.json", DBLPDiscovery),
     ]
 

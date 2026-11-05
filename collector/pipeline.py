@@ -22,6 +22,7 @@ from collector.sources.openreview import search_from_iclr
 from collector.sources.thecvf import search_from_thecvf
 from collector.sources.nips import search_from_nips
 from collector.sources.dblp import search_from_dblp
+from collector.sources.miccai import search_from_miccai
 
 # 空结果（empty 标记）的过期重试周期：标记后 30 天内跳过，过期重抓一次。
 # 兼顾两类情况：被静默拦截/改版的页面终会被重试，而合法空页不会每次
@@ -41,6 +42,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
     import collector as _pkg
 
     res = {}
+    miccai_official_res = {}
     failures = []
     progress = {} if force else _pkg.load_collect_progress()
 
@@ -54,6 +56,8 @@ def collect(cache_file=None, force=False, soft_timeout=None):
         iclr_conf = json.load(f)
     with open("conf/thecvf_conf.json", "r") as f:
         thecvf_conf = json.load(f)
+    with open("conf/miccai_conf.json", "r") as f:
+        miccai_conf = json.load(f)
 
     cache_conf = set()
     cache_res = {}
@@ -88,6 +92,15 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                 return True
         return False
 
+    def _merge_result():
+        return _merge_with_cache(
+            res,
+            cache_res,
+            multi_volume_dblp_names,
+            collected_dblp_names,
+            title_merge_records=miccai_official_res,
+        )
+
     def _save_state():
         now = time.time()
         if now - save_tracker["last"] < 5:
@@ -95,13 +108,13 @@ def collect(cache_file=None, force=False, soft_timeout=None):
         save_tracker["last"] = now
         _pkg.save_collect_progress(progress)
         if cache_file:
-            merged = _merge_with_cache(res, cache_res, multi_volume_dblp_names, collected_dblp_names)
+            merged = _merge_result()
             tmp_file = cache_file + ".tmp"
             _pkg.save_cache(tmp_file, merged)
             os.replace(tmp_file, cache_file)
             print(f"[*] Incremental cache saved: {cache_file}")
 
-    def _should_skip(source, url, name):
+    def _should_skip(source, url, name, refresh_cached=False):
         if force:
             return False
         key = f"{source}::{url}"
@@ -120,6 +133,8 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                     return False
             return True
         if name in cache_conf:
+            if refresh_cached:
+                return False
             if source == "DBLP" and name in multi_volume_dblp_names:
                 return False
             if source == "ACL" and name in multi_volume_acl_names:
@@ -137,6 +152,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
         "conf/iclr_conf.json": iclr_conf,
         "conf/thecvf_conf.json": thecvf_conf,
         "conf/nips_conf.json": nips_conf,
+        "conf/miccai_conf.json": miccai_conf,
         "conf/dblp_conf.json": dblp_conf,
     }
 
@@ -152,7 +168,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                     continue
 
                 url, name = conf["url"], conf["name"]
-                if _should_skip(spec.key, url, name):
+                if _should_skip(spec.key, url, name, spec.refresh_cached):
                     continue
                 if _is_timeout():
                     break
@@ -197,6 +213,11 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                         }
                     else:
                         progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                elif spec.key == "MICCAI":
+                    before = len(res.get(name, []))
+                    res = search_fn(url, name, res)
+                    miccai_official_res[name] = res[name][before:]
+                    progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
                 else:
                     res = search_fn(url, name, res)
                     progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
@@ -222,7 +243,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                 })
         _save_state()
 
-    final_res = _merge_with_cache(res, cache_res, multi_volume_dblp_names, collected_dblp_names)
+    final_res = _merge_result()
 
     res = add_code_links(final_res)
 
