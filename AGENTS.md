@@ -45,11 +45,12 @@ PaperVault/
 │   ├── code_links.py             # GitHub link extraction from abstracts (_GITHUB_RE, extract_github_link, add_code_links)
 │   ├── pipeline.py               # Top-level orchestration: collect() drives SOURCE_REGISTRY over all sources; do_collect() wraps cache load/save + HF sync
 │   └── sources/                  # Per-vendor scrapers (one module per data source)
-│       ├── __init__.py           # SourceSpec dataclass + SOURCE_REGISTRY (ACL / ICLR / thecvf / NeurIPS / DBLP)
+│       ├── __init__.py           # SourceSpec dataclass + SOURCE_REGISTRY (ACL / ICLR / thecvf / NeurIPS / MICCAI / DBLP)
 │       ├── openreview.py         # OpenReview API v1/v2 + ICLR official schedule (search_from_iclr and helpers)
 │       ├── nips.py               # NeurIPS proceedings pages (search_from_nips, search_abs_from_nips)
 │       ├── acl.py                # ACL Anthology volume pages (_parse_acl_volume, _is_acl_volume_entry, search_from_acl)
 │       ├── dblp.py               # DBLP mixed-venue pages (search_from_dblp, search_abs_from_dblp)
+│       ├── miccai.py             # MICCAI Open Access detail pages (abstract + dedicated code repository field; conservative DBLP title merge)
 │       └── thecvf.py             # CVF Open Access pages (search_from_thecvf, search_abs_from_thecvf; deferred import of scripts.cvf_abstract)
 ├── maintain.py                   # README updater, stats renderer, cache refresh utility
 ├── data_artifacts.py             # Hugging Face dataset sync helpers (cache.jsonl.gz upload with parent_commit optimistic locking)
@@ -133,12 +134,14 @@ PaperVault/
 │   ├── dblp_conf.json            # DBLP sources (mixed venues)
 │   ├── iclr_conf.json            # OpenReview ICLR/NeurIPS sources
 │   ├── nips_conf.json            # NeurIPS & MLSys proceedings
+│   ├── miccai_conf.json          # MICCAI main-conference Open Access sources (2024 onward on the current site)
 │   └── thecvf_conf.json          # CVF Open Access (CVPR, ICCV, WACV)
 ├── discovery/                    # Auto-discovery of new conference editions
 │   ├── base.py                   # Discovery base class & shared HTTP utilities (DBLP requests are routed through the shared Anubis solver session)
 │   ├── acl.py                    # ACL Anthology discovery
 │   ├── cvf.py                    # CVF Open Access discovery
 │   ├── dblp.py                   # DBLP discovery
+│   ├── miccai.py                 # MICCAI main-conference Open Access discovery (excludes satellite URLs)
 │   ├── nips.py                   # NeurIPS proceedings discovery
 │   ├── openreview.py             # OpenReview (ICLR) discovery
 │   └── generate_conf.py          # Generate/merge conf JSON from discovery results
@@ -146,6 +149,7 @@ PaperVault/
 │   ├── fetch_abstracts.py            # Multi-source abstract backfill (Crossref/S2/arXiv/OpenAlex)
 │   ├── fetch_openreview_abstracts.py # OpenReview-only abstract backfill (v2 batch → v1 fallback) for ICLR/NeurIPS forums
 │   ├── fetch_cvf_abstracts.py        # CVF Open Access-only abstract backfill (scrapes `*_paper.html` detail pages)
+│   ├── fetch_miccai_openaccess.py    # MICCAI Open Access collector/backfill with exact normalized-title cache merge, dry-run and atomic write
 │   ├── cvf_abstract.py               # Side-effect-free CVF scraping helpers, shared by `collector` and `fetch_cvf_abstracts.py`
 │   ├── fetch_code_links.py           # Extract GitHub code links from abstracts
 │   ├── fetch_pwc_backfill.py         # Offline one-shot backfill of empty abstracts/code links from the archived PwC HF snapshots (exact-key matching only; never overwrites non-empty fields)
@@ -407,6 +411,7 @@ Other frontend scripts:
 | `python scripts/fetch_abstracts.py` | Multi-source abstract backfill (domain fetchers → concurrent Crossref / Semantic Scholar / OpenAlex DOI lookups → arXiv title fallback). OpenAlex uses `mailto` plus optional `OPENALEX_API_KEY` Bearer authentication. On DOI-chain failure for `doi.org` URLs it follows the redirect once and re-dispatches the final landing page to the domain-fetcher registry (e.g. Springer LNCS / ISCA DOIs; disable with `--no-doi-redirect`). Last resort: direct `.pdf` URLs are downloaded (≤8MB, first 3 pages) and their Abstract section extracted with pdfminer (disable with `--no-pdf-fallback`). Three mutually-exclusive dedicated passes retry previously-failed records: `--s2-batch` (failed `doi.org` URLs via S2 `/paper/batch`, ≤500 DOIs/request), `--s2-title-match` (failed non-DOI long-tail hosts via S2 `/paper/search/match` with ≥0.85 title + ±1 year gates) and `--openalex-title` (same gates via OpenAlex `/works?search.title=` at 3 rps, evaluating up to 10 candidates and rebuilding the inverted-index abstract; the excluded-host set drops `ndss-symposium.org` whose pages carry no abstract). All three honour `--max-papers` / `--soft-timeout` / `--chunk-size` / `--dry-run` / `--no-sync` / `--offline` and the optional `S2_API_KEY` / `OPENALEX_API_KEY` env vars as appropriate. Title-match dry-runs log HIT/MISS reasons; request-level rate-limit/timeout/network failures do not increment per-paper `attempts`. Supports `--phase`, `--conf`, `--chunk-size`, `--retry-failed` |
 | `python scripts/fetch_openreview_abstracts.py` | OpenReview-targeted abstract backfill (v2 batch API with v1 fallback). Supports `--conf`, `--year`, `--limit`, `--chunk-size`, `--dry-run` |
 | `python scripts/fetch_cvf_abstracts.py` | CVF Open Access-targeted abstract backfill (scrapes `openaccess.thecvf.com/.../*_paper.html`). Independent of DOI-based sources |
+| `python scripts/fetch_miccai_openaccess.py` | MICCAI main-conference Open Access collection (title/authors/abstract/dedicated code field) for the current 2024+ site. Merges old DBLP records by URL then unique exact-title keys (NFKC/casefold/punctuation cleanup plus Springer inline-graphic prefix and common LaTeX formatting removal), prefers known DOI URLs, and preserves unmatched satellite records. Dry-run by default; `--write` applies atomically with a local backup. Supports `--year`, `--limit`, `--concurrency`, `--offline`, `--no-sync` |
 | `python scripts/fetch_code_links.py` | Extract GitHub code links from collected abstracts. Supports `--year`, `--retry-failed` |
 | `python scripts/fetch_pwc_backfill.py` | Offline backfill of empty abstracts/code links from `pwc-archive/papers-with-abstracts` + `pwc-archive/links-between-paper-and-code` (2025-07 snapshots). Conservative exact-key matching (arXiv ID → OpenReview ID → normalized URL → unique normalized title with year guard). Supports `--dry-run`, `--report`, `--conf`, `--no-upload` |
 | `python scripts/cleanup_cache_dedupe.py` | One-shot cache dedupe by `(conf, paper_url)` — reuses `collector._merge_paper_record` so semantics stay in lockstep with the collector |
@@ -470,6 +475,7 @@ The collector fetches paper metadata from:
 - [OpenReview](https://openreview.net/) - ICLR, NeurIPS
 - [OpenAccess.thecvf](https://openaccess.thecvf.com/) - CVPR, ICCV, WACV
 - [NeurIPS Proceedings](https://papers.nips.cc/) - NeurIPS, MLSys
+- [MICCAI Open Access](https://papers.miccai.org/) - MICCAI main-conference papers on the current 2024+ site, including abstracts and explicitly listed code repositories; DBLP records are retained for older years and satellite events
 - [DBLP](https://dblp.org/) - 30+ mixed venues
 
 Abstract backfill sources (`scripts/fetch_abstracts.py`):

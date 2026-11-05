@@ -36,6 +36,7 @@ dblp_conf_path = os.path.join(os.path.dirname(__file__), "conf", "dblp_conf.json
 nips_conf_path = os.path.join(os.path.dirname(__file__), "conf", "nips_conf.json")
 iclr_conf_path = os.path.join(os.path.dirname(__file__), "conf", "iclr_conf.json")
 thecvf_conf_path = os.path.join(os.path.dirname(__file__), "conf", "thecvf_conf.json")
+miccai_conf_path = os.path.join(os.path.dirname(__file__), "conf", "miccai_conf.json")
 stats_dir = os.path.join(os.path.dirname(__file__), "pics", "stats")
 stats_html_path = os.path.join(os.path.dirname(__file__), "docs", "stats.html")
 meta_path = os.path.join(os.path.dirname(__file__), "cache", "readme_meta.json")
@@ -272,7 +273,7 @@ def generate_new_readme(src: str, content: str, start_comment: str, end_comment:
 def _load_all_confs():
     """Load all conference configs and return a dict of {upper_name: set(years)}."""
     confs_list = {}
-    for files in [acl_conf_path, dblp_conf_path, nips_conf_path, iclr_conf_path, thecvf_conf_path]:
+    for files in [acl_conf_path, dblp_conf_path, nips_conf_path, iclr_conf_path, thecvf_conf_path, miccai_conf_path]:
         with open(files, "r", encoding="utf-8") as f:
             for conf in json.load(f):
                 m = re.search(r"\d{4}", conf["name"])

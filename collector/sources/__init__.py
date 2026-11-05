@@ -16,6 +16,7 @@ class SourceSpec:
     # 页面误判为"空收录"后永久跳过）。ACL 用 empty_result_soft_fail
     # 走的是带 tag 诊断的专属逻辑，两者互斥。
     empty_result_is_failure: bool = False
+    refresh_cached: bool = False
 
 
 SOURCE_REGISTRY: tuple[SourceSpec, ...] = (
@@ -44,6 +45,13 @@ SOURCE_REGISTRY: tuple[SourceSpec, ...] = (
         conf_file="conf/nips_conf.json",
         tqdm_desc="[+] Collecting NeurIPS",
         search_fn_name="search_from_nips",
+    ),
+    SourceSpec(
+        key="MICCAI",
+        conf_file="conf/miccai_conf.json",
+        tqdm_desc="[+] Collecting MICCAI Open Access",
+        search_fn_name="search_from_miccai",
+        refresh_cached=True,
     ),
     SourceSpec(
         key="DBLP",
