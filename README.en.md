@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-11-04
-- 🆕 **New Papers This Update**: 529
-- 📢 **New Conferences This Update**: 2
-- 📊 **Database Scale**: 722,493 papers / 129 publication series / 659,219 with abstracts / 114,203 with code
+- 📅 **Last Updated**: 2026-11-06
+- 🆕 **New Papers This Update**: 363
+- 📢 **New Conferences This Update**: 1
+- 📊 **Database Scale**: 722,857 papers / 129 publication series / 661,580 with abstracts / 115,330 with code
 
 <!-- recent-update-end -->
 
@@ -194,7 +194,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **SP** 2000-2026 (27 editions)
 - **TDSC** 2004-2026 (23 editions)
 - **TIFS** 2006-2026 (21 editions)
-- **USS** 2000-2025 (26 editions)
+- **USS** 2000-2026 (27 editions)
 
 </details>
 <details>

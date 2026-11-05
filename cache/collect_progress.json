@@ -24082,6 +24082,22 @@
     "DBLP::https://dblp.org/db/conf/uist/uist2026.html": {
       "name": "UIST2026",
       "ts": "2026-11-04T07:15:15"
+    },
+    "MICCAI::https://papers.miccai.org/miccai-2024/": {
+      "name": "MICCAI2024",
+      "ts": "2026-11-06T07:41:22"
+    },
+    "MICCAI::https://papers.miccai.org/miccai-2025/": {
+      "name": "MICCAI2025",
+      "ts": "2026-11-06T07:42:42"
+    },
+    "MICCAI::https://papers.miccai.org/miccai-2026/": {
+      "name": "MICCAI2026",
+      "ts": "2026-11-06T07:44:06"
+    },
+    "DBLP::https://dblp.org/db/conf/uss/uss2026.html": {
+      "name": "USS2026",
+      "ts": "2026-11-06T07:46:12"
     }
   }
 }
