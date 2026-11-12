@@ -38,10 +38,10 @@ PaperVault aggregates paper metadata from top-tier conferences and journals scat
 
 <!-- recent-update-start -->
 
-- 📅 **Last Updated**: 2026-11-06
-- 🆕 **New Papers This Update**: 363
+- 📅 **Last Updated**: 2026-11-12
+- 🆕 **New Papers This Update**: 29
 - 📢 **New Conferences This Update**: 1
-- 📊 **Database Scale**: 722,857 papers / 129 publication series / 661,580 with abstracts / 115,330 with code
+- 📊 **Database Scale**: 722,886 papers / 129 publication series / 667,806 with abstracts / 115,424 with code
 
 <!-- recent-update-end -->
 
@@ -230,7 +230,7 @@ Google Analytics, Search Console, and Baidu Analytics are optional, and the comm
 - **TKDE** 2000-2025 (26 editions)
 - **TODS** 2000-2026 (27 editions)
 - **TOIS** 2000-2025 (23 editions)
-- **VLDB** 2008-2025 (18 editions)
+- **VLDB** 2008-2026 (19 editions)
 - **VLDBJ** 2000-2026 (27 editions)
 - **WSDM** 2008-2026 (19 editions)
 - **WWW** 2001-2026 (26 editions)

@@ -24098,6 +24098,18 @@
     "DBLP::https://dblp.org/db/conf/uss/uss2026.html": {
       "name": "USS2026",
       "ts": "2026-11-06T07:46:12"
+    },
+    "DBLP::https://dblp.org/db/journals/pvldb/pvldb20.html": {
+      "name": "VLDB2026",
+      "ts": "2026-11-12T08:34:26"
+    },
+    "DBLP::https://dblp.org/db/journals/ai/ai360.html": {
+      "name": "AI2026",
+      "ts": "2026-11-12T08:35:27"
+    },
+    "DBLP::https://dblp.org/db/journals/ai/ai361.html": {
+      "name": "AI2026",
+      "ts": "2026-11-12T08:36:29"
     }
   }
 }
