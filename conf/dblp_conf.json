@@ -7960,6 +7960,10 @@
         "url": "https://dblp.org/db/journals/pvldb/pvldb16.html"
     },
     {
+        "name": "VLDB2026",
+        "url": "https://dblp.org/db/journals/pvldb/pvldb20.html"
+    },
+    {
         "name": "AI2000",
         "url": "https://dblp.org/db/journals/ai/ai116.html"
     },
@@ -8778,6 +8782,14 @@
     {
         "name": "AI2026",
         "url": "https://dblp.org/db/journals/ai/ai359.html"
+    },
+    {
+        "name": "AI2026",
+        "url": "https://dblp.org/db/journals/ai/ai360.html"
+    },
+    {
+        "name": "AI2026",
+        "url": "https://dblp.org/db/journals/ai/ai361.html"
     },
     {
         "name": "MLJ2000",
