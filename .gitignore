@@ -20,6 +20,10 @@ cache/.*.sqlite3.*.tmp
 cache/abstract_backfill_progress.jsonl.gz
 cache/abstract_backfill_progress.jsonl.gz.tmp
 cache/abstract_backfill_progress.json
+# Papers with Code enrichment progress is likewise synced only through HF.
+cache/cache.jsonl.gz.pwc.bak
+cache/pwc_backfill_progress.jsonl.gz
+cache/pwc_backfill_progress.jsonl.gz.tmp
 # Wayback repair resume state is also authoritative on Hugging Face, not Git.
 cache/wayback_repair_checkpoint.json
 cache/wayback_repair_checkpoint.json.tmp

@@ -233,7 +233,8 @@ def test_hf_writer_workflows_share_external_lock_and_backfill_skips_stats():
         )
         jobs = workflow["jobs"]
         assert jobs[main_job]["needs"] == "acquire_lock"
-        assert jobs[main_job]["timeout-minutes"] == 330
+        expected_timeout = 360 if filename == "backfill_abstracts.yml" else 330
+        assert jobs[main_job]["timeout-minutes"] == expected_timeout
         assert jobs["acquire_lock"]["timeout-minutes"] == 360
         assert jobs["release_lock"]["needs"] == ["acquire_lock", main_job]
         assert "always()" in jobs["release_lock"]["if"]

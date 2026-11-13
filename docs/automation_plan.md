@@ -37,8 +37,8 @@
 │    └─ 复用现有 collector.py 逻辑                             │
 │                          ↓                                   │
 │  Step 4: 数据增强 (Enhancer)  [可选，二期]                   │
-│    ├─ AbstractBackfill   → Semantic Scholar / OpenAlex API   │
-│    └─ CodeLinkEnrich     → PapersWithCode API                │
+│    ├─ AbstractBackfill   → Semantic Scholar / OpenAlex / PWC │
+│    └─ CodeLinkEnrich     → PapersWithCode batch lookup API   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -132,7 +132,7 @@
 
 - [x] **Step 2.1**: 在 GitHub Actions 中新增 `discover_and_update.yml`，每日运行一次自动发现，并将配置直接提交到 `main`。
 - [ ] **Step 2.2**: 接入 Semantic Scholar / OpenAlex API，批量补全 DBLP 来源论文的 abstract。
-- [ ] **Step 2.3**: 接入 PapersWithCode API，替换现有的 GitHub Markdown 代码链接匹配逻辑。
+- [x] **Step 2.3**: 接入 PapersWithCode API，批量补充摘要和代码链接，同时保留现有摘要正则与离线 PwC 快照渠道。
 - [x] **Step 2.4**: 优化增量更新粒度，支持单会议强制刷新。
   - 新增 `maintain.py collect` 命令，只收集 conf 中有但 cache 中没有的会议。
   - 新增 GitHub Actions 工作流 `collect_papers.yml`：定时 + conf 文件 push 触发 + 手动触发；自动发现提交后显式派发收集，产物直接提交到 `main`。
