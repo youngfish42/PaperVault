@@ -74,9 +74,10 @@ DBLP 采集的论文虽然入口统一，但最终 `paper_url` 指向多个出�
 - `search_from_dblp` 中的 `search_abs_from_dblp` 被整体注释（`# due to limits`）。
 - 导致 DBLP 来源的 5 万余篇论文**全部没有 abstract**，严重影响搜索质量。
 
-### 3.3 代码链接来源单一且易失效
-- `add_code_links` 依赖外部仓库 `MLNLP-World/Top-AI-Conferences-Paper-with-Code` 的 Markdown 列表。
-- 该仓库更新不及时，且标题匹配是简单的 lower-case 字符串比较，**匹配率不高**。
+### 3.3 代码链接补充渠道
+- 现有 `add_code_links` / `fetch_code_links.py` 从摘要中提取 GitHub 链接，成本低但依赖作者是否在摘要中公开仓库。
+- 新增 `fetch_pwc_api_backfill.py` 使用 Papers with Code 公共 Beta API：每批最多 500 篇，按 arXiv ID 或精确标题指纹匹配，再按需获取仓库列表；严格顺序限流且只填补空字段。
+- PWC 是原 API 的实验性重新实现，无稳定性 SLA，因此保留摘要正则提取作为独立兜底，不以 PWC 取代其他数据来源。
 
 ### 3.4 增量粒度粗
 - 当前增量更新以**整个会议**为单位：只要某个 `conf_name` 在缓存中，就跳过该会议的全部采集。
