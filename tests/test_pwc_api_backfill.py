@@ -341,8 +341,12 @@ def test_repository_failure_is_resumable_and_counts_one_attempt(
 
 
 def test_permanent_batch_failure_still_syncs_completed_chunks(tmp_path, monkeypatch):
-    papers = [_paper("First", "https://example.org/1"), _paper("Second", "https://example.org/2")]
-    _cache, progress, _backup = _install_run_files(tmp_path, monkeypatch, papers)
+    papers = [
+        _paper("First", "https://example.org/1"),
+        _paper("Bad batch", "https://example.org/2"),
+        _paper("After bad batch", "https://example.org/3"),
+    ]
+    _cache, progress, backup = _install_run_files(tmp_path, monkeypatch, papers)
     client = _FakeClient(papers)
     original_lookup = client.lookup
 
@@ -360,8 +364,14 @@ def test_permanent_batch_failure_still_syncs_completed_chunks(tmp_path, monkeypa
 
     stats = pwc.run(_args(chunk_size=1, offline=False, no_sync=False))
 
-    assert stats["processed"] == 1
-    assert pwc.ProgressLedger(progress).records[pwc.paper_key(papers[0])]["terminal"] is True
+    assert stats["processed"] == 3
+    assert stats["failed"] == 1
+    records = pwc.ProgressLedger(progress).records
+    assert records[pwc.paper_key(papers[0])]["terminal"] is True
+    assert records[pwc.paper_key(papers[1])]["attempts"] == 1
+    assert records[pwc.paper_key(papers[1])]["terminal"] is False
+    assert records[pwc.paper_key(papers[2])]["terminal"] is True
+    assert backup.exists()
     sync.assert_called_once()
 
 

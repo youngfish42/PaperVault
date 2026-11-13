@@ -333,7 +333,11 @@ def load_cache(path: Path = CACHE_FILE) -> list[dict]:
     return papers
 
 
-def save_cache_atomic(path: Path, papers: list[dict], backup_path: Path = BACKUP_FILE) -> None:
+def save_cache_atomic(
+    path: Path, papers: list[dict], backup_path: Optional[Path] = None
+) -> None:
+    if backup_path is None:
+        backup_path = BACKUP_FILE
     if not backup_path.exists():
         shutil.copy2(path, backup_path)
     tmp_path = path.with_name(path.name + ".tmp")
@@ -455,7 +459,32 @@ def run(args) -> dict:
             continue
         try:
             response = client.lookup([entry["reference"] for entry in entries])
-        except PwcError as exc:
+        except PwcPermanentError as exc:
+            print(f"[!] PWC permanent batch failure; recording attempts and continuing: {exc}")
+            for entry in entries:
+                previous = ledger.records.get(entry["key"], {})
+                attempts = int(previous.get("attempts") or 0) + 1
+                ledger.update(
+                    entry["key"],
+                    _progress_record(
+                        entry,
+                        paper=None,
+                        matched_by=None,
+                        abstract_status="failed",
+                        code_status="failed",
+                        terminal=False,
+                        reason="invalid_response",
+                        attempts=attempts,
+                    ),
+                )
+                stats["processed"] += 1
+                stats["failed"] += 1
+                if dry_run:
+                    print(f"  [invalid_response] {(entry['paper'].get('paper_name') or '')[:80]}")
+            if not dry_run:
+                ledger.save()
+            continue
+        except PwcTransientError as exc:
             print(f"[!] PWC batch failed without advancing paper attempts: {exc}")
             break
         results = {}
@@ -584,7 +613,7 @@ def run(args) -> dict:
         )
     print(
         "[*] PWC done: processed={processed}, matched={matched}, "
-        "abstracts={abstracts}, code={code}, transient_failures={failed}".format(**stats)
+        "abstracts={abstracts}, code={code}, failures={failed}".format(**stats)
     )
     return stats
 
