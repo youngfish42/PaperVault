@@ -314,11 +314,20 @@ def test_batch_failure_does_not_advance_attempts_or_files(tmp_path, monkeypatch)
     assert not progress.exists()
 
 
-def test_repository_failure_is_resumable_and_counts_one_attempt(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "error,reason",
+    [
+        (pwc.PwcTransientError("timeout"), "timeout"),
+        (pwc.PwcPermanentError("HTTP 422"), "invalid_response"),
+    ],
+)
+def test_repository_failure_is_resumable_and_counts_one_attempt(
+    tmp_path, monkeypatch, error, reason
+):
     paper = _paper()
     _cache, progress, _backup = _install_run_files(tmp_path, monkeypatch, [paper])
     client = _FakeClient([paper])
-    client.repositories = MagicMock(side_effect=pwc.PwcTransientError("timeout"))
+    client.repositories = MagicMock(side_effect=error)
     monkeypatch.setattr(pwc, "PwcClient", lambda **_kwargs: client)
 
     stats = pwc.run(_args())
@@ -327,8 +336,33 @@ def test_repository_failure_is_resumable_and_counts_one_attempt(tmp_path, monkey
     assert stats["failed"] == 1
     record = pwc.ProgressLedger(progress).records[pwc.paper_key(paper)]
     assert record["terminal"] is False
-    assert record["reason"] == "timeout"
+    assert record["reason"] == reason
     assert record["attempts"] == 1
+
+
+def test_permanent_batch_failure_still_syncs_completed_chunks(tmp_path, monkeypatch):
+    papers = [_paper("First", "https://example.org/1"), _paper("Second", "https://example.org/2")]
+    _cache, progress, _backup = _install_run_files(tmp_path, monkeypatch, papers)
+    client = _FakeClient(papers)
+    original_lookup = client.lookup
+
+    def fail_second_batch(references):
+        if references[0]["key"] == pwc.paper_key(papers[1]):
+            raise pwc.PwcPermanentError("HTTP 400")
+        return original_lookup(references)
+
+    client.lookup = fail_second_batch
+    monkeypatch.setattr(pwc, "PwcClient", lambda **_kwargs: client)
+    monkeypatch.setattr(pwc, "ensure_cache_local", lambda *_a, **_k: None)
+    monkeypatch.setattr(pwc, "ensure_progress_local", lambda *_a, **_k: None)
+    sync = MagicMock()
+    monkeypatch.setattr(pwc, "sync_cache_artifacts", sync)
+
+    stats = pwc.run(_args(chunk_size=1, offline=False, no_sync=False))
+
+    assert stats["processed"] == 1
+    assert pwc.ProgressLedger(progress).records[pwc.paper_key(papers[0])]["terminal"] is True
+    sync.assert_called_once()
 
 
 def test_zero_repositories_skips_detail_request(tmp_path, monkeypatch):

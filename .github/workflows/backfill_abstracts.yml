@@ -50,7 +50,7 @@ jobs:
   backfill:
     needs: acquire_lock
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 360
     env:
       TZ: Asia/Shanghai
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -206,8 +206,8 @@ jobs:
         # This step scrapes the openaccess.thecvf.com detail pages directly
         # to fill their <div id="abstract"> content. Runs strictly after the
         # generic backfill so both writers to cache.jsonl.gz are serialised
-        # within the same job. `--soft-timeout 2400` (40 min) keeps the total
-        # workflow well under the 330 min hard cap.
+        # within the same job. `--soft-timeout 2400` (40 min) leaves room for
+        # the bounded PWC pass within the 360 min hard cap.
         run: |
           force_flag=""
           if [ "${{ github.event.inputs.force }}" = "true" ]; then

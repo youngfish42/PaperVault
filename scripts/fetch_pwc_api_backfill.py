@@ -455,7 +455,7 @@ def run(args) -> dict:
             continue
         try:
             response = client.lookup([entry["reference"] for entry in entries])
-        except PwcTransientError as exc:
+        except PwcError as exc:
             print(f"[!] PWC batch failed without advancing paper attempts: {exc}")
             break
         results = {}
@@ -535,7 +535,7 @@ def run(args) -> dict:
                         else:
                             code_status = "unavailable"
                             reasons.append("no_repository")
-                    except PwcTransientError as exc:
+                    except PwcError as exc:
                         code_status = "failed"
                         reasons.append(exc.reason)
                         transient = True
