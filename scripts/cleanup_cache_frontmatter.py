@@ -1,22 +1,16 @@
 """一次性缓存清洗：移除 front-matter 类记录（会议卷首页 / 论文集封面条目）。
 
-背景
-----
-全库约 2,033 条记录不是论文而是 front-matter：``paper_name`` 以
-"Proceedings of" / "Front Matter" / "Table of Contents" / "Preface" /
-"Findings of the Association" 等开头（如 ICSE2026 的
-``doi.org/10.1145/3786581``、IJCAI2025 的 ``/proceedings/2025/`` 落地页、
-ICML2025 workshop 的 ``proceedings.mlr.press/v292/`` 卷首页）。
-
-判定（保守，双重条件——标题命中正则 *且* 满足任一佐证）：
-  1. 标题命中 :data:`FRONT_MATTER_RE`（大小写不敏感）；
-  2. ``classify_paper_url(url) == "venue-index"``，或（无摘要 *且* 无真实
-     代码链接——``paper_code`` 为空或 ``"#"`` 占位）。
+判定分两类，均要求标题与结构证据同时成立：
+  1. 普通 front-matter：标题命中 :data:`FRONT_MATTER_RE`，且 URL 是
+     venue-index，或无摘要且无真实代码链接（``paper_code`` 为空/``"#"``）。
+  2. 整卷 proceedings：标题符合整卷形态，且具有 Springer 书籍 DOI、ACM
+     裸出版物 DOI/citation ID 或明确 venue-index URL。整卷即使已有摘要、
+     代码或普通作者列表也可移除；章节 DOI 与单篇 workshop 论文保留。
 
 设计参照 ``cleanup_cache_dedupe.py``：流式读取，``.tmp`` + 回读校验 +
 ``os.replace`` 原子重写，默认保留 ``.bak`` 备份。进度文件
 （abstract_backfill_progress.jsonl.gz）中的对应记录**不动**——它们是
-历史账本，不是缓存索引。
+历史账本，不是缓存索引。默认 dry-run，只有人工审阅后才应使用 ``--write``。
 
 用法
 ----

@@ -155,3 +155,18 @@ def test_ijcai_paper_urls(url):
 def test_ijcai_venue_index_urls(url):
     assert classify_paper_url(url) == "venue-index"
     assert is_venue_index(url)
+
+
+
+# ---------- IEEE conference landing pages -----------------------------------
+
+def test_ieee_conhome_proceeding_is_venue_index():
+    url = "https://ieeexplore.ieee.org/xpl/conhome/10226/proceeding"
+    assert classify_paper_url(url) == "venue-index"
+    assert is_venue_index(url)
+
+
+def test_ieee_article_path_remains_unknown():
+    url = "https://ieeexplore.ieee.org/document/1234567"
+    assert classify_paper_url(url) == "unknown"
+    assert not is_venue_index(url)

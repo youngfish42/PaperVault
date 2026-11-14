@@ -1,16 +1,9 @@
 """Regression tests for collection-side front-matter filtering.
 
-``collector/frontmatter.py`` is the single source of truth for the
-front-matter title regex; the collection-side predicate
-(``should_drop_on_collect``) deliberately differs from the cleanup-side
-one (``is_frontmatter_record``) because freshly collected records never
-have abstracts/code links yet — the cleanup "empty fields" leg would be
-vacuously true. The collector therefore requires the title match AND
-(venue-index URL OR empty/editorial authors), and only ever filters
-*new* records (existing cache rows are left to the cleanup script).
-
-``collector.merge._merge_with_cache`` is the chokepoint where new
-records enter the cache; the filter lives there with a printed count.
+Fresh records cannot use the cleanup-side empty-field evidence because they do
+not have abstracts or code links yet. Whole-proceedings records instead require
+both a proceedings-shaped title and publisher/venue structural evidence.
+Individual workshop papers remain outside this filter.
 """
 
 from __future__ import annotations
@@ -26,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 from collector.frontmatter import (  # noqa: E402
     FRONT_MATTER_RE,
     is_frontmatter_record,
+    is_proceedings_record,
     should_drop_on_collect,
 )
 from collector.merge import _merge_with_cache  # noqa: E402
@@ -42,8 +36,6 @@ def _rec(title, url="https://dl.acm.org/doi/10.1145/123", authors=None,
         "conf": conf,
     }
 
-
-# ---------- predicate: collection-side ---------------------------------------
 
 def test_collect_drops_title_match_with_venue_index_url():
     rec = _rec("Proceedings of the Thirty-Fifth International Joint Conference",
@@ -63,8 +55,7 @@ def test_collect_drops_title_match_with_editorial_authors():
 
 
 def test_collect_keeps_title_match_with_real_authors_and_paper_url():
-    """新记录没摘要/代码是常态——不能仅凭空字段腿误删（设计差异的核心）。"""
-    rec = _rec("Proceedings of Some Workshop", authors=["Alice", "Bob"])
+    rec = _rec("Proceedings of Some Workshop", url="https://example.org/paper")
     assert should_drop_on_collect(rec) is False
 
 
@@ -78,25 +69,87 @@ def test_collect_keeps_real_paper():
     assert should_drop_on_collect(_rec("Deep Residual Learning")) is False
 
 
-# ---------- predicate: shared regex / cleanup-side unchanged -------------------
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://doi.org/10.1007/978-3-032-38062-3",
+        "https://doi.org/10.1145/2442796",
+        "https://dl.acm.org/doi/10.1145/2442796",
+        "http://dl.acm.org/citation.cfm?id=2534190",
+        "https://ieeexplore.ieee.org/xpl/conhome/10226/proceeding",
+    ],
+)
+def test_whole_proceedings_structural_evidence_overrides_enriched_fields(url):
+    rec = _rec(
+        "Proceedings of Some Conference",
+        url=url,
+        abstract="A" * 100,
+        code="https://github.com/example/volume",
+    )
+    assert is_proceedings_record(rec) is True
+    assert is_frontmatter_record(rec) is True
+    assert should_drop_on_collect(rec) is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://doi.org/10.1007/978-3-032-38062-3_1",
+        "https://doi.org/10.1145/2442796.2442800",
+        "https://dl.acm.org/doi/10.1145/2442796.2442800",
+        "https://dl.acm.org/citation.cfm?id=not-numeric",
+    ],
+)
+def test_chapter_and_paper_dois_are_not_whole_proceedings(url):
+    rec = _rec(
+        "Proceedings of Some Conference",
+        url=url,
+        abstract="A" * 100,
+        code="https://github.com/example/paper",
+    )
+    assert is_proceedings_record(rec) is False
+    assert is_frontmatter_record(rec) is False
+    assert should_drop_on_collect(rec) is False
+
+
+def test_proceedings_title_shape_requires_structural_evidence():
+    rec = _rec(
+        "On the Proceedings of Thought: A Study",
+        url="https://doi.org/10.1145/2442796",
+        abstract="A" * 100,
+        code="https://github.com/example/paper",
+    )
+    assert is_proceedings_record(rec) is False
+
+
+def test_workshop_research_article_is_preserved():
+    rec = _rec(
+        "A Novel Method for Geospatial Data Analysis",
+        url="https://doi.org/10.1145/2442796.2442800",
+        abstract="A" * 100,
+        code="https://github.com/example/workshop-paper",
+    )
+    assert is_proceedings_record(rec) is False
+    assert is_frontmatter_record(rec) is False
+    assert should_drop_on_collect(rec) is False
+
 
 def test_shared_regex_drives_both_predicates():
     title = "Preface to the special issue"
     assert FRONT_MATTER_RE.match(title)
-    # 清理端：空摘要空代码 → 命中
     assert is_frontmatter_record(_rec(title, authors=[])) is True
-    # 采集端：空作者 → 也拦
     assert should_drop_on_collect(_rec(title, authors=[])) is True
 
 
 def test_cleanup_side_still_keeps_records_with_abstract():
-    """清理端行为不变：有摘要的标题命中记录保留（即便 venue-index 之外）。"""
-    rec = _rec("Proceedings of Some Conference", abstract="A" * 100)
+    rec = _rec(
+        "Proceedings of Some Conference",
+        url="https://example.org/paper",
+        abstract="A" * 100,
+    )
     assert is_frontmatter_record(rec) is False
-    assert should_drop_on_collect(rec) is False  # 有作者 → 采集端也保留
+    assert should_drop_on_collect(rec) is False
 
-
-# ---------- _merge_with_cache integration --------------------------------------
 
 def test_merge_with_cache_filters_new_frontmatter_records(capsys):
     new_res = {
@@ -114,11 +167,10 @@ def test_merge_with_cache_filters_new_frontmatter_records(capsys):
 
 
 def test_merge_with_cache_does_not_delete_existing_cache_records():
-    """存量缓存里的 front-matter 由清理脚本负责，collector 不删除。"""
     stale = _rec("Proceedings of Old Conf", url="https://doi.org/10.1145/old",
                  authors=[], conf="OLD2020")
     result = _merge_with_cache({}, {"OLD2020": [stale]}, set(), set())
-    assert len(result["OLD2020"]) == 1  # 原样保留
+    assert len(result["OLD2020"]) == 1
 
 
 def test_merge_with_cache_no_frontmatter_no_log(capsys):

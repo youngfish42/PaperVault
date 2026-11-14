@@ -69,16 +69,6 @@ def missing_code(paper: dict) -> bool:
     return str(paper.get("paper_code") or "#").strip() in ("", "#")
 
 
-def is_whole_proceedings(paper: dict) -> bool:
-    title = str(paper.get("paper_name") or "").casefold()
-    if "proceedings" not in title:
-        return False
-    parsed = urlparse(str(paper.get("paper_url") or ""))
-    host = (parsed.netloc or "").lower()
-    doi = (parsed.path or "").strip("/")
-    return host == "doi.org" and doi.startswith("10.1007/978-") and "_" not in doi
-
-
 def extract_arxiv_id(url: str) -> Optional[str]:
     try:
         parsed = urlparse(str(url or "").strip())
@@ -375,7 +365,7 @@ def collect_targets(
             continue
         if classify_paper_url(str(paper.get("paper_url") or "")) == "venue-index":
             continue
-        if is_frontmatter_record(paper) or is_whole_proceedings(paper):
+        if is_frontmatter_record(paper):
             continue
         if not _conf_matches(str(paper.get("conf") or ""), conf):
             continue
