@@ -74,7 +74,7 @@ def _merge_with_cache(
     * For every conf we *did* recollect, URL-dedupe the cache against the new
       records and field-merge (longer abstract / authors / non-placeholder
       code) so cache abstracts survive a fresh source run.
-    * Filter front-matter records (volume covers / proceedings landing pages)
+    * Filter front-matter and structurally verified whole-proceedings records
       out of the **new** side before they ever enter the cache — see
       ``collector/frontmatter.py`` for the collection-side predicate and how
       it deliberately differs from the cleanup-side one. Existing cache

@@ -138,12 +138,14 @@ def _classify_ijcai(path: str) -> UrlKind:
     return "unknown"
 
 
+_IEEE_CONHOME_RE = re.compile(r"^/xpl/conhome/\d+/proceeding/?$", re.IGNORECASE)
+
+
 def classify_paper_url(url: str) -> UrlKind:
     """Classify a paper URL into one of ``paper`` / ``venue-index`` / ``unknown``.
 
-    Only three domains are meaningful today because those are the ones
-    where the backfill pipeline is currently poisoned by venue-index
-    entries. Everything else returns ``"unknown"`` so callers can pick a
+    Only domains with known landing-page layouts are classified here.
+    Everything else returns ``"unknown"`` so callers can pick a
     domain-specific policy without this module ever silently downgrading a
     real paper URL.
     """
@@ -161,6 +163,8 @@ def classify_paper_url(url: str) -> UrlKind:
         return _classify_openreview(path, parsed.query or "")
     if host.endswith("ijcai.org"):
         return _classify_ijcai(path)
+    if host.endswith("ieeexplore.ieee.org") and _IEEE_CONHOME_RE.match(path):
+        return "venue-index"
 
     return "unknown"
 

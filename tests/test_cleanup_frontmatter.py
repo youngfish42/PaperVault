@@ -123,6 +123,31 @@ def test_non_dict_record_not_matched():
     assert cf.is_frontmatter_record("not a dict") is False
 
 
+def test_whole_proceedings_removed_even_with_abstract_and_code():
+    rec = _rec(
+        "Proceedings of the ACM SIGSPATIAL Workshop",
+        url="https://doi.org/10.1145/2442796",
+        abstract="These proceedings contain selected papers.",
+        code="https://github.com/example/volume",
+    )
+    assert cf.is_frontmatter_record(rec) is True
+
+
+def test_workshop_article_and_chapter_survive():
+    article = _rec(
+        "A Novel Method for Geospatial Data Analysis",
+        url="https://doi.org/10.1145/2442796.2442800",
+        abstract="A" * 100,
+    )
+    chapter = _rec(
+        "Proceedings of Some Conference",
+        url="https://doi.org/10.1007/978-3-032-38062-3_1",
+        abstract="A" * 100,
+    )
+    assert cf.is_frontmatter_record(article) is False
+    assert cf.is_frontmatter_record(chapter) is False
+
+
 # ---------- cleanup(): dry-run / write ------------------------------------------
 
 def _sample_records():
