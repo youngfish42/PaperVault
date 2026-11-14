@@ -31,9 +31,15 @@ FRONT_MATTER_RE = re.compile(
     re.IGNORECASE,
 )
 PROCEEDINGS_TITLE_RE = re.compile(
-    r"(?:^(?:(?:adjunct|joint|workshops)\s+)?proceedings\b"
+    r"(?:^(?:(?:adjunct|joint|workshops)\s+)?proceedings\b|^workshop proceedings\s+of\b"
     r"|[,:]\s*proceedings\b|\bproceedings\s*(?:,\s*part\b|$)"
     r"|\bconference proceedings\s*,|\bworkshop proceedings\s*\()",
+    re.IGNORECASE,
+)
+_ACM_PROCEEDINGS_TITLE_RE = re.compile(
+    r"(?:^(?:(?:adjunct|joint|workshops)\s+)?proceedings\b|^workshop proceedings\s+of\b"
+    r"|[,:]\s*proceedings\b|\bconference proceedings\s*,"
+    r"|\bworkshop proceedings\s*\()",
     re.IGNORECASE,
 )
 _SPRINGER_BOOK_DOI_RE = re.compile(r"^10\.1007/978-[^_]+$", re.IGNORECASE)
@@ -68,9 +74,10 @@ def is_proceedings_record(rec: dict) -> bool:
 
     if host == "doi.org" and _SPRINGER_BOOK_DOI_RE.fullmatch(path):
         return True
-    if host == "doi.org" and _ACM_DOI_RE.fullmatch(path):
+    acm_title = _ACM_PROCEEDINGS_TITLE_RE.search(title)
+    if acm_title and host == "doi.org" and _ACM_DOI_RE.fullmatch(path):
         return True
-    if host.endswith("acm.org"):
+    if acm_title and host.endswith("acm.org"):
         if _ACM_LEGACY_DOI_RE.fullmatch(path):
             return True
         if path == "citation.cfm":

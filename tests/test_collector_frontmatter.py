@@ -133,6 +133,44 @@ def test_workshop_proceedings_revisited_is_not_a_volume_title():
     assert is_proceedings_record(rec) is False
 
 
+def test_singular_workshop_proceedings_is_a_volume_title():
+    rec = _rec(
+        "Workshop Proceedings of the ACM Conference",
+        url="https://doi.org/10.1145/2442796",
+        abstract="A" * 100,
+        code="https://github.com/example/volume",
+    )
+    assert is_proceedings_record(rec) is True
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Scientometric analysis of the CHI proceedings",
+        "Temporal Semantic Analysis of Conference Proceedings",
+    ],
+)
+def test_acm_bare_doi_does_not_override_research_article_title(title):
+    rec = _rec(
+        title,
+        url="https://doi.org/10.1145/2442796",
+        abstract="A" * 100,
+        code="https://github.com/example/paper",
+    )
+    assert is_proceedings_record(rec) is False
+    assert is_frontmatter_record(rec) is False
+    assert should_drop_on_collect(rec) is False
+
+
+def test_acm_colon_proceedings_title_remains_a_volume():
+    rec = _rec(
+        "COVID-19: Proceedings of the ACM Workshop",
+        url="https://doi.org/10.1145/3423459",
+        abstract="A" * 100,
+    )
+    assert is_proceedings_record(rec) is True
+
+
 @pytest.mark.parametrize(
     "url",
     [
