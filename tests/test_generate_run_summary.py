@@ -256,6 +256,7 @@ def test_hf_writer_workflows_share_external_lock_and_backfill_skips_stats():
     ).read_text(encoding="utf-8")
     assert "Regenerate stats overview chart" not in backfill_text
     assert "pics/stats/stats_overview.svg" not in backfill_text
+    assert "--chunk-size 500 --max-papers 5000 --soft-timeout 900" in backfill_text
 
     discovery = yaml.safe_load(
         (ROOT / ".github/workflows/discover_and_update.yml").read_text(
