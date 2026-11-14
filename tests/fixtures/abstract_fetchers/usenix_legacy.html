@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<!--[if lt IE 7 ]>              <html  lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" class="no-js ie6"> <![endif]-->
+<!--[if IE 7 ]>                 <html  lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" class="no-js ie7"> <![endif]-->
+<!--[if IE 8 ]>                 <html  lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" class="no-js ie8"> <![endif]-->
+<!--[if (gte IE 9)|!(IE)]><!-->
+
+<html  lang="en" dir="ltr" prefix="og: http://ogp.me/ns#" class="no-js">
+<!--<![endif]-->
+
+  <head>
+    <meta charset="utf-8" />
+<style class="vjs-styles-defaults">    .video-js {
+    }</style><link rel="shortcut icon" href="https://www.usenix.org/themes/motherboard/favicon.ico" type="image/vnd.microsoft.icon" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="citation_title" content="Resilient Distributed Datasets: A {Fault-Tolerant} Abstraction for {In-Memory} Cluster Computing" />
+<meta name="citation_author" content="Matei Zaharia" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Mosharaf Chowdhury" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Tathagata Das" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Ankur Dave" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Justin Ma" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Murphy McCauly" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Michael J. Franklin" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Scott Shenker" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_author" content="Ion Stoica" />
+<meta name="citation_author_institution" content="University of California, Berkeley" />
+<meta name="citation_publication_date" content="2012" />
+<meta name="citation_conference_title" content="9th USENIX Symposium on Networked Systems Design and Implementation (NSDI 12)" />
+<meta name="citation_firstpage" content="15" />
+<meta name="citation_lastpage" content="28" />
+<meta name="citation_isbn" content="978-931971-92-8" />
+<meta name="citation_pdf_url" content="https://www.usenix.org/system/files/conference/nsdi12/nsdi12-final138.pdf" />
+    <!--
+	<link rel="image_src" href="https://www.usenix.org/sites/default/files/lisa15_button_125.png" />
+	<meta property="og:image" content="https://www.usenix.org/sites/default/files/lisa15_button_125.png" />
+	<meta property="og:image:secure_url" content="https://www.usenix.org/sites/default/files/lisa15_button_125.png" />
+    -->
+    <!-- TODO: add the following meta tags to $head via theme_settings -->
+    <!-- Always force latest IE rendering engine (even in intranet) & Chrome Frame 
+       Remove this if you use the .htaccess -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><!--  Mobile viewport optimized: j.mp/bplateviewport -->
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
+	<title>Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing | USENIX</title>
+    <link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_1_--XOA3e5wXR8kpuIC8dX5PESMVW2ExWZzWaBHwUAA.css" media="all" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_sjbIB5GEqe9Dl8nBlENdU0lUL2orFpNvZVYZq6b-H78.css" media="all" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_xqfpjbADPRl5Pjyce-So9oiIpm9qfOBp9RM2W4_8moQ.css" media="all" />
+<style media="all">#backtotop{bottom:20px;right:20px;}
+</style>
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_9E4-CnnlcumAtlLhvCa7Cf8sZClY3Jx5uj1E-DGbq00.css" media="all" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_qFgpkJD9LCbzFq1MQrtO4IkZu4u0bPvQ41XA-NJVJPM.css" media="all and (min-width: 60em)" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_B99K36ryG5rmvImk01aGYNU6pRjl9ax1F1V5MSwJ1l0.css" media="all" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_cU3KfR4jRp9zSJ4c3qKFtdvl9cZqjJmX6xjYh4peo_E.css" media="all and (min-width: 60em)" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_vm-DRaqYFK3OITrjgMk731u7cDFEJsQeoLlCEtMp4oI.css" media="all" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_sZC2I8TLoYHNhmLOlqkeLINNnk1Al0uAP5GcbskKSeM.css" media="all" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_Sv2B4_2SMxMCE7KckXEVOaa9J3TjLk6RHKlnZmM0bDM.css" media="screen" />
+<link rel="stylesheet" href="https://www.usenix.org/sites/default/files/css/css_47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU.css" media="print" />
+    <link href="/themes/waves/css/ie.css" media="screen, projection" rel="stylesheet" type="text/css">
+	<link href="/themes/modern_lisa/css/MyFontsWebfontsKit.css" rel="stylesheet" type="text/css">
+    <script>window.Backdrop = {settings: {"basePath":"\/","pathPrefix":"","drupalCompatibility":true,"ajaxPageState":{"theme":"usenix_conference_nsdi","theme_token":"O7DmWp2wxqm0hFA3fqVxlPBOoaogx_fYWka0x2poqKE","css":{"core\/misc\/normalize.css":1,"core\/modules\/system\/css\/system.css":1,"core\/modules\/system\/css\/system.theme.css":1,"core\/modules\/system\/css\/messages.theme.css":1,"modules\/custom\/usenix_blocks\/libraries\/mmenu\/dist\/mmenu.css":1,"modules\/contrib\/views_slideshow\/views_slideshow.css":1,"modules\/contrib\/back_to_top\/css\/back_to_top.css":1,"modules\/custom\/adamm\/css\/base.css":1,"modules\/custom\/adamm\/css\/dropdown.css":1,"core\/modules\/comment\/css\/comment.css":1,"core\/modules\/date\/css\/date.css":1,"core\/modules\/field\/css\/field.css":1,"modules\/contrib\/og\/css\/og.css":1,"modules\/contrib\/paragraphs\/css\/paragraphs.css":1,"core\/modules\/search\/search.theme.css":1,"modules\/contrib\/special_menu_items\/css\/special_menu_items.css":1,"modules\/custom\/usenix_conference\/css\/timezone-picker.css":1,"modules\/custom\/usenix_logo_preview\/css\/usenix_logo_preview.css":1,"core\/modules\/user\/css\/user.css":1,"modules\/contrib\/workflow\/workflow_admin_ui\/workflow_admin_ui.css":1,"core\/modules\/views\/css\/views.css":1,"modules\/contrib\/rules\/rules.css":1,"0":1,"modules\/contrib\/geshifilter\/geshifilter.css":1,"modules\/custom\/biblio\/biblio.css":1,"layouts\/usenix_conference_base\/usenix-conference-base.css":1,"modules\/custom\/usenix_media\/js\/videojs\/video-js.min.css":1,"core\/modules\/system\/css\/menu-dropdown.theme.breakpoint.css":1,"core\/modules\/system\/css\/menu-dropdown.theme.breakpoint-queries.css":1,"core\/modules\/system\/css\/menu-toggle.theme.breakpoint.css":1,"core\/modules\/system\/css\/menu-toggle.theme.breakpoint-queries.css":1,"modules\/custom\/usenix_blocks\/css\/mobile-menu.css":1,"modules\/contrib\/views_slideshow\/contrib\/views_slideshow_cycle\/views_slideshow_cycle.css":1,"themes\/tao\/reset.css":1,"themes\/tao\/base.css":1,"themes\/waves\/css\/screen.css":1,"themes\/waves\/system.css":1,"themes\/waves\/views.css":1,"themes\/usenix_conference_base\/css\/conference_base.css":1,"themes\/usenix_conference_nsdi\/css\/conference.css":1,"themes\/usenix_conference_base\/css\/usenix_conference_base.css":1,"themes\/usenix_conference_base\/css\/menu-dropdown.css":1,"themes\/tao\/drupal.css":1,"themes\/waves\/core.css":1,"themes\/waves\/icons.css":1,"themes\/waves\/style.css":1,"themes\/waves\/reset.css":1,"themes\/waves\/base.css":1,"themes\/waves\/print.css":1},"js":{"public:\/\/google_tag\/google_tag.script.js":1,"modules\/contrib\/jquery_update\/replace\/jquery\/1.12\/jquery.min.js":1,"core\/misc\/jquery.once.js":1,"core\/misc\/backdrop.js":1,"modules\/contrib\/behavior_weights\/js\/behavior_weights.js":1,"modules\/contrib\/jquery_update\/js\/jquery_browser.js":1,"modules\/contrib\/beautytips\/js\/jquery.bt.min.js":1,"modules\/contrib\/beautytips\/js\/beautytips.js":1,"modules\/custom\/usenix_blocks\/libraries\/mmenu\/dist\/mmenu.js":1,"modules\/contrib\/views_slideshow\/js\/views_slideshow.js":1,"modules\/contrib\/views_slideshow\/contrib\/views_slideshow_cycle\/libraries\/jquery.cycle\/jquery.cycle.all.js":1,"modules\/contrib\/back_to_top\/js\/back_to_top.js":1,"modules\/custom\/adamm\/js\/accessible-menu\/dist\/disclosure-menu.iife.js":1,"modules\/custom\/adamm\/js\/contentexpander\/contentExpander.js":1,"modules\/custom\/adamm\/js\/adamm.js":1,"modules\/contrib\/views_slideshow\/contrib\/views_slideshow_cycle\/js\/formoptions.js":1,"themes\/waves\/js\/search.js":1,"themes\/waves\/js\/modernizr-1.6.min.js":1,"themes\/waves\/js\/usenix.js":1,"modules\/contrib\/beautytips\/other_libs\/jquery.hoverIntent.minified.js":1,"modules\/contrib\/field_group\/js\/field_group.js":1,"modules\/contrib\/field_group\/js\/field_groups.js":1,"modules\/custom\/usenix_media\/js\/videojs\/video.js":1,"modules\/custom\/usenix_media\/swf_assets\/swfobject\/swfobject.js":1,"modules\/custom\/usenix_media\/swf_assets\/audio-player\/audio-player.js":1,"modules\/custom\/usenix_media\/js\/usenix_audio.js":1,"core\/modules\/system\/js\/menus.js":1,"modules\/custom\/usenix_blocks\/js\/mobile-menu.js":1,"modules\/contrib\/views_slideshow\/contrib\/views_slideshow_cycle\/js\/views_slideshow_cycle.js":1,"themes\/rubik\/js\/rubik.js":1}},"back_to_top":{"distance":"100","text":"Back to top","title":1,"type":"image","disable_mobile":0},"beautytipStyles":{"default":[],"plain":[],"netflix":{"positions":["right","left"],"fill":"#FFF","padding":5,"shadow":true,"shadowBlur":12,"strokeStyle":"#B9090B","spikeLength":50,"spikeGirth":20,"cornerRadius":10,"centerPointY":0.1,"overlap":-8,"cssStyles":{"fontSize":"12px","fontFamily":"arial,helvetica,sans-serif"}},"facebook":{"fill":"#F7F7F7","padding":8,"strokeStyle":"#B7B7B7","cornerRadius":0,"cssStyles":{"fontFamily":"\u0022lucida grande\u0022,tahoma,verdana,arial,sans-serif","fontSize":"11px"}},"transparent":{"fill":"rgba(0, 0, 0, .8)","padding":20,"strokeStyle":"#CC0","strokeWidth":3,"spikeLength":40,"spikeGirth":40,"cornerRadius":40,"cssStyles":{"color":"#FFF","fontWeight":"bold"}},"big-green":{"fill":"#00FF4E","padding":20,"strokeWidth":0,"spikeLength":40,"spikeGirth":40,"cornerRadius":15,"cssStyles":{"fontFamily":"\u0022lucida grande\u0022,tahoma,verdana,arial,sans-serif","fontSize":"14px"}},"google-maps":{"positions":["top","bottom"],"fill":"#FFF","padding":15,"strokeStyle":"#ABABAB","strokeWidth":1,"spikeLength":65,"spikeGirth":40,"cornerRadius":25,"centerPointX":0.9,"cssStyles":{"fontSize":"12px","fontFamily":"arial,helvetica,sans-serif"}},"hulu":{"fill":"#F4F4F4","strokeStyle":"#666666","spikeLength":20,"spikeGirth":10,"width":350,"overlap":0,"centerPointY":1,"cornerRadius":0,"cssStyles":{"fontFamily":"\u0022Lucida Grande\u0022,Helvetica,Arial,Verdana,sans-serif","fontSize":"12px","padding":"10px 14px"},"shadow":true,"shadowColor":"rgba(0,0,0,.5)","shadowBlur":8,"shadowOffsetX":4,"shadowOffsetY":4}},"beautytips":{".beautytips":{"cssSelect":".beautytips","style":null}},"viewsSlideshow":{"sponsor_slideshow-block_1":{"methods":{"goToSlide":["viewsSlideshowPager","viewsSlideshowSlideCounter","viewsSlideshowCycle"],"nextSlide":["viewsSlideshowPager","viewsSlideshowSlideCounter","viewsSlideshowCycle"],"pause":["viewsSlideshowControls","viewsSlideshowCycle"],"play":["viewsSlideshowControls","viewsSlideshowCycle"],"previousSlide":["viewsSlideshowPager","viewsSlideshowSlideCounter","viewsSlideshowCycle"],"transitionBegin":["viewsSlideshowPager","viewsSlideshowSlideCounter"],"transitionEnd":[]},"paused":0}},"viewsSlideshowCycle":{"#views_slideshow_cycle_main_sponsor_slideshow-block_1":{"num_divs":9,"id_prefix":"#views_slideshow_cycle_main_","div_prefix":"#views_slideshow_cycle_div_","vss_id":"sponsor_slideshow-block_1","effect":"fade","transition_advanced":0,"timeout":5000,"speed":700,"delay":0,"sync":1,"random":0,"pause":1,"pause_on_click":0,"action_advanced":1,"start_paused":0,"remember_slide":0,"remember_slide_days":1,"pause_in_middle":0,"pause_when_hidden":0,"pause_when_hidden_type":"full","amount_allowed_visible":"","nowrap":0,"fixed_height":1,"items_per_slide":1,"wait_for_image_load":0,"wait_for_image_load_timeout":3000,"cleartype":0,"cleartypenobg":0,"advanced_options":"{}"}},"field_group":{"div":"full"},"usenix_media":{"pathToSWFVideoPlayer":"https:\/\/www.usenix.org\/modules\/custom\/usenix_media\/swf_assets\/jwplayer\/player.swf","supportsVideo":"unset","videos":[{"uniqueDIV":"usenix-media-video-1","h264VideoURL":"https:\/\/c59951.ssl.cf2.rackcdn.com\/nsdi12\/zaharia.mp4","oggVideoURL":false,"webmVideoURL":"https:\/\/c59951.ssl.cf2.rackcdn.com\/nsdi12\/zaharia.webm","jpg":"https:\/\/www.usenix.org\/sites\/default\/files\/styles\/video-thumbnail\/public\/conference\/video\/zaharia.jpg"}],"pathToSWFAudioPlayer":"https:\/\/www.usenix.org\/modules\/custom\/usenix_media\/swf_assets\/audio-player\/player.swf","supportsAudio":"unset","audio":[{"uniqueDIV":"usenix-media-audio-1","mp3AudioUrl":"https:\/\/c59951.ssl.cf2.rackcdn.com\/nsdi12\/zaharia.mp3","oggAudioUrl":"https:\/\/c59951.ssl.cf2.rackcdn.com\/nsdi12\/zaharia.ogg"}]}}};</script>
+<script defer="defer" src="https://www.usenix.org/sites/default/files/google_tag/google_tag.script.js?tn5o41"></script>
+<script src="https://www.usenix.org/sites/default/files/js/js_bZlYCeUOgUn_Zy3vTWwKIeA3h8k-K96O5_iBg4r0XoU.js"></script>
+<script src="https://www.usenix.org/sites/default/files/js/js_xSWT4GBKxkReZOSx9PqEQiGkAqWtejV1Yc_nQEhWzfo.js"></script>
+<script src="https://www.usenix.org/sites/default/files/js/js_OBbEdvAMLplavBZwuJLx2XxIWde5lahDYOxOAqmpc4c.js"></script>
+<script src="https://www.usenix.org/sites/default/files/js/js_ayPZtBNZYm0SX7q60r_Oz9ZDRce1QblaBl7EsjNPWkQ.js"></script>
+<script src="https://www.usenix.org/sites/default/files/js/js_FUdUX8E5FQpQBUVDz5s0QckEm_v9cLgZHX-L7sviwCo.js"></script>
+        	
+</head>
+
+  <body class="page node-type-paper __default user-is-non-member page-node page-conference-nsdi12-technical-sessions-presentation-zaharia not-front sidebar-left" >
+    <div id="skip-link">
+        <a href="#main-content" class="element-invisible element-focusable">Skip to main content</a>
+    </div>
+    
+<!-- start conference nav -->
+
+<div id='top-outer'>
+  <div id='top' class='limiter'>
+    <div id='top-inner'>
+      <div class="top-left">
+        <a href="/" id="site-logo" class="site-logo back-to-usenix">
+          Back to USENIX        </a>
+      </div>
+
+<!-- start conference top nav -->
+      <div id="top-right">
+        <nav id="conference-top">
+                      <ul class="menu"><li class="first leaf menu-mlid-4366"><a href="/conferences" title="">Conferences</a></li>
+<li class="last leaf menu-mlid-4368"><a href="/students" title="">Students</a></li>
+</ul>          
+                      <span class="conference-header-login"><a href="/user?destination=node/162809">Sign in</a></span>                  </nav>
+      </div>
+<!-- end conference top nav -->
+
+    </div>
+  </div>
+</div>
+<!-- start conference header -->
+<div id="conference-header">
+  <div id='header-theme'>
+          <a href="/conference/nsdi12">
+        <div id="header-main" class="header-main-replaced" style="background-image: url('https://www.usenix.org/sites/default/files/styles/conference_header/public/nsdi12_banner.jpg');">
+          <div class="header-main-background"></div>
+        </div>
+      </a>
+      </div>
+</div>
+<!-- end conference header -->
+        <div class="layout--usenix-conference-base" id="page-wrapper"><div id="page">
+
+
+  <div id='horizontal_menu'>
+	  </div>
+
+<div id="container">
+
+  <div class='clearfix limiter page-content'>
+          <div id='sidebar-left'>
+<div class='block block-og-menu-og-single-menu-block clearfix'  id="block-og-menu-og-single-menu-block">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+  
+  
+      <div class='content clearfix '>
+      <ul class="menu"><li class="first leaf menu-mlid-19253"><a href="/conference/nsdi12" title="">NSDI &#039;12 Home</a></li>
+<li class="leaf menu-mlid-19254"><a href="/conference/nsdi12/registration-information">Registration Information</a></li>
+<li class="leaf menu-mlid-19255"><a href="/conference/nsdi12/registration-discounts">Discounts</a></li>
+<li class="leaf menu-mlid-19256"><a href="/conference/nsdi12/symposium-organizers" title="">Organizers</a></li>
+<li class="leaf menu-mlid-19257"><a href="/conference/nsdi12/glance" title="">At a Glance</a></li>
+<li class="leaf menu-mlid-19259"><a href="/conference/nsdi12/technical-sessions" title="">Technical Sessions</a></li>
+<li class="leaf menu-mlid-20576"><a href="/conference/nsdi12/session/poster-and-demo-session" title="Poster Session info on Activities page">Poster and Demo Session</a></li>
+<li class="leaf menu-mlid-19261"><a href="/conference/nsdi12/birds-feather-sessions" title="">Birds-of-a-Feather Sessions</a></li>
+<li class="leaf menu-mlid-19262"><a href="/conference/nsdi12/workshops" title="">Workshops</a></li>
+<li class="leaf menu-mlid-19614"><a href="/conference/nsdi12/sponsors" title="NSDI Sponsors">Sponsors</a></li>
+<li class="leaf menu-mlid-19263"><a href="/conference/nsdi12/activities">Activities</a></li>
+<li class="leaf menu-mlid-21749"><a href="/conference/nsdi12/calendar-0" title="">Calendar</a></li>
+<li class="leaf menu-mlid-19264"><a href="/conference/nsdi12/hotel-travel-information" title="">Hotel and Travel Information</a></li>
+<li class="leaf menu-mlid-19266"><a href="/conference/nsdi12/students" title="">Students</a></li>
+<li class="leaf menu-mlid-19267"><a href="/conference/nsdi12/questions" title="">Questions?</a></li>
+<li class="leaf menu-mlid-20577"><a href="/conference/nsdi12/help-promote" title="Help Promote NSDI &#039;12">Help Promote</a></li>
+<li class="leaf menu-mlid-19268"><a href="/conference/nsdi12/participants" title="">For Participants</a></li>
+<li class="leaf menu-mlid-20792"><a href="/conference/nsdi12/call-for-papers-0" title="">Call for Papers</a></li>
+<li class="last leaf menu-mlid-19613"><a href="/conferences/byname/178" title="Past NSDI Proceedings">Past Proceedings</a></li>
+</ul>    </div>
+  
+      </div></div>
+  </div>
+
+
+<div class='block block-views-sponsor-slideshow-block-1 clearfix'  id="block-views-sponsor-slideshow-block-1">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+      <h2  class="block-title">
+            sponsors    </h2>
+  
+  
+      <div class='content clearfix '>
+      <div class="view view-sponsor-slideshow view-id-sponsor_slideshow view-display-id-block_1 view-dom-id-9a8ad406870f961fd0a662fd5818449f">
+        
+  
+  
+      <div class="view-content">
+      
+  <div class="skin-default">
+    
+    <div id="views_slideshow_cycle_main_sponsor_slideshow-block_1" class="views_slideshow_cycle_main views_slideshow_main"><div id="views_slideshow_cycle_teaser_section_sponsor_slideshow-block_1" class="views-slideshow-cycle-main-frame views_slideshow_cycle_teaser_section">
+  <div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_0" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-1 views-row-odd" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_0'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-0 views-row-odd views-row-first">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Gold Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.infosys.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/infosys_0.png" width="200" height="78" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_1" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-2 views_slideshow_cycle_hidden views-row-even" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_1'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-1 views-row-even">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Silver Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.nsf.gov/" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/nsf.png" width="127" height="125" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_2" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-3 views_slideshow_cycle_hidden views-row-odd" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_2'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-2 views-row-odd">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Silver Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.vmware.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/vmware_gs_4.png" width="173" height="27" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_3" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-4 views_slideshow_cycle_hidden views-row-even" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_3'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-3 views-row-even">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Silver Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://research.microsoft.com/" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/microsoft_research_200x56.png" width="200" height="56" alt="Microsoft Research" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_4" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-5 views_slideshow_cycle_hidden views-row-odd" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_4'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-4 views-row-odd">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Silver Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="https://www.google.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/google_0.png" width="200" height="73" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_5" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-6 views_slideshow_cycle_hidden views-row-even" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_5'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-5 views-row-even">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Bronze Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.hp.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/hpr_d_b_rgb_72_lg_0.png" width="125" height="125" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_6" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-7 views_slideshow_cycle_hidden views-row-odd" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_6'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-6 views-row-odd">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Bronze Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.fb.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/facebook_0.png" width="200" height="70" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_7" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-8 views_slideshow_cycle_hidden views-row-even" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_7'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-7 views-row-even">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Bronze Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.akamai.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/akamai_0.png" width="200" height="87" alt="" /></a></div>  </div></div>
+</div>
+<div id="views_slideshow_cycle_div_sponsor_slideshow-block_1_8" class="views-slideshow-cycle-main-frame-row views_slideshow_cycle_slide views_slideshow_slide views-row-9 views_slideshow_cycle_hidden views-row-odd" aria-labelledby='views_slideshow_pager_field_item_bottom_sponsor_slideshow-block_1_8'>
+  <div class="views-slideshow-cycle-main-frame-row-item views-row views-row-8 views-row-odd views-row-last">
+    
+  <div class="views-field views-field-field-sponsor-level">        <div class="field-content">Media Sponsor</div>  </div>  
+  <div class="views-field views-field-field-sponsor-image">        <div class="field-content"><a href="http://www.lxer.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_slideshow_front/public/sponsor_images/lxer_150x53.png" width="150" height="53" alt="LXer" /></a></div>  </div></div>
+</div>
+</div>
+</div>
+      </div>
+    </div>
+  
+  
+  
+  
+  
+  
+</div>    </div>
+  
+      </div></div>
+  </div>
+
+
+<div class='block block-block-112 clearfix'  id="block-block-112">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+      <h2  class="block-title">
+            USENIX Conference Policies    </h2>
+  
+  
+      <div class='content clearfix '>
+              <ul>
+            <li><a href="/conferences/coc">Event Code of Conduct</a></li>
+
+            <li><a href="/conferences/network-policy">Conference Network Policy</a></li>
+
+            <li><a href="/conferences/environmental-responsibility">Statement on Environmental Responsibility Policy</a></li>
+        </ul>
+    </div>
+  
+      </div></div>
+  </div>
+
+</div>
+    
+    <div id="content" class=
+      'left-sidebar'
+            > <!-- closing content class -->
+      
+      <div class='below-breadcrumb clearfix'></div>
+
+      
+      <h1 class='page-title '>
+                Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing      </h1>
+
+      
+      
+      
+      
+              <div class='content-wrapper clearfix'>
+<div id="node-162809" class="node node-paper view-mode-full clearfix" id="node-162809">
+
+  
+      
+  
+  <div class="content">
+    <div class="field field-name-field-paper-people-text field-type-text-long field-label-hidden"><div class="field-items field-items"><div class="field-item odd"><p class="p1">Matei Zaharia, Mosharaf Chowdhury, Tathagata Das, Ankur Dave, Justin Ma, Murphy McCauley, Michael J. Franklin, Scott Shenker, and Ion Stoica, <em>University of California, Berkeley</em><br />     <strong>Awarded Best Paper!</strong><br />     <strong>Awarded Community Award Honorable Mention!</strong></p>
+</div></div></div><div class="field field-name-field-paper-description field-type-text-long field-label-hidden"><div class="field-items field-items"><div class="field-item odd"><p class="p1">We present Resilient Distributed Datasets (RDDs), a distributed memory abstraction that lets programmers perform in-memory computations on large clusters in a fault-tolerant manner. RDDs are motivated by two types of applications that current computing frameworks handle inefficiently: iterative algorithms and interactive data mining tools. In both cases, keeping data in memory can improve performance by an order of magnitude. To achieve fault tolerance efficiently, RDDs provide a restricted form of shared memory, based on coarse-grained transformations rather than fine-grained updates to shared state. However, we show that RDDs are expressive enough to capture a wide class of computations, including recent specialized programming models for iterative jobs, such as Pregel, and new applications that these models do not capture. We have implemented RDDs in a system called Spark, which we evaluate through a variety of user applications and benchmarks.</p>
+<p> </p>
+</div></div></div><div class="field field-name-field-paper-people field-type-node-reference field-label-hidden"><div class="field-items field-items"><div class="field-item odd">
+<div id="node-180551" class="node node-speaker view-mode-schedule clearfix" id="node-180551">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/matei-zaharia-university-california-berkeley">Matei Zaharia, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item even">
+<div id="node-180554" class="node node-speaker view-mode-schedule clearfix" id="node-180554">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/mosharaf-chowdhury-university-california-berkeley">Mosharaf Chowdhury, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item odd">
+<div id="node-180553" class="node node-speaker view-mode-schedule clearfix" id="node-180553">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/tathagata-das-university-california-berkeley">Tathagata Das, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item even">
+<div id="node-180552" class="node node-speaker view-mode-schedule clearfix" id="node-180552">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/ankur-dave-university-california-berkeley">Ankur Dave, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item odd">
+<div id="node-180555" class="node node-speaker view-mode-schedule clearfix" id="node-180555">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/justin-ma-university-california-berkeley">Justin Ma, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item even">
+<div id="node-180556" class="node node-speaker view-mode-schedule clearfix" id="node-180556">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/murphy-mccauly-university-california-berkeley">Murphy McCauly, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item odd">
+<div id="node-180557" class="node node-speaker view-mode-schedule clearfix" id="node-180557">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/michael-j-franklin-university-california-berkeley">Michael J. Franklin, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item even">
+<div id="node-180559" class="node node-speaker view-mode-schedule clearfix" id="node-180559">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/scott-shenker-university-california-berkeley">Scott Shenker, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div><div class="field-item odd">
+<div id="node-180558" class="node node-speaker view-mode-schedule clearfix" id="node-180558">
+
+  
+        <h2><a href="/conference/nsdi12/speaker-or-organizer/ion-stoica-university-california-berkeley">Ion Stoica, University of California, Berkeley</a></h2>
+    
+  
+  <div class="content">
+      </div>
+
+  
+</div>
+
+</div></div></div><div id="node-paper-full-group-open-access-content" class=" group-open-access-content field-group-div"><h2><span>Open Access Media</span></h2><div class="description"><p>USENIX is committed to Open Access to the research presented at our events. Papers and proceedings are freely available to everyone once the event begins. Any video, audio, and/or slides that are posted after the event are also free and open to everyone. <a href="/annual-fund">Support USENIX</a> and our commitment to Open Access.</p>
+</div><div class="field field-name-field-bibtex-node field-type-node-reference field-label-hidden"><div class="field-items field-items"><div class="field-item odd"><div class="bibtex-accordion"><div class="bibtex-accordion-label">BibTeX</div><div class="bibtex-accordion-content"><div class="bibtex-text-entry bibtex-accordion-text-entry">@inproceedings {180560,<br />
+	author = {Matei Zaharia and Mosharaf Chowdhury and Tathagata Das and Ankur Dave and Justin Ma and Murphy McCauly and Michael J. Franklin and Scott Shenker and Ion Stoica},<br />
+	title = {Resilient Distributed Datasets: A {Fault-Tolerant} Abstraction for {In-Memory} Cluster Computing},<br />
+	booktitle = {9th USENIX Symposium on Networked Systems Design and Implementation (NSDI 12)},<br />
+	year = {2012},<br />
+	isbn = {978-931971-92-8},<br />
+	address = {San Jose, CA},<br />
+	pages = {15--28},<br />
+	url = {https://www.usenix.org/conference/nsdi12/technical-sessions/presentation/zaharia},<br />
+	publisher = {USENIX Association},<br />
+	month = apr<br />
+}<br />
+</div><div class="bibtex-download-link bibtex-accordion-download-link"><a href="/biblio/export/bibtex/180560">Download</a></div></div></div></div></div></div><div class="field field-name-field-presentation-pdf field-type-file field-label-hidden"><div class="field-items field-items"><div class="field-item odd"><span class="file"> <a href="https://www.usenix.org/system/files/conference/nsdi12/nsdi12-final138.pdf" type="application/pdf; length=886315" title="nsdi12-final138.pdf">Zaharia PDF</a></span></div></div></div><div class="field field-name-field-paper-slides field-type-file field-label-hidden"><div class="field-items field-items"><div class="field-item odd"><div class="usenix-schedule-slides"><a href="https://www.usenix.org/sites/default/files/conference/protected-files/nsdi_zaharia.pdf">View the slides</a></div></div></div></div>
+<script type="text/javascript">
+   function videoPlay() {
+     var video_title = "Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing";
+     if (typeof _gaq !== "undefined") {
+       _gaq.push(['_trackEvent', 'Video', 'Play', video_title]);
+     }
+   }
+   jQuery(document).ready(
+                          function() {
+                            var video_id = "usenix-media-video-1";
+                            var video = document.getElementById(video_id);
+                            video.addEventListener("play", videoPlay, false);
+                          });
+</script>
+
+<div class="usenix-video-field">
+  <h4>Presentation Video</h4>
+    <video width="640" height="480"  poster="https://www.usenix.org/sites/default/files/styles/video-thumbnail/public/conference/video/zaharia.jpg" class="video-js vjs-default-skin vjs-big-play-centered" preload="auto" controls>
+    <source src='https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.mp4' type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+               <source src='https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.webm' type='video/webm; codecs="vp8.0, vorbis"'>
+        <object type="application/x-shockwave-flash" data="https://releases.flowplayer.org/swf/flowplayer-3.2.1.swf" width="640" height="480">
+       <param name="movie" value="http://releases.flowplayer.org/swf/flowplayer-3.2.1.swf">
+       <param name="allowFullScreen" value="true">
+       <param name="wmode" value="transparent">
+       <param name="flashVars" value="config={'playlist':['https%3A%2F%2Fwww.usenix.org%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Fvideo-thumbnail%2Fpublic%2Fconference%2Fvideo%2Fzaharia.jpg',{'url':'https%3A%2F%2Fc59951.ssl.cf2.rackcdn.com%2Fnsdi12%2Fzaharia.mp4','autoPlay':false}]}">
+       <img src="https://www.usenix.org/sites/default/files/styles/video-thumbnail/public/conference/video/zaharia.jpg" width="640" height="480" title="No video playback capabilities. Please install Adobe Flash Player or download the video below">
+    </object>
+  </video>
+  
+  <p><a href="https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.mp4"></a></p>
+</div>
+<h4>Presentation Audio</h4>
+<div id="usenix-media-audio-1">
+  <audio controls>
+          <source src='https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.mp3'>
+              <source src='https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.ogg'>
+              <a href="https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.mp3">MP3 Download</a>
+              <a href="https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.ogg">OGG Download</a>
+      </audio>
+  <p><a href="https://c59951.ssl.cf2.rackcdn.com/nsdi12/zaharia.mp3">Download Audio</a></p>
+</div>
+</div>  </div>
+
+      <div class='node-links clearfix'><ul class="links inline"><li class="comment-forbidden odd first last"><span><a href="/user/login?destination=comment/reply/162809%23comment-form">Log in</a> or <a href="/user/register?destination=comment/reply/162809%23comment-form">register</a> to post comments</span></li></ul></div>
+  
+</div>
+
+</div>
+                </div>
+
+    
+	
+  </div>
+</div>
+
+<div id="footer-outer"><div id='footer' class='limiter clearfix'>
+    <div id='pre-footer'>
+    <div id='pre-footer-inner'>
+<div class='block block-views-sponsors-conference-block-1 clearfix'  id="block-views-sponsors-conference-block-1">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+      <h2  class="block-title">
+            Gold Sponsors    </h2>
+  
+  
+      <div class='content clearfix '>
+      <div class="view view-sponsors-conference view-id-sponsors_conference view-display-id-block_1 view-dom-id-67e20b1e456abbf3cba19186a4cd36e7">
+        
+  
+  
+      <div class="view-content">
+        <div class="views-row views-row-1 odd first last">
+      
+          <a href="http://www.infosys.com" target="_blank"></a>    
+          <a href="http://www.infosys.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/infosys_0.png" width="115" height="45" alt="" /></a>    </div>
+    </div>
+  
+  
+  
+  
+  
+  
+</div>    </div>
+  
+      </div></div>
+  </div>
+
+
+<div class='block block-views-sponsors-conference-block-4 clearfix'  id="block-views-sponsors-conference-block-4">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+      <h2  class="block-title">
+            Silver Sponsors    </h2>
+  
+  
+      <div class='content clearfix '>
+      <div class="view view-sponsors-conference view-id-sponsors_conference view-display-id-block_4 view-dom-id-e43fb3b1f5f7791604f5883120cd391f">
+        
+  
+  
+      <div class="view-content">
+        <div class="views-row views-row-1 odd first">
+      
+          <a href="https://www.google.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/google_0.png" width="115" height="42" alt="" /></a>    </div>
+  <div class="views-row views-row-2 even">
+      
+          <a href="http://research.microsoft.com/" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/microsoft_research_200x56.png" width="115" height="32" alt="Microsoft Research" /></a>    </div>
+  <div class="views-row views-row-3 odd">
+      
+          <a href="http://www.nsf.gov/" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/nsf.png" width="115" height="113" alt="" /></a>    </div>
+  <div class="views-row views-row-4 even last">
+      
+          <a href="http://www.vmware.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/vmware_gs_4.png" width="115" height="18" alt="" /></a>    </div>
+    </div>
+  
+  
+  
+  
+  
+  
+</div>    </div>
+  
+      </div></div>
+  </div>
+
+
+<div class='block block-views-sponsors-conference-block-5 clearfix'  id="block-views-sponsors-conference-block-5">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+      <h2  class="block-title">
+            Bronze Sponsors    </h2>
+  
+  
+      <div class='content clearfix '>
+      <div class="view view-sponsors-conference view-id-sponsors_conference view-display-id-block_5 view-dom-id-42cc8a6b279603637f87e2fb9f864322">
+        
+  
+  
+      <div class="view-content">
+        <div class="views-row views-row-1 odd first">
+      
+          <a href="http://www.akamai.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_front_black_white/public/sponsor_images/akamai_bw.png" width="300" height="131" alt="" /></a>    
+          <a href="http://www.akamai.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/akamai_0.png" width="115" height="50" alt="" /></a>    </div>
+  <div class="views-row views-row-2 even">
+      
+          <a href="http://www.fb.com" target="_blank"></a>    
+          <a href="http://www.fb.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/facebook_0.png" width="115" height="40" alt="" /></a>    </div>
+  <div class="views-row views-row-3 odd last">
+      
+          <a href="http://www.hp.com" target="_blank"></a>    
+          <a href="http://www.hp.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_interest_color/public/sponsor_images/hpr_d_b_rgb_72_lg_0.png" width="115" height="115" alt="" /></a>    </div>
+    </div>
+  
+  
+  
+  
+  
+  
+</div>    </div>
+  
+      </div></div>
+  </div>
+
+
+<div class='block block-views-sponsors-conference-block-6 clearfix'  id="block-views-sponsors-conference-block-6">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+      <h2  class="block-title">
+            Media Sponsors &amp; Industry Partners    </h2>
+  
+  
+      <div class='content clearfix '>
+      <div class="view view-sponsors-conference view-id-sponsors_conference view-display-id-block_6 view-dom-id-899a1bf6ae0a6a9b200c85098b289a0c">
+        
+  
+  
+      <div class="view-content">
+        <div class="views-row views-row-1 odd first last">
+      
+          <a href="http://www.lxer.com"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_front_black_white/public/sponsor_images/lxer_bw_150x53.png" width="150" height="53" alt="" /></a>    
+          <a href="http://www.lxer.com" target="_blank"><img src="https://www.usenix.org/sites/default/files/styles/sponsor_front_color/public/sponsor_images/lxer_150x53.png" width="90" height="32" alt="LXer" /></a>    </div>
+    </div>
+  
+  
+  
+  
+  
+  
+</div>    </div>
+  
+      </div></div>
+  </div>
+
+</div>
+  </div>
+    
+        <div id='footer-region'>
+      
+<div class='block block-block-27 clearfix'  id="block-block-27">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+  
+  
+      <div class='content clearfix '>
+      <div style="padding-top: .25em;">
+	<p style="color: inherit;">&copy; USENIX <script>new Date().getFullYear()>document.write(new Date().getFullYear());</script><br>
+        EIN 13-3055038</p>
+</div>    </div>
+  
+      </div></div>
+  </div>
+
+
+<div class='block block-menu-menu-footer clearfix'  role="navigation" id="block-menu-menu-footer">
+  
+  
+  
+  
+      <div class='column-main'><div class='column-wrapper'>
+  
+  
+  
+  
+      <div class='content clearfix '>
+      <ul class="menu-tree menu" data-menu-style="tree" data-clickdown="0" data-collapse="default"><li class="first leaf menu-mlid-2774"><a href="/privacy-policy">Privacy Policy</a></li>
+<li class="last leaf menu-mlid-2775"><a href="/contact">Contact Us</a></li>
+</ul>    </div>
+  
+      </div></div>
+  </div>
+
+    </div>
+  </div></div>
+
+
+    <noscript aria-hidden="true"><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WQSPGJT"
+ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>      <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d0238e9c9866d5',t:'MTc5MjQxNjY0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

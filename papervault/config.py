@@ -1,0 +1,157 @@
+"""Runtime configuration for the PaperVault web service.
+
+All env-driven fields use ``field(default_factory=...)`` so that ``Settings``
+is reconstructed from the *current* environment every time ``get_settings()``
+is invoked. This keeps the dataclass ``frozen=True`` (cheap hashable value
+object) while avoiding the classic "defaults captured at import time" trap
+that would otherwise make environment overrides in tests ineffective.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+_BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _env_str(name: str, default: str) -> str:
+    return os.environ.get(name, default)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class Settings:
+    base_dir: Path = _BASE_DIR
+    cache_path: Path = _BASE_DIR / "cache" / "cache.jsonl.gz"
+    # ``None`` means "derive papers.sqlite3 beside cache_path". Keeping the
+    # derivation in PaperRepository makes custom cache paths in tests and
+    # deployments automatically get an isolated search database.
+    search_db_path: Path | None = field(
+        default_factory=lambda: (
+            Path(value)
+            if (value := os.environ.get("PAPERVAULT_SEARCH_DB_PATH"))
+            else None
+        )
+    )
+    # ``None`` means "derive users.sqlite3 beside cache_path". Same
+    # derivation philosophy as ``search_db_path``: keeping the derivation in
+    # UserStore makes custom cache paths in tests and deployments
+    # automatically get an isolated user database.
+    user_db_path: Path | None = field(
+        default_factory=lambda: (
+            Path(value)
+            if (value := os.environ.get("PAPERVAULT_USER_DB_PATH"))
+            else None
+        )
+    )
+    saved_queries_max_per_user: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_SAVED_QUERIES_MAX_PER_USER", 100)
+    )
+    static_folder: Path = _BASE_DIR / "static" / "dist"
+
+    host: str = field(default_factory=lambda: _env_str("HOST", "127.0.0.1"))
+    port: int = field(default_factory=lambda: _env_int("PORT", 5001))
+    debug: bool = field(default_factory=lambda: _env_bool("FLASK_DEBUG", False))
+
+    log_level: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_LOG_LEVEL", "INFO")
+    )
+
+    openai_model: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_OPENAI_MODEL", "gpt-4o-mini")
+    )
+    openai_temperature: float = field(
+        default_factory=lambda: _env_float("PAPERVAULT_OPENAI_TEMPERATURE", 0.5)
+    )
+    openai_max_keywords: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_OPENAI_MAX_KEYWORDS", 10)
+    )
+
+    # ``suggest_provider`` is intentionally empty by default in P2: empty
+    # means "let the request set it or fall back to legacy DeepSeek / OpenAI
+    # detection". Existing deployments set PAPERVAULT_SUGGEST_PROVIDER to
+    # keep their old behaviour; new callers override per request instead.
+    suggest_provider: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_SUGGEST_PROVIDER", "").lower()
+    )
+    deepseek_model: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_DEEPSEEK_MODEL", "deepseek-chat")
+    )
+    deepseek_base_url: str = field(
+        default_factory=lambda: _env_str(
+            "PAPERVAULT_DEEPSEEK_BASE_URL", "https://api.deepseek.com"
+        )
+    )
+
+    anthropic_max_tokens: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_ANTHROPIC_MAX_TOKENS", 2048)
+    )
+    anthropic_model: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_ANTHROPIC_MODEL", "claude-haiku-4-5")
+    )
+
+    cors_origins: str = field(
+        default_factory=lambda: _env_str("PAPERVAULT_CORS_ORIGINS", "")
+    )
+
+    max_page_size: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_MAX_PAGE_SIZE", 200)
+    )
+    default_page_size: int = field(
+        default_factory=lambda: _env_int("PAPERVAULT_DEFAULT_PAGE_SIZE", 50)
+    )
+
+    # Authentication and OAuth configuration. Secrets are read only from the
+    # process environment and are never returned by the API.
+    secret_key: str = field(default_factory=lambda: _env_str("PAPERVAULT_SECRET_KEY", "change-me-in-production"))
+    admin_username: str = field(default_factory=lambda: _env_str("PAPERVAULT_ADMIN_USERNAME", "admin"))
+    admin_password: str = field(default_factory=lambda: _env_str("PAPERVAULT_ADMIN_PASSWORD", ""))
+    admin_users: str = field(default_factory=lambda: _env_str("PAPERVAULT_ADMIN_USERS", ""))
+    github_client_id: str = field(default_factory=lambda: _env_str("GITHUB_OAUTH_CLIENT_ID", ""))
+    github_client_secret: str = field(default_factory=lambda: _env_str("GITHUB_OAUTH_CLIENT_SECRET", ""))
+    github_redirect_uri: str = field(default_factory=lambda: _env_str("GITHUB_OAUTH_REDIRECT_URI", ""))
+    zhihu_client_id: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_CLIENT_ID", ""))
+    zhihu_client_secret: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_CLIENT_SECRET", ""))
+    zhihu_redirect_uri: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_REDIRECT_URI", ""))
+    # Zhihu OpenAPI (openapi.zhihu.com) endpoints; overridable for testing.
+    zhihu_authorize_url: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_AUTHORIZE_URL", "https://openapi.zhihu.com/authorize"))
+    zhihu_token_url: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_TOKEN_URL", "https://openapi.zhihu.com/access_token"))
+    zhihu_user_url: str = field(default_factory=lambda: _env_str("ZHIHU_OAUTH_USER_URL", "https://openapi.zhihu.com/user"))
+    zhihu_timeout_seconds: float = field(default_factory=lambda: _env_float("ZHIHU_OAUTH_TIMEOUT_SECONDS", 15.0))
+    llm_api_url: str = field(default_factory=lambda: _env_str("PAPERVAULT_LLM_API_URL", ""))
+    llm_api_key: str = field(default_factory=lambda: _env_str("PAPERVAULT_LLM_API_KEY", ""))
+
+
+def get_settings() -> Settings:
+    """Build a fresh ``Settings`` instance from the current environment."""
+
+    return Settings()

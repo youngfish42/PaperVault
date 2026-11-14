@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>IJCAI Heading-Style Fixture (Mirror / Legacy)</title></head>
+<body>
+  <div class="content">
+    <h1>Fixture Title (Mirror Layout)</h1>
+    <h2>Abstract</h2>
+    <p>
+      This mirror-style fixture verifies the heading-based fallback path
+      in the IJCAI fetcher: when a page exposes an explicit
+      &lt;h2&gt;Abstract&lt;/h2&gt; heading, the fetcher must concatenate
+      only the following-sibling nodes until the next heading, so
+      BibTeX and References sections stay strictly out of the abstract.
+    </p>
+    <p>
+      A second paragraph is included so that ordinary multi-paragraph
+      abstracts are exercised too, and to comfortably clear the
+      MIN_ABSTRACT_CHARS length gate defined in base.py.
+    </p>
+    <h2>BibTeX</h2>
+    <pre>@inproceedings{fixture2026,
+  title  = {A Fixture Paper},
+  author = {Alice and Bob},
+  year   = {2026},
+}</pre>
+    <h2>References</h2>
+    <ol>
+      <li>Fixture Reference One.</li>
+      <li>Fixture Reference Two.</li>
+    </ol>
+    <div class="footer-nav">Home | Contact | About</div>
+  </div>
+</body>
+</html>
