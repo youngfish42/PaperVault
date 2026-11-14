@@ -92,6 +92,48 @@ def test_whole_proceedings_structural_evidence_overrides_enriched_fields(url):
 
 
 @pytest.mark.parametrize(
+    "title,url",
+    [
+        (
+            "Adjunct Proceedings of the 2017 ACM International Joint Conference",
+            "https://doi.org/10.1145/3123024",
+        ),
+        (
+            "Joint Proceedings of the Workshop on AI Problems",
+            "https://doi.org/10.1145/2516911",
+        ),
+        (
+            "ACM SIGGRAPH 2023 Conference Proceedings, SIGGRAPH 2023",
+            "https://doi.org/10.1145/3588432",
+        ),
+        (
+            "Workshops Proceedings of the 6th IEEE International Conference",
+            "https://ieeexplore.ieee.org/xpl/conhome/4063580/proceeding",
+        ),
+        (
+            "ASE 2008 - Workshop Proceedings (ASE Workshops 2008)",
+            "https://ieeexplore.ieee.org/xpl/conhome/4674379/proceeding",
+        ),
+    ],
+)
+def test_additional_verified_whole_proceedings_title_forms(title, url):
+    rec = _rec(title, url=url, abstract="A" * 100, code="https://github.com/example/volume")
+    assert is_proceedings_record(rec) is True
+    assert is_frontmatter_record(rec) is True
+    assert should_drop_on_collect(rec) is True
+
+
+def test_workshop_proceedings_revisited_is_not_a_volume_title():
+    rec = _rec(
+        "Workshop Proceedings Revisited",
+        url="https://doi.org/10.1145/2442796",
+        abstract="A" * 100,
+        code="https://github.com/example/paper",
+    )
+    assert is_proceedings_record(rec) is False
+
+
+@pytest.mark.parametrize(
     "url",
     [
         "https://doi.org/10.1007/978-3-032-38062-3_1",

@@ -31,7 +31,9 @@ FRONT_MATTER_RE = re.compile(
     re.IGNORECASE,
 )
 PROCEEDINGS_TITLE_RE = re.compile(
-    r"(?:^proceedings\b|[,:]\s*proceedings\b|\bproceedings\s*(?:,\s*part\b|$))",
+    r"(?:^(?:(?:adjunct|joint|workshops)\s+)?proceedings\b"
+    r"|[,:]\s*proceedings\b|\bproceedings\s*(?:,\s*part\b|$)"
+    r"|\bconference proceedings\s*,|\bworkshop proceedings\s*\()",
     re.IGNORECASE,
 )
 _SPRINGER_BOOK_DOI_RE = re.compile(r"^10\.1007/978-[^_]+$", re.IGNORECASE)
