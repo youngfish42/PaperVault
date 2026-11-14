@@ -171,6 +171,15 @@ def test_acm_colon_proceedings_title_remains_a_volume():
     assert is_proceedings_record(rec) is True
 
 
+def test_acm_conference_proceedings_without_suffix_is_a_volume():
+    rec = _rec(
+        "ACM SIGGRAPH 2023 Conference Proceedings",
+        url="https://doi.org/10.1145/3588432",
+        abstract="A" * 100,
+    )
+    assert is_proceedings_record(rec) is True
+
+
 @pytest.mark.parametrize(
     "url",
     [
