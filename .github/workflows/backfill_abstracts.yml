@@ -149,9 +149,9 @@ jobs:
             force_flag="--force"
           fi
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
-            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3 $force_flag
+            python scripts/fetch_abstracts.py --conf "${{ github.event.inputs.target_conf }}" --chunk-size 500 --soft-timeout 13200 --max-failed-attempts 3 $force_flag
           else
-            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 14400 --max-failed-attempts 3 $force_flag
+            python scripts/fetch_abstracts.py --batch --chunk-size 500 --soft-timeout 13200 --max-failed-attempts 3 $force_flag
           fi
 
       - name: Retry recoverable failures (--reason-in whitelist)
@@ -224,8 +224,11 @@ jobs:
         # Batch lookup resolves up to 500 papers per request by arXiv ID or exact
         # title fingerprint. Repository details are fetched only when advertised.
         # The dedicated HF-backed ledger advances even when PWC has no match.
+        # The first production run processed 1000 papers in 171s; 5000/900
+        # provides 5x throughput with a bounded 15-minute budget. Main 220 +
+        # retry 70 + CVF 40 + PWC 15 = 345 min, leaving 15 min for fixed overhead.
         run: |
-          pwc_args=(--chunk-size 500 --max-papers 1000 --soft-timeout 600)
+          pwc_args=(--chunk-size 500 --max-papers 5000 --soft-timeout 900)
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
             pwc_args+=(--force)
           fi
