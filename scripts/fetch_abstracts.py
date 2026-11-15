@@ -502,7 +502,7 @@ def _reconstruct_openalex_abstract(inverted_index: dict) -> Optional[str]:
 
 
 def _openalex_headers() -> dict:
-    headers = dict(HEADERS)
+    headers = {"User-Agent": CROSSREF_AGENT}
     api_key = os.getenv("OPENALEX_API_KEY", "").strip()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -1107,13 +1107,14 @@ def _s2_request(
 def _s2_batch_fetch(dois: List[str]) -> Tuple[Optional[List[Optional[dict]]], str]:
     """POST /paper/batch，返回 (与 ``dois`` 索引对齐的结果数组, error_reason)。
 
-    数组中缺失条目为 ``None``（S2 查无此 DOI）。请求级失败返回 ``(None, reason)``。
+    裸字符串按 DOI 处理；已带命名空间的 ID（例如 ``ACL:P05-1001``）原样传递。
+    数组中缺失条目为 ``None``。请求级失败返回 ``(None, reason)``。
     """
     resp, err = _s2_request(
         "post",
         S2_BATCH_ENDPOINT,
         params={"fields": "title,abstract,externalIds"},
-        json={"ids": [f"DOI:{doi}" for doi in dois]},
+        json={"ids": [doi if ":" in doi else f"DOI:{doi}" for doi in dois]},
     )
     if err or resp is None:
         return None, err or "network"
@@ -1284,6 +1285,7 @@ OPENALEX_MIN_INTERVAL = 1.0 / 3
 OPENALEX_TITLE_EXCLUDED_HOSTS = S2_TITLE_EXCLUDED_HOSTS - {"ndss-symposium.org"}
 
 _openalex_rate_state = {"last_time": 0.0}
+_openalex_key_exhausted = False
 
 
 def _openalex_title_search(
@@ -1292,16 +1294,34 @@ def _openalex_title_search(
     params = {"search.title": title, "per_page": 10, "select": select}
     if CONTACT_EMAIL:
         params["mailto"] = CONTACT_EMAIL
+    global _openalex_key_exhausted
+    headers = _openalex_headers()
+    if _openalex_key_exhausted:
+        headers.pop("Authorization", None)
     resp, err = _s2_request(
         "get",
         OPENALEX_SEARCH_ENDPOINT,
         params=params,
         timeout=30,
         min_interval=OPENALEX_MIN_INTERVAL,
-        headers=_openalex_headers(),
+        headers=headers,
         rate_state=_openalex_rate_state,
         max_retries=max_retries,
     )
+    if resp is not None and resp.status_code in (401, 403, 429) and "Authorization" in headers:
+        _openalex_key_exhausted = True
+        print("    [!] OpenAlex key rejected or out of budget; retrying anonymously.")
+        headers.pop("Authorization")
+        resp, err = _s2_request(
+            "get",
+            OPENALEX_SEARCH_ENDPOINT,
+            params=params,
+            timeout=30,
+            min_interval=OPENALEX_MIN_INTERVAL,
+            headers=headers,
+            rate_state=_openalex_rate_state,
+            max_retries=max_retries,
+        )
     if err or resp is None:
         return None, err or "network"
     if resp.status_code in (401, 403):

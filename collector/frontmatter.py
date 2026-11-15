@@ -16,7 +16,8 @@
 
 本模块不判断单篇论文是否属于 workshop。缓存缺少来源页面血缘，标题也不
 足以证明这一点；workshop proceedings 整卷会按非论文条目过滤，但其中的
-单篇研究论文一律保留。
+单篇研究论文一律保留。ACL 另按明确的作者索引、整卷、教程摘要合集及旧式
+整会标题/ID 证据过滤非单篇条目，真实教程和报告不按缺摘要处理。
 """
 
 from __future__ import annotations
@@ -53,6 +54,18 @@ _IEEE_PROCEEDINGS_DOI_RE = re.compile(
     r"^10\.1109/[A-Za-z0-9]+\.(?:19|20)\d{2}$",
     re.IGNORECASE,
 )
+_ACL_NONPAPER_TITLE_RE = re.compile(
+    r"(?:\bauthor index\b|\btutorial abstracts\b|\bcompanion volume\b"
+    r"|^student research workshop$|\bdemonstration papers\b"
+    r"|\bcoling \d{4}: (?:posters|demonstrations)\b"
+    r"|\bproceedings of the student research workshop\b)",
+    re.IGNORECASE,
+)
+_ACL_WHOLE_CONF_TITLE_RE = re.compile(
+    r"(?:\bconference\b|\bannual meeting\b|\bmeeting\b|\bcoling\b|\bhuman language technologies\b)",
+    re.IGNORECASE,
+)
+_ACL_LEGACY_ID_SUFFIX_RE = re.compile(r"-(\d+)$")
 
 _EDITOR_ROLE_RE = re.compile(r"\(\s*eds?\.?\s*\)|\beditors?\b", re.IGNORECASE)
 
@@ -64,13 +77,25 @@ def _title_matches(rec: dict) -> bool:
     return bool(FRONT_MATTER_RE.match(title))
 
 
+def _is_acl_nonpaper(title: str, path: str) -> bool:
+    if _ACL_NONPAPER_TITLE_RE.search(title):
+        return True
+    match = _ACL_LEGACY_ID_SUFFIX_RE.search(path)
+    return bool(
+        match
+        and int(match.group(1)) % 100 == 0
+        and _ACL_WHOLE_CONF_TITLE_RE.search(title)
+    )
+
+
 def is_proceedings_record(rec: dict) -> bool:
     """Return whether structural evidence identifies a whole proceedings volume."""
     if not isinstance(rec, dict):
         return False
     title = (rec.get("paper_name") or "").strip()
     ieee_title = _IEEE_PROCEEDINGS_TITLE_RE.search(title)
-    if not PROCEEDINGS_TITLE_RE.search(title) and not ieee_title:
+    acl_title = _ACL_NONPAPER_TITLE_RE.search(title) or _ACL_WHOLE_CONF_TITLE_RE.search(title)
+    if not PROCEEDINGS_TITLE_RE.search(title) and not ieee_title and not acl_title:
         return False
     try:
         parsed = urlparse((rec.get("paper_url") or "").strip())
@@ -81,6 +106,8 @@ def is_proceedings_record(rec: dict) -> bool:
         host = host[4:]
     path = (parsed.path or "").strip("/")
 
+    if host == "aclanthology.org" and acl_title and _is_acl_nonpaper(title, path):
+        return True
     if host == "doi.org" and _SPRINGER_BOOK_DOI_RE.fullmatch(path):
         return True
     if ieee_title and host == "doi.org" and _IEEE_PROCEEDINGS_DOI_RE.fullmatch(path):
