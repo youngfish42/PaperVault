@@ -1107,13 +1107,14 @@ def _s2_request(
 def _s2_batch_fetch(dois: List[str]) -> Tuple[Optional[List[Optional[dict]]], str]:
     """POST /paper/batch，返回 (与 ``dois`` 索引对齐的结果数组, error_reason)。
 
-    数组中缺失条目为 ``None``（S2 查无此 DOI）。请求级失败返回 ``(None, reason)``。
+    裸字符串按 DOI 处理；已带命名空间的 ID（例如 ``ACL:P05-1001``）原样传递。
+    数组中缺失条目为 ``None``。请求级失败返回 ``(None, reason)``。
     """
     resp, err = _s2_request(
         "post",
         S2_BATCH_ENDPOINT,
         params={"fields": "title,abstract,externalIds"},
-        json={"ids": [f"DOI:{doi}" for doi in dois]},
+        json={"ids": [doi if ":" in doi else f"DOI:{doi}" for doi in dois]},
     )
     if err or resp is None:
         return None, err or "network"
