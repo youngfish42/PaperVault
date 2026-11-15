@@ -180,6 +180,7 @@ def run_openalex_pass(
     start_time: float, soft_timeout: Optional[float], dry_run: bool,
 ) -> None:
     pending = [record for record in targets if not (record.get("paper_abstract") or "").strip()]
+    transient_streak = 0
     for index, record in enumerate(pending, 1):
         if soft_timeout and time.time() - start_time >= soft_timeout:
             print(f"[!] Soft timeout reached at OpenAlex record {index}/{len(pending)}; progress saved.")
@@ -192,7 +193,16 @@ def run_openalex_pass(
         candidates, error = _openalex_title_match_fetch(title)
         if candidates is None:
             _s2_record_failure(progress, record, error or "network", "openalex_title", count_attempt=error not in {"network", "timeout", "rate_limited"})
+            if error in {"network", "timeout", "rate_limited"}:
+                transient_streak += 1
+                if transient_streak >= 5:
+                    _flush(records, progress, stats)
+                    print("[!] Stopping after 5 consecutive transient OpenAlex failures; progress saved.")
+                    return
+            else:
+                transient_streak = 0
             continue
+        transient_streak = 0
         abstract, reason = _evaluate_openalex_title_item(candidates, record)
         if abstract:
             _fill(progress, record, abstract, "openalex_title", stats)

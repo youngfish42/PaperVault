@@ -177,3 +177,22 @@ def test_no_targets_skips_bibtex_and_api(monkeypatch, tmp_path):
     monkeypatch.setattr(backfill, "_openalex_title_match_fetch", lambda _title: pytest.fail("must not call OpenAlex"))
     args = backfill.parse_args(["--offline", "--no-sync"])
     assert backfill.run(args) == 0
+
+
+def test_openalex_transient_failures_trigger_circuit_breaker(monkeypatch):
+    records = [_paper("ACL2005", f"P05-{1000 + index}", f"Paper {index}") for index in range(6)]
+    calls = []
+    monkeypatch.setattr(
+        backfill,
+        "_openalex_title_match_fetch",
+        lambda _title: calls.append(_title) or (None, "rate_limited"),
+    )
+    flushes = []
+    monkeypatch.setattr(backfill, "_flush", lambda *args: flushes.append(args))
+    stats = {"changed": False, "code": 0, "dirty": False}
+    progress = {}
+    backfill.run_openalex_pass(records, records, progress, stats, 0.0, None, False)
+    assert len(calls) == 5
+    assert len(flushes) == 1
+    assert all(record["paper_abstract"] == "" for record in records)
+    assert all(item["attempts"] == 0 for item in progress.values())
