@@ -222,10 +222,10 @@ jobs:
 
       - name: Backfill ACL Anthology abstracts
         # Semantic Scholar accepts ACL:<Anthology ID> for every venue series,
-        # including legacy COLING/EACL/NAACL identifiers. OpenAlex and S2 title
-        # matches are bounded fallbacks; no PDF downloads are required.
+        # including legacy COLING/EACL/NAACL identifiers. OpenAlex title match
+        # is the bounded fallback; no PDF downloads are required.
         run: |
-          acl_args=(--skip-bibtex --retry-failed --s2-title --soft-timeout 1200)
+          acl_args=(--skip-bibtex --retry-failed --soft-timeout 1200)
           if [ -n "${{ github.event.inputs.target_conf }}" ]; then
             acl_args+=(--conf "${{ github.event.inputs.target_conf }}")
           fi
