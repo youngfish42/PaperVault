@@ -1285,6 +1285,7 @@ OPENALEX_MIN_INTERVAL = 1.0 / 3
 OPENALEX_TITLE_EXCLUDED_HOSTS = S2_TITLE_EXCLUDED_HOSTS - {"ndss-symposium.org"}
 
 _openalex_rate_state = {"last_time": 0.0}
+_openalex_key_exhausted = False
 
 
 def _openalex_title_search(
@@ -1293,7 +1294,10 @@ def _openalex_title_search(
     params = {"search.title": title, "per_page": 10, "select": select}
     if CONTACT_EMAIL:
         params["mailto"] = CONTACT_EMAIL
+    global _openalex_key_exhausted
     headers = _openalex_headers()
+    if _openalex_key_exhausted:
+        headers.pop("Authorization", None)
     resp, err = _s2_request(
         "get",
         OPENALEX_SEARCH_ENDPOINT,
@@ -1305,6 +1309,7 @@ def _openalex_title_search(
         max_retries=max_retries,
     )
     if resp is not None and resp.status_code in (401, 403, 429) and "Authorization" in headers:
+        _openalex_key_exhausted = True
         print("    [!] OpenAlex key rejected or out of budget; retrying anonymously.")
         headers.pop("Authorization")
         resp, err = _s2_request(

@@ -224,6 +224,7 @@ def test_openalex_rejected_key_falls_back_to_anonymous(monkeypatch):
             return {"results": [{"title": "Paper"}]}
 
     monkeypatch.setenv("OPENALEX_API_KEY", "invalid-test-key")
+    monkeypatch.setattr(generic, "_openalex_key_exhausted", False)
 
     def fake_request(*_args, **kwargs):
         calls.append(kwargs["headers"].copy())
@@ -235,3 +236,9 @@ def test_openalex_rejected_key_falls_back_to_anonymous(monkeypatch):
     assert len(candidates) == 1
     assert "Authorization" in calls[0]
     assert "Authorization" not in calls[1]
+
+    candidates, error = generic._openalex_title_search("Paper", "title")
+    assert error == ""
+    assert len(candidates) == 1
+    assert len(calls) == 3
+    assert "Authorization" not in calls[2]
