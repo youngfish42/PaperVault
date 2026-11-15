@@ -394,6 +394,17 @@ def test_ijcai_real_layout_extracts_abstract_and_excludes_keywords():
     assert "synthetic IJCAI proceedings abstract" in res.abstract
 
 
+def test_ijcai_current_layout_extracts_real_abstract_without_references():
+    html = _fixture_html("ijcai_current.html")
+    with patch("papervault.services.abstract_fetchers._http.SESSION") as sess:
+        sess.get.return_value = _make_response(html)
+        res = af.dispatch("https://ijcai.org/proceedings/2026/1")
+    assert res.ok is True
+    assert res.abstract.startswith("We study multi-task reinforcement learning")
+    assert "References" not in res.abstract
+    assert "Aminof" not in res.abstract
+
+
 def test_ijcai_heading_fallback_stops_at_next_heading():
     """Fallback path (mirror / archived pages that DO carry an explicit
     <h2>Abstract</h2>) must break at the *next* heading so BibTeX /

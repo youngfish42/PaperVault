@@ -17,6 +17,7 @@ from discovery import (
     OpenReviewDiscovery,
     DBLPDiscovery,
     MICCAIDiscovery,
+    IJCAIDiscovery,
 )
 
 CONF_DIR = Path("conf")
@@ -258,6 +259,7 @@ def run(
         ("nips_conf.json", MLSysDiscovery),  # 合并到 nips_conf.json
         ("iclr_conf.json", OpenReviewDiscovery),
         ("miccai_conf.json", MICCAIDiscovery),
+        ("ijcai_conf.json", IJCAIDiscovery),
         ("dblp_conf.json", DBLPDiscovery),
     ]
 
@@ -284,7 +286,7 @@ def run(
 
     # 预加载其他信源配置，供 DBLP 去重使用
     other_confs = []
-    for other_file in ["acl_conf.json", "iclr_conf.json", "nips_conf.json", "thecvf_conf.json"]:
+    for other_file in ["acl_conf.json", "iclr_conf.json", "nips_conf.json", "thecvf_conf.json", "ijcai_conf.json"]:
         other_path = CONF_DIR / other_file
         if other_path.exists():
             other_confs.extend(load_conf(other_file))

@@ -27,6 +27,7 @@ def _all_conf_progress():
         ("thecvf_conf.json", "thecvf"),
         ("nips_conf.json", "NeurIPS"),
         ("miccai_conf.json", "MICCAI"),
+        ("ijcai_conf.json", "IJCAI"),
         ("dblp_conf.json", "DBLP"),
     ]:
         with open(f"conf/{filename}", encoding="utf-8") as f:

@@ -234,7 +234,7 @@ python maintain.py force
 python maintain.py
 
 # 验证配置 JSON 有效性
-python -c "import json; [json.load(open(f)) for f in ['conf/acl_conf.json','conf/dblp_conf.json','conf/iclr_conf.json','conf/nips_conf.json','conf/thecvf_conf.json']]"
+python -c "import json; [json.load(open(f)) for f in ['conf/acl_conf.json','conf/dblp_conf.json','conf/iclr_conf.json','conf/nips_conf.json','conf/thecvf_conf.json','conf/miccai_conf.json','conf/ijcai_conf.json']]"
 ```
 
 ---

@@ -4,6 +4,7 @@ from .nips import NeurIPSDiscovery, MLSysDiscovery
 from .openreview import OpenReviewDiscovery
 from .dblp import DBLPDiscovery
 from .miccai import MICCAIDiscovery
+from .ijcai import IJCAIDiscovery
 
 __all__ = [
     "ACLDiscovery",
@@ -13,4 +14,5 @@ __all__ = [
     "OpenReviewDiscovery",
     "DBLPDiscovery",
     "MICCAIDiscovery",
+    "IJCAIDiscovery",
 ]

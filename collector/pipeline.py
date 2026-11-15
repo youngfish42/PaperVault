@@ -23,6 +23,7 @@ from collector.sources.thecvf import search_from_thecvf
 from collector.sources.nips import search_from_nips
 from collector.sources.dblp import search_from_dblp
 from collector.sources.miccai import search_from_miccai
+from collector.sources.ijcai import search_from_ijcai
 
 # 空结果（empty 标记）的过期重试周期：标记后 30 天内跳过，过期重抓一次。
 # 兼顾两类情况：被静默拦截/改版的页面终会被重试，而合法空页不会每次
@@ -44,6 +45,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
     res = {}
     miccai_official_res = {}
     cvf_official_res = {}
+    ijcai_official_res = {}
     failures = []
     progress = {} if force else _pkg.load_collect_progress()
 
@@ -59,6 +61,8 @@ def collect(cache_file=None, force=False, soft_timeout=None):
         thecvf_conf = json.load(f)
     with open("conf/miccai_conf.json", "r") as f:
         miccai_conf = json.load(f)
+    with open("conf/ijcai_conf.json", "r") as f:
+        ijcai_conf = json.load(f)
 
     cache_conf = set()
     cache_res = {}
@@ -101,6 +105,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
             collected_dblp_names,
             title_merge_records=miccai_official_res,
             cvf_title_merge_records=cvf_official_res,
+            ijcai_title_merge_records=ijcai_official_res,
         )
 
     def _save_state():
@@ -155,6 +160,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
         "conf/thecvf_conf.json": thecvf_conf,
         "conf/nips_conf.json": nips_conf,
         "conf/miccai_conf.json": miccai_conf,
+        "conf/ijcai_conf.json": ijcai_conf,
         "conf/dblp_conf.json": dblp_conf,
     }
 
@@ -224,6 +230,11 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                     before = len(res.get(name, []))
                     res = search_fn(url, name, res)
                     cvf_official_res[name] = res[name][before:]
+                    progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                elif spec.key == "IJCAI":
+                    before = len(res.get(name, []))
+                    res = search_fn(url, name, res)
+                    ijcai_official_res.setdefault(name, []).extend(res[name][before:])
                     progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
                 else:
                     res = search_fn(url, name, res)

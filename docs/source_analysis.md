@@ -35,7 +35,7 @@
 
 ## 2. 会议级来源与采集器映射
 
-`collector.py` 中定义了 5 类采集函数，对应 5 组配置文件：
+`collector/pipeline.py` 通过 `SOURCE_REGISTRY` 驱动各采集函数和配置文件：
 
 | 采集器 | 配置文件 | 解析方式 | 典型会议 | 缓存中论文数（估算） |
 |:---|:---|:---|:---|---:|
@@ -43,6 +43,7 @@
 | `search_from_thecvf` | `thecvf_conf.json` | HTML (BeautifulSoup) | CVPR, ICCV, WACV | ~11,600 |
 | `search_from_iclr` | `iclr_conf.json` | OpenReview API (JSON) | ICLR, NeurIPS (OpenReview) | ~7,400 |
 | `search_from_nips` | `nips_conf.json` | HTML (BeautifulSoup) | NeurIPS, MLSys | ~5,800 |
+| `search_from_ijcai` | `ijcai_conf.json` | 官方 JSON，HTML 回退（不读 PDF） | IJCAI 主会 | — |
 | `search_from_dblp` | `dblp_conf.json` | HTML (BeautifulSoup) | AAAI, ICML, KDD, CIKM, MICCAI, … | ~50,000+ |
 
 ### 2.1 DBLP 子来源细分

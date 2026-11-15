@@ -54,6 +54,13 @@ SOURCE_REGISTRY: tuple[SourceSpec, ...] = (
         refresh_cached=True,
     ),
     SourceSpec(
+        key="IJCAI",
+        conf_file="conf/ijcai_conf.json",
+        tqdm_desc="[+] Collecting IJCAI Proceedings",
+        search_fn_name="search_from_ijcai",
+        refresh_cached=True,
+    ),
+    SourceSpec(
         key="DBLP",
         conf_file="conf/dblp_conf.json",
         tqdm_desc="[+] Collecting DBLP",
