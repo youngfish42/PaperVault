@@ -53,7 +53,7 @@ def _save_atomic(cache_path: Path, data: dict) -> None:
 
 
 def run(args) -> int:
-    if not args.offline:
+    if not (args.offline or args.dry_run or args.replay):
         ensure_cache_local(CACHE_FILE, refresh=True)
     if not CACHE_FILE.exists():
         print(f"[!] Cache file not found: {CACHE_FILE}", file=sys.stderr)
@@ -123,14 +123,14 @@ def run(args) -> int:
 
     _save_atomic(CACHE_FILE, merged)
     print(f"[*] Cache updated atomically; backup: {BACKUP_FILE}")
-    if not (args.no_sync or args.offline):
+    if not (args.no_sync or args.offline or args.replay):
         sync_cache_artifacts(
             cache_path=CACHE_FILE,
             progress_path=None,
             commit_message="Enrich IJCAI papers from official proceedings metadata",
         )
     else:
-        print("[*] Skipped Hugging Face sync (--no-sync/--offline).")
+        print("[*] Skipped Hugging Face sync (--no-sync/--offline/--replay).")
     if failures:
         print(f"[!] {len(failures)} IJCAI page(s) failed; rerun to resume from local snapshots.", file=sys.stderr)
         return 2
