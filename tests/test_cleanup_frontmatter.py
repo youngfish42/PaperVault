@@ -111,6 +111,37 @@ def test_ieee_chapter_doi_is_not_whole_proceedings():
     assert cf.is_frontmatter_record(rec) is False
 
 
+@pytest.mark.parametrize(
+    ("title", "url"),
+    [
+        ("Author Index", "https://aclanthology.org/W00-1328/"),
+        ("NAACL HLT 2013 Tutorial Abstracts", "https://aclanthology.org/N13-4000/"),
+        ("Companion Volume of the Proceedings of HLT-NAACL 2003", "https://aclanthology.org/N03-2000/"),
+        ("Student Research Workshop", "https://aclanthology.org/E03-3000/"),
+        ("Coling 2010: Posters", "https://aclanthology.org/C10-2000/"),
+        ("COLING 2000 Volume 1: The 18th International Conference on Computational Linguistics", "https://aclanthology.org/C00-1000/"),
+        ("11th Conference of the European Chapter of the Association for Computational Linguistics", "https://aclanthology.org/E06-1000/"),
+        ("2000 Joint SIGDAT Conference on Empirical Methods in Natural Language Processing and Very Large Corpora", "https://aclanthology.org/W00-1300/"),
+        ("Second Meeting of the North American Chapter of the Association for Computational Linguistics", "https://aclanthology.org/N01-1000/"),
+    ],
+)
+def test_acl_nonpaper_entries_are_removed(title, url):
+    assert cf.is_frontmatter_record(_rec(title, url=url, abstract="nonempty")) is True
+
+
+@pytest.mark.parametrize(
+    ("title", "url"),
+    [
+        ("Deep Learning for NLP (without Magic)", "https://aclanthology.org/P12-4005/"),
+        ("Variational Inference for Structured NLP Models", "https://aclanthology.org/P13-5006/"),
+        ("A High-Performance Semi-Supervised Learning Method for Text Chunking", "https://aclanthology.org/P05-1001/"),
+        ("EACL 2026 Student Research Workshop: Mentorship Program Report", "https://aclanthology.org/2026.eacl-srw.1/"),
+    ],
+)
+def test_acl_real_papers_and_tutorials_survive(title, url):
+    assert cf.is_frontmatter_record(_rec(title, url=url, abstract="nonempty")) is False
+
+
 # ---------- predicate: negatives ------------------------------------------------
 
 @pytest.mark.parametrize(

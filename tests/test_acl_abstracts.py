@@ -242,3 +242,23 @@ def test_openalex_rejected_key_falls_back_to_anonymous(monkeypatch):
     assert len(candidates) == 1
     assert len(calls) == 3
     assert "Authorization" not in calls[2]
+
+
+def test_parquet_pass_matches_id_title_and_year(monkeypatch, tmp_path):
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    path = tmp_path / "acl.parquet"
+    pq.write_table(pa.Table.from_pylist([
+        {"acl_id": "C10-1001", "title": "First Paper", "abstract": "A complete abstract for the first paper.", "year": "2010"},
+        {"acl_id": "C10-1002", "title": "Different Paper", "abstract": "Another complete abstract for the second paper.", "year": "2010"},
+    ]), path)
+    monkeypatch.setattr(generic, "S2_MIN_ABSTRACT_CHARS", 40)
+    records = [
+        _paper("COLING2010", "C10-1001", "First Paper"),
+        _paper("COLING2010", "C10-1002", "Second Paper"),
+    ]
+    stats = {"changed": False, "code": 0, "dirty": False}
+    backfill.run_parquet_pass(records, records, {}, path, stats)
+    assert records[0]["paper_abstract"] == "A complete abstract for the first paper."
+    assert records[1]["paper_abstract"] == ""
+    assert stats["acl_ocl"] == 1

@@ -38,6 +38,8 @@ from scripts.fetch_abstracts import (  # noqa: E402
     _s2_record_failure,
     _s2_record_success,
     _s2_title_match_fetch,
+    _title_gate,
+    _year_gate,
     clean_abstract,
     load_progress,
     save_progress,
@@ -141,6 +143,37 @@ def run_bibtex_pass(
         abstract = clean_acl_abstract(fields.get("abstract", ""))
         if len(abstract) >= MIN_ABSTRACT_CHARS:
             _fill(progress, record, abstract, "acl_bibtex", stats)
+
+
+def run_parquet_pass(
+    records: list[dict], targets: list[dict], progress: dict, path: Path, stats: dict
+) -> None:
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise RuntimeError("The optional --parquet pass requires pyarrow") from exc
+    target_ids = {
+        canonical_acl_url(record["paper_url"]).rstrip("/").rsplit("/", 1)[-1]
+        for record in targets
+    }
+    table = pq.read_table(path, columns=["acl_id", "title", "abstract", "year"])
+    metadata = {
+        row["acl_id"]: row for row in table.to_pylist()
+        if row["acl_id"] in target_ids
+    }
+    print(f"[*] Parquet metadata matched: {len(metadata)}/{len(targets)}")
+    for record in targets:
+        if (record.get("paper_abstract") or "").strip():
+            continue
+        paper_id = canonical_acl_url(record["paper_url"]).rstrip("/").rsplit("/", 1)[-1]
+        row = metadata.get(paper_id)
+        if not row or not _title_gate(row.get("title"), record.get("paper_name")):
+            continue
+        if not _year_gate(record.get("conf", ""), row.get("year")):
+            continue
+        abstract = clean_abstract(row.get("abstract") or "")
+        if len(abstract) >= MIN_ABSTRACT_CHARS:
+            _fill(progress, record, abstract, "acl_ocl", stats)
 
 
 def run_s2_pass(
@@ -285,6 +318,10 @@ def run(args) -> int:
             _flush(records, progress, stats)
     else:
         metadata = {}
+    if args.parquet:
+        run_parquet_pass(records, targets, progress, args.parquet, stats)
+        if stats["changed"]:
+            _flush(records, progress, stats)
     if not args.skip_s2:
         run_s2_pass(records, targets, progress, stats, start_time, args.soft_timeout, args.dry_run)
     if not args.skip_openalex:
@@ -316,6 +353,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--skip-s2", action="store_true")
     parser.add_argument("--skip-openalex", action="store_true")
     parser.add_argument("--s2-title", action="store_true", help="Also retry remaining titles via S2 search/match")
+    parser.add_argument("--parquet", type=Path, default=None, help="Optional ACL-OCL metadata Parquet path (requires pyarrow)")
     parser.add_argument("--refresh-bibtex", action="store_true")
     parser.add_argument("--soft-timeout", type=float, default=None)
     parser.add_argument("--dry-run", action="store_true")
