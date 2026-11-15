@@ -211,3 +211,27 @@ def test_s2_title_fallback_uses_existing_gates(monkeypatch):
     backfill.run_s2_title_pass([record], [record], {}, stats, 0.0, None)
     assert record["paper_abstract"].startswith("A sufficiently detailed fallback abstract")
     assert stats["semanticscholar_title"] == 1
+
+
+def test_openalex_rejected_key_falls_back_to_anonymous(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, status):
+            self.status_code = status
+
+        def json(self):
+            return {"results": [{"title": "Paper"}]}
+
+    monkeypatch.setenv("OPENALEX_API_KEY", "invalid-test-key")
+
+    def fake_request(*_args, **kwargs):
+        calls.append(kwargs["headers"].copy())
+        return Response(429 if len(calls) == 1 else 200), ""
+
+    monkeypatch.setattr(generic, "_s2_request", fake_request)
+    candidates, error = generic._openalex_title_search("Paper", "title")
+    assert error == ""
+    assert len(candidates) == 1
+    assert "Authorization" in calls[0]
+    assert "Authorization" not in calls[1]

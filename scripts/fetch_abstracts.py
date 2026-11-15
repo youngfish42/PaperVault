@@ -502,7 +502,7 @@ def _reconstruct_openalex_abstract(inverted_index: dict) -> Optional[str]:
 
 
 def _openalex_headers() -> dict:
-    headers = dict(HEADERS)
+    headers = {"User-Agent": CROSSREF_AGENT}
     api_key = os.getenv("OPENALEX_API_KEY", "").strip()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -1293,16 +1293,30 @@ def _openalex_title_search(
     params = {"search.title": title, "per_page": 10, "select": select}
     if CONTACT_EMAIL:
         params["mailto"] = CONTACT_EMAIL
+    headers = _openalex_headers()
     resp, err = _s2_request(
         "get",
         OPENALEX_SEARCH_ENDPOINT,
         params=params,
         timeout=30,
         min_interval=OPENALEX_MIN_INTERVAL,
-        headers=_openalex_headers(),
+        headers=headers,
         rate_state=_openalex_rate_state,
         max_retries=max_retries,
     )
+    if resp is not None and resp.status_code in (401, 403, 429) and "Authorization" in headers:
+        print("    [!] OpenAlex key rejected or out of budget; retrying anonymously.")
+        headers.pop("Authorization")
+        resp, err = _s2_request(
+            "get",
+            OPENALEX_SEARCH_ENDPOINT,
+            params=params,
+            timeout=30,
+            min_interval=OPENALEX_MIN_INTERVAL,
+            headers=headers,
+            rate_state=_openalex_rate_state,
+            max_retries=max_retries,
+        )
     if err or resp is None:
         return None, err or "network"
     if resp.status_code in (401, 403):
