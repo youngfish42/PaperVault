@@ -43,6 +43,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
 
     res = {}
     miccai_official_res = {}
+    cvf_official_res = {}
     failures = []
     progress = {} if force else _pkg.load_collect_progress()
 
@@ -99,6 +100,7 @@ def collect(cache_file=None, force=False, soft_timeout=None):
             multi_volume_dblp_names,
             collected_dblp_names,
             title_merge_records=miccai_official_res,
+            cvf_title_merge_records=cvf_official_res,
         )
 
     def _save_state():
@@ -217,6 +219,11 @@ def collect(cache_file=None, force=False, soft_timeout=None):
                     before = len(res.get(name, []))
                     res = search_fn(url, name, res)
                     miccai_official_res[name] = res[name][before:]
+                    progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                elif spec.key == "thecvf":
+                    before = len(res.get(name, []))
+                    res = search_fn(url, name, res)
+                    cvf_official_res[name] = res[name][before:]
                     progress[f"{spec.key}::{url}"] = {"name": name, "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
                 else:
                     res = search_fn(url, name, res)

@@ -61,6 +61,7 @@ def _merge_with_cache(
     multi_volume_names,
     collected_dblp_names,
     title_merge_records=None,
+    cvf_title_merge_records=None,
 ):
     """Merge ``cache_res`` (loaded from cache.jsonl.gz) into ``new_res``.
 
@@ -117,5 +118,12 @@ def _merge_with_cache(
         for conf_name in set(title_merge_records) & new_res.keys() & result.keys():
             result[conf_name] = merge_miccai_records(
                 result[conf_name], title_merge_records[conf_name]
+            )
+    if cvf_title_merge_records:
+        from collector.sources.thecvf import merge_cvf_records
+
+        for conf_name in set(cvf_title_merge_records) & new_res.keys() & result.keys():
+            result[conf_name] = merge_cvf_records(
+                result[conf_name], cvf_title_merge_records[conf_name]
             )
     return result
