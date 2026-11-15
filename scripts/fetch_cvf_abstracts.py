@@ -9,6 +9,7 @@
     1. `ensure_cache_local(refresh=True)` 从 Hugging Face 拉最新 cache.jsonl.gz；
     2. 默认扫描缓存内所有合法 CVF 论文详情 URL；`--sync-official` 额外同步
        conf/thecvf_conf.json 中 confirmed-conf 的目录，按规范 URL / 唯一标题合并；
+       单会议目录失败会记录并继续其他会议，最终以非零退出码报告部分失败；
     3. 使用 ThreadPoolExecutor 并发抓取新增或缺摘要记录的详情页，并从新摘要提取代码链接；
     4. 增量写回 cache.jsonl.gz（.tmp + os.replace 原子替换），并维护独立进度文件；
     5. 结束时 `sync_cache_artifacts` 推 HF（可 --no-sync 关闭）。
@@ -202,17 +203,23 @@ def load_conf_entries(
 
 
 def sync_official_records(
-    records: List[dict], entries: List[dict], metadata_fetcher=collect_cvf_metadata
+    records: List[dict], entries: List[dict], metadata_fetcher=None
 ) -> Tuple[Dict[str, List[dict]], dict]:
+    fetcher = metadata_fetcher or collect_cvf_metadata
     official_by_conf: Dict[str, List[dict]] = {}
-    stats = {"added": 0, "duplicates_removed": 0, "changed": False, "confs": 0}
+    stats = {"added": 0, "duplicates_removed": 0, "changed": False, "confs": 0, "failures": []}
     for entry in entries:
         conf_name = entry["name"]
         indices = [i for i, rec in enumerate(records) if rec.get("conf") == conf_name]
         existing = [records[i] for i in indices]
         before = json.dumps(existing, ensure_ascii=False, sort_keys=True)
         existing_ids = {id(record) for record in existing}
-        official = metadata_fetcher(entry["url"])
+        try:
+            official = fetcher(entry["url"])
+        except Exception as exc:
+            stats["failures"].append({"name": conf_name, "url": entry["url"], "error": str(exc)})
+            print(f"    [!] {conf_name}: metadata sync failed: {exc}")
+            continue
         merged = merge_cvf_records(existing, official)
         for record in merged:
             record.setdefault("conf", conf_name)
@@ -284,6 +291,9 @@ def build_task(
 
 
 def run(args) -> int:
+    if args.conf is not None and not [name for name in args.conf if name.strip()]:
+        print("[!] --conf requires at least one non-empty conference name", file=sys.stderr)
+        return 2
     if not args.offline:
         ensure_cache_local(CACHE_FILE, refresh=True)
         # Best-effort pull the CVF progress ledger from Hugging Face so that
@@ -305,10 +315,13 @@ def run(args) -> int:
         print("[*] Force mode: ENABLED — will retry CVF papers that previously failed to fetch an abstract")
 
     progress = load_progress()
-    conf_filter = set(args.conf) if args.conf else None
+    conf_filter = (
+        {name.strip() for name in args.conf if name.strip()}
+        if args.conf is not None else None
+    )
     year_filter = set(args.year) if args.year else None
     official_by_conf = None
-    sync_stats = {"added": 0, "duplicates_removed": 0, "changed": False, "confs": 0}
+    sync_stats = {"added": 0, "duplicates_removed": 0, "changed": False, "confs": 0, "failures": []}
 
     if args.sync_official:
         entries = load_conf_entries(conf_filter, year_filter)
@@ -374,7 +387,9 @@ def run(args) -> int:
                 )
         else:
             print("[*] Nothing to do.")
-        return 0
+        if sync_stats["failures"]:
+            print(f"    Official sync had {len(sync_stats['failures'])} failed conference(s).")
+        return 1 if sync_stats["failures"] else 0
 
     _backup_cache()
 
@@ -510,7 +525,8 @@ def run(args) -> int:
     if args.sync_official:
         print(
             f"    Official sync: added={sync_stats['added']}, "
-            f"duplicates_removed={sync_stats['duplicates_removed']}"
+            f"duplicates_removed={sync_stats['duplicates_removed']}, "
+            f"failed_confs={len(sync_stats['failures'])}"
         )
     print(f"    GitHub links filled from abstracts: {total_code_filled}")
     if total_filled < total_tried:
@@ -558,7 +574,7 @@ def run(args) -> int:
                 )
         except Exception as exc:
             print(f"[!] cvf progress push skipped: {exc}")
-    return 1 if sync_failed else 0
+    return 1 if sync_failed or sync_stats["failures"] else 0
 
 
 def parse_args(argv=None) -> argparse.Namespace:

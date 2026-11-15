@@ -223,3 +223,41 @@ def test_sync_official_dry_run_sends_no_requests_and_writes_nothing(monkeypatch,
     assert backfill.run(args) == 0
     assert cache.read_bytes() == original
     assert not (tmp_path / "progress.json").exists()
+
+
+def test_empty_conf_is_rejected_before_cache_access():
+    args = backfill.parse_args(["--conf", "--offline", "--no-sync"])
+    assert backfill.run(args) == 2
+
+
+def test_sync_failure_does_not_block_other_conferences_or_abstracts(monkeypatch, tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    with gzip.open(cache, "wt", encoding="utf-8"):
+        pass
+    conf = tmp_path / "thecvf_conf.json"
+    conf.write_text(json.dumps([
+        {"name": "BAD2026", "url": "bad"},
+        {"name": "GOOD2026", "url": "good"},
+    ]), encoding="utf-8")
+    official_url = "https://openaccess.thecvf.com/content/CVPR2026/html/A_Good_Paper_CVPR_2026_paper.html"
+
+    def metadata(url):
+        if url == "bad":
+            raise RuntimeError("read timeout")
+        return [_paper("Good Paper", official_url)]
+
+    monkeypatch.setattr(backfill, "CACHE_FILE", cache)
+    monkeypatch.setattr(backfill, "BACKUP_FILE", tmp_path / "backup.gz")
+    monkeypatch.setattr(backfill, "PROGRESS_FILE", tmp_path / "progress.json")
+    monkeypatch.setattr(backfill, "CONF_FILE", conf)
+    monkeypatch.setattr(backfill, "collect_cvf_metadata", metadata)
+    monkeypatch.setattr(backfill, "fetch_cvf_abstract", lambda _url: "A complete abstract that is long enough for validation.")
+    args = backfill.parse_args(["--sync-official", "--offline", "--no-sync"])
+
+    assert backfill.run(args) == 1
+    rows = backfill.load_cache(cache)
+    assert len(rows) == 1
+    assert rows[0]["conf"] == "GOOD2026"
+    assert rows[0]["paper_name"] == "Good Paper"
+    assert rows[0]["paper_abstract"].startswith("A complete abstract")
+    assert (tmp_path / "progress.json").exists()

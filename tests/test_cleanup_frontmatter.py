@@ -243,6 +243,28 @@ def test_cleanup_conf_filter_preserves_other_conferences(tmp_path):
     assert "Proceedings of the IEEE/ACM 48th ICSE" in {row["paper_name"] for row in rows}
 
 
+def test_cleanup_empty_conf_is_rejected_before_write(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    _write_jsonl_gz(cache, _sample_records())
+    original = cache.read_bytes()
+
+    with pytest.raises(SystemExit) as exc_info:
+        cf.main(["--source", str(cache), "--conf", "--write", "--offline"])
+
+    assert exc_info.value.code == 2
+    assert cache.read_bytes() == original
+    assert not (tmp_path / "cache.jsonl.gz.tmp").exists()
+    assert not (tmp_path / "cache.jsonl.gz.bak").exists()
+
+
+def test_cleanup_empty_filter_selects_nothing(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    _write_jsonl_gz(cache, _sample_records())
+    stats = cf.cleanup(cache, dry_run=False, backup=False, conf_filter=set())
+    assert stats["matched_frontmatter"] == 0
+    assert _read_jsonl_gz(cache) == _sample_records()
+
+
 def test_cleanup_is_idempotent(tmp_path):
     cache = tmp_path / "cache.jsonl.gz"
     _write_jsonl_gz(cache, _sample_records())

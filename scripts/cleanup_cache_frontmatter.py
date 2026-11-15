@@ -69,7 +69,7 @@ def cleanup(
                 continue
             total += 1
             if is_frontmatter_record(rec) and (
-                not conf_filter or rec.get("conf") in conf_filter
+                conf_filter is None or rec.get("conf") in conf_filter
             ):
                 matched.append(
                     (rec.get("conf", ""), (rec.get("paper_name") or "").strip(),
@@ -177,6 +177,11 @@ def main(argv=None) -> int:
     parser.add_argument("--offline", action="store_true",
                         help="跳过 ensure_cache_local 并且不推送 HF")
     args = parser.parse_args(argv)
+    conf_names = None
+    if args.conf is not None:
+        conf_names = [name.strip() for name in args.conf if name.strip()]
+        if not conf_names:
+            parser.error("--conf requires at least one non-empty conference name")
 
     if not args.offline:
         ensure_cache_local(args.source, refresh=True)
@@ -186,7 +191,7 @@ def main(argv=None) -> int:
             args.source,
             dry_run=args.dry_run,
             backup=not args.no_backup,
-            conf_filter=set(args.conf) if args.conf else None,
+            conf_filter=set(conf_names) if conf_names is not None else None,
         )
     except FileNotFoundError as exc:
         print(f"[cleanup_frontmatter] ERROR: {exc}", file=sys.stderr)
