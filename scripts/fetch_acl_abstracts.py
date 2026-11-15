@@ -1,4 +1,8 @@
-"""Backfill ACL Anthology abstracts from official BibTeX and academic APIs."""
+"""Backfill ACL Anthology abstracts from official BibTeX and academic APIs.
+
+The progress ledger is synced even when a run fills no new abstracts, so failed
+or rate-limited records retain their state across workflow runs.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from data_artifacts import (  # noqa: E402
     ensure_cache_local,
     ensure_progress_local,
     sync_cache_artifacts,
+    upload_to_huggingface,
 )
 from scripts.acl_abstracts import (  # noqa: E402
     ACL_BIBTEX_URL,
@@ -334,12 +339,18 @@ def run(args) -> int:
     if stats["changed"]:
         _flush(records, progress, stats)
     print(f"[*] ACL backfill summary: {stats}; remaining={len(remaining)}")
-    if not args.no_sync and not args.offline and stats["changed"]:
-        sync_cache_artifacts(
-            cache_path=CACHE_FILE,
-            progress_path=PROGRESS_FILE,
-            commit_message=f"Backfill ACL abstracts (+{sum(value for key, value in stats.items() if key not in {'changed', 'code'})})",
-        )
+    if not args.no_sync and not args.offline:
+        if stats["changed"]:
+            sync_cache_artifacts(
+                cache_path=CACHE_FILE,
+                progress_path=PROGRESS_FILE,
+                commit_message=f"Backfill ACL abstracts (+{sum(value for key, value in stats.items() if key not in {'changed', 'code'})})",
+            )
+        elif PROGRESS_FILE.exists():
+            upload_to_huggingface(
+                [PROGRESS_FILE],
+                commit_message="Update ACL abstract backfill progress",
+            )
     return 0
 
 
