@@ -196,3 +196,18 @@ def test_openalex_transient_failures_trigger_circuit_breaker(monkeypatch):
     assert len(flushes) == 1
     assert all(record["paper_abstract"] == "" for record in records)
     assert all(item["attempts"] == 0 for item in progress.values())
+
+
+def test_s2_title_fallback_uses_existing_gates(monkeypatch):
+    record = _paper("COLING2010", "C10-1001", "Fallback Paper")
+    monkeypatch.setattr(generic, "S2_MIN_ABSTRACT_CHARS", 40)
+    monkeypatch.setattr(
+        backfill,
+        "_s2_title_match_fetch",
+        lambda _title: ({"title": "Fallback Paper", "abstract": "A sufficiently detailed fallback abstract for this paper."}, ""),
+    )
+    monkeypatch.setattr(backfill, "_flush", lambda *_args: None)
+    stats = {"changed": False, "code": 0, "dirty": False}
+    backfill.run_s2_title_pass([record], [record], {}, stats, 0.0, None)
+    assert record["paper_abstract"].startswith("A sufficiently detailed fallback abstract")
+    assert stats["semanticscholar_title"] == 1

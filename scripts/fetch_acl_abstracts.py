@@ -37,6 +37,7 @@ from scripts.fetch_abstracts import (  # noqa: E402
     _s2_batch_fetch,
     _s2_record_failure,
     _s2_record_success,
+    _s2_title_match_fetch,
     clean_abstract,
     load_progress,
     save_progress,
@@ -213,6 +214,39 @@ def run_openalex_pass(
             print(f"[*] OpenAlex: {index}/{len(pending)}, filled={stats.get('openalex_title', 0)}")
 
 
+def run_s2_title_pass(
+    records: list[dict], targets: list[dict], progress: dict, stats: dict,
+    start_time: float, soft_timeout: Optional[float],
+) -> None:
+    pending = [record for record in targets if not (record.get("paper_abstract") or "").strip()]
+    transient_streak = 0
+    for index, record in enumerate(pending, 1):
+        if soft_timeout and time.time() - start_time >= soft_timeout:
+            print(f"[!] Soft timeout reached at S2 title record {index}/{len(pending)}; progress saved.")
+            return
+        data, error = _s2_title_match_fetch(record.get("paper_name", ""))
+        if data is None:
+            _s2_record_failure(progress, record, error or "network", "semanticscholar_title", count_attempt=error not in {"network", "timeout", "rate_limited"})
+            if error in {"network", "timeout", "rate_limited"}:
+                transient_streak += 1
+                if transient_streak >= 5:
+                    _flush(records, progress, stats)
+                    print("[!] Stopping after 5 consecutive transient S2 title failures; progress saved.")
+                    return
+            else:
+                transient_streak = 0
+            continue
+        transient_streak = 0
+        abstract, reason = _evaluate_s2_title_item(data, record)
+        if abstract:
+            _fill(progress, record, abstract, "semanticscholar_title", stats)
+        else:
+            _s2_record_failure(progress, record, reason or "empty_abstract", "semanticscholar_title")
+        if index % 100 == 0 or index == len(pending):
+            _flush(records, progress, stats)
+            print(f"[*] S2 title: {index}/{len(pending)}, filled={stats.get('semanticscholar_title', 0)}")
+
+
 def run(args) -> int:
     if args.conf is not None and not [name for name in args.conf if name.strip()]:
         print("[!] --conf requires at least one non-empty conference name", file=sys.stderr)
@@ -255,6 +289,8 @@ def run(args) -> int:
         run_s2_pass(records, targets, progress, stats, start_time, args.soft_timeout, args.dry_run)
     if not args.skip_openalex:
         run_openalex_pass(records, targets, progress, stats, start_time, args.soft_timeout, args.dry_run)
+    if args.s2_title:
+        run_s2_title_pass(records, targets, progress, stats, start_time, args.soft_timeout)
 
     remaining = [record for record in targets if not (record.get("paper_abstract") or "").strip()]
     save_progress(progress)
@@ -279,6 +315,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--skip-bibtex", action="store_true")
     parser.add_argument("--skip-s2", action="store_true")
     parser.add_argument("--skip-openalex", action="store_true")
+    parser.add_argument("--s2-title", action="store_true", help="Also retry remaining titles via S2 search/match")
     parser.add_argument("--refresh-bibtex", action="store_true")
     parser.add_argument("--soft-timeout", type=float, default=None)
     parser.add_argument("--dry-run", action="store_true")
