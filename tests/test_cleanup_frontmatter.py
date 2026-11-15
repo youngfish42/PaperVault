@@ -227,6 +227,22 @@ def test_cleanup_write_removes_exactly_matched(tmp_path):
     assert not (tmp_path / "cache.jsonl.gz.tmp").exists()
 
 
+def test_cleanup_conf_filter_preserves_other_conferences(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    records = _sample_records()
+    records[1]["conf"] = "ICSE2026"
+    records[-1]["conf"] = "CVPR2025"
+    _write_jsonl_gz(cache, records)
+
+    stats = cf.cleanup(cache, dry_run=False, backup=False, conf_filter={"CVPR2025"})
+
+    rows = _read_jsonl_gz(cache)
+    assert stats["matched_frontmatter"] == 1
+    assert len(rows) == len(records) - 1
+    assert "Table of Contents" not in {row["paper_name"] for row in rows}
+    assert "Proceedings of the IEEE/ACM 48th ICSE" in {row["paper_name"] for row in rows}
+
+
 def test_cleanup_is_idempotent(tmp_path):
     cache = tmp_path / "cache.jsonl.gz"
     _write_jsonl_gz(cache, _sample_records())
