@@ -282,8 +282,39 @@ def test_zero_fill_run_still_uploads_progress(monkeypatch, tmp_path):
     monkeypatch.setattr(backfill, "sync_cache_artifacts", lambda *args, **kwargs: pytest.fail("cache must not upload on zero-fill"))
     uploads = []
     monkeypatch.setattr(backfill, "upload_to_huggingface", lambda paths, **kwargs: uploads.append(paths))
-    args = backfill.parse_args(["--retry-failed"])
+    args = backfill.parse_args(["--retry-failed", "--skip-bibtex"])
 
     assert backfill.run(args) == 0
     assert uploads == [[progress]]
     assert progress.exists()
+
+
+def test_timestamp_only_progress_change_does_not_upload(monkeypatch, tmp_path):
+    record = _paper("ACL2021", "2021.findings-acl.232", "Missing Abstract")
+    cache = tmp_path / "cache.jsonl.gz"
+    progress = tmp_path / "abstract_backfill_progress.jsonl.gz"
+    with gzip.open(cache, "wt", encoding="utf-8") as handle:
+        handle.write(json.dumps(record) + "\n")
+    with gzip.open(progress, "wt", encoding="utf-8") as handle:
+        handle.write(json.dumps({"_meta": True, "schema": "abstract_backfill_progress/v4"}) + "\n")
+        handle.write(json.dumps({
+            "url": record["paper_url"], "status": "failed", "attempts": 1,
+            "reason": "network", "ts": "2026-01-01T00:00:00",
+            "last_source": "openalex_title",
+        }) + "\n")
+
+    monkeypatch.setattr(backfill, "CACHE_FILE", cache)
+    monkeypatch.setattr(backfill, "PROGRESS_FILE", progress)
+    monkeypatch.setattr(generic, "PROGRESS_FILE", progress)
+    monkeypatch.setattr(backfill, "BACKUP_FILE", tmp_path / "backup.gz")
+    monkeypatch.setattr(backfill, "ensure_cache_local", lambda *args, **kwargs: None)
+    monkeypatch.setattr(backfill, "ensure_progress_local", lambda *args, **kwargs: None)
+    monkeypatch.setattr(backfill, "_s2_batch_fetch", lambda _ids: (None, "network"))
+    monkeypatch.setattr(backfill, "_openalex_title_match_fetch", lambda _title: (None, "network"))
+    monkeypatch.setattr(backfill, "sync_cache_artifacts", lambda *args, **kwargs: pytest.fail("cache must not upload"))
+    uploads = []
+    monkeypatch.setattr(backfill, "upload_to_huggingface", lambda paths, **kwargs: uploads.append(paths))
+    args = backfill.parse_args(["--retry-failed", "--skip-bibtex"])
+
+    assert backfill.run(args) == 0
+    assert uploads == []

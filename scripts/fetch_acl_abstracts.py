@@ -1,7 +1,7 @@
 """Backfill ACL Anthology abstracts from official BibTeX and academic APIs.
 
-The progress ledger is synced even when a run fills no new abstracts, so failed
-or rate-limited records retain their state across workflow runs.
+Substantive progress changes are synced even when a run fills no new abstracts;
+timestamp-only rewrites do not create a remote commit.
 """
 
 from __future__ import annotations
@@ -285,6 +285,13 @@ def run_s2_title_pass(
             print(f"[*] S2 title: {index}/{len(pending)}, filled={stats.get('semanticscholar_title', 0)}")
 
 
+def _progress_semantics(progress: dict) -> dict:
+    return {
+        url: {key: value for key, value in record.items() if key != "ts"}
+        for url, record in progress.items()
+    }
+
+
 def run(args) -> int:
     if args.conf is not None and not [name for name in args.conf if name.strip()]:
         print("[!] --conf requires at least one non-empty conference name", file=sys.stderr)
@@ -297,6 +304,7 @@ def run(args) -> int:
         return 1
     records = load_cache(CACHE_FILE)
     progress = load_progress()
+    initial_progress = _progress_semantics(progress)
     conf_filter = {name.strip() for name in args.conf if name.strip()} if args.conf is not None else None
     year_filter = set(args.year) if args.year else None
     targets = collect_targets(records, progress, conf_filter, year_filter, args.retry_failed)
@@ -346,7 +354,7 @@ def run(args) -> int:
                 progress_path=PROGRESS_FILE,
                 commit_message=f"Backfill ACL abstracts (+{sum(value for key, value in stats.items() if key not in {'changed', 'code'})})",
             )
-        elif PROGRESS_FILE.exists():
+        elif PROGRESS_FILE.exists() and _progress_semantics(progress) != initial_progress:
             upload_to_huggingface(
                 [PROGRESS_FILE],
                 commit_message="Update ACL abstract backfill progress",
