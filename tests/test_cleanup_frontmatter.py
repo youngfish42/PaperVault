@@ -87,6 +87,30 @@ def test_venue_index_url_suffices_even_with_abstract():
     assert cf.is_frontmatter_record(rec) is True
 
 
+def test_ieee_bare_conference_doi_is_whole_proceedings():
+    rec = _rec(
+        "IEEE/CVF Conference on Computer Vision and Pattern Recognition, CVPR 2024, Seattle, WA, USA",
+        url="https://doi.org/10.1109/CVPR52733.2024",
+    )
+    assert cf.is_frontmatter_record(rec) is True
+
+
+def test_ieee_conference_title_with_venue_index_is_whole_proceedings():
+    rec = _rec(
+        "IEEE Conference on Computer Vision and Pattern Recognition, CVPR 2021, virtual",
+        url="https://openaccess.thecvf.com/CVPR2021",
+    )
+    assert cf.is_frontmatter_record(rec) is True
+
+
+def test_ieee_chapter_doi_is_not_whole_proceedings():
+    rec = _rec(
+        "IEEE/CVF Conference on Computer Vision and Pattern Recognition, CVPR 2024, Seattle, WA, USA",
+        url="https://doi.org/10.1109/CVPR52733.2024.02628",
+    )
+    assert cf.is_frontmatter_record(rec) is False
+
+
 # ---------- predicate: negatives ------------------------------------------------
 
 @pytest.mark.parametrize(

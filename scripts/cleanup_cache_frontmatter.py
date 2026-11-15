@@ -4,7 +4,7 @@
   1. 普通 front-matter：标题命中 :data:`FRONT_MATTER_RE`，且 URL 是
      venue-index，或无摘要且无真实代码链接（``paper_code`` 为空/``"#"``）。
   2. 整卷 proceedings：标题符合整卷形态，且具有 Springer 书籍 DOI、ACM
-     裸出版物 DOI/citation ID 或明确 venue-index URL。整卷即使已有摘要、
+     裸出版物 DOI/citation ID、IEEE 裸会议 DOI 或明确 venue-index URL。整卷即使已有摘要、
      代码或普通作者列表也可移除；章节 DOI 与单篇 workshop 论文保留。
 
 设计参照 ``cleanup_cache_dedupe.py``：流式读取，``.tmp`` + 回读校验 +

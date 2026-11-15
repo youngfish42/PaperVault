@@ -132,6 +132,36 @@ def test_merge_cvf_records_dedupes_url_variants_and_preserves_best_fields():
     assert merged[0]["paper_code"] == "https://github.com/a/b"
 
 
+@pytest.mark.parametrize(
+    ("cached", "official"),
+    [
+        ("Mop Moiré Patterns Using MopNet", "Mop Moire Patterns Using MopNet"),
+        ("Task-Decoupled Bézier Surface Constraint", "Task-Decoupled Bezier Surface Constraint"),
+        ("$\\pi$-AVAS: Neural Synthesis", "p-AVAS: Neural Synthesis"),
+        ("lambda-Net: Reconstruct Images", "l-Net: Reconstruct Images"),
+        ("Lidar Waveforms are Worth 40×128×33 Words", "Lidar Waveforms are Worth 40x128x33 Words"),
+        ("$\\text{CO}_{2}$-Net: Global $\\text{CO}_{{2}}$ Reconstruction", "CO2-Net: Global CO2 Reconstruction"),
+    ],
+)
+def test_normalize_cvf_title_handles_publisher_formatting(cached, official):
+    assert cvf.normalize_cvf_title(cached) == cvf.normalize_cvf_title(official)
+
+
+def test_paper_original_variant_merges_by_unique_title():
+    doi = "https://doi.org/10.1109/CVPR52733.2024.01228"
+    original = "https://openaccess.thecvf.com/content/CVPR2024/html/Zhang_DePT_Decoupled_Prompt_Tuning_CVPR_2024_paperOriginal.html"
+    regular = original.replace("paperOriginal.html", "paper.html")
+    records = [
+        _paper("DePT: Decoupled Prompt Tuning", original, "original abstract"),
+        _paper("DePT: Decoupled Prompt Tuning", doi, "longer DOI abstract"),
+    ]
+    merged = cvf.merge_cvf_records(records, [_paper("DePT: Decoupled Prompt Tuning", regular)])
+    assert cvf.is_cvf_paper_url(original)
+    assert len(merged) == 1
+    assert merged[0]["paper_url"] == doi
+    assert merged[0]["paper_abstract"] == "longer DOI abstract"
+
+
 def test_merge_cvf_records_does_not_guess_ambiguous_titles():
     doi = "https://doi.org/10.1/same"
     records = [_paper("Same Title", doi)]

@@ -56,6 +56,8 @@ def test_acl_venue_index_urls(url):
         "Author_Paper_Title_CVPR_2023_paper.html",
         "https://openaccess.thecvf.com/content_CVPR_2020/html/"
         "Foo_Bar_CVPR_2020_paper.html",
+        "https://openaccess.thecvf.com/content/CVPR2024/html/"
+        "Zhang_DePT_Decoupled_Prompt_Tuning_CVPR_2024_paperOriginal.html",
     ],
 )
 def test_thecvf_paper_urls(url):

@@ -35,7 +35,7 @@ def is_cvf_paper_url(url: str) -> bool:
     return (
         host == CVF_HOST
         and "/html/" in parsed.path
-        and parsed.path.lower().endswith("_paper.html")
+        and re.search(r"_paper(?:original)?\.html$", parsed.path, re.IGNORECASE) is not None
     )
 
 
@@ -143,14 +143,15 @@ def collect_cvf_metadata(url: str) -> list[dict]:
 
 
 def normalize_cvf_title(title: str) -> str:
-    normalized = re.sub(
-        r"\\(?:mathrm|mathbf|mathit|mathsf|mathtt|mathcal|mathbb|textbf|textit|texttt|emph|underline|text|textrm)\b",
-        "",
-        title or "",
-        flags=re.IGNORECASE,
-    )
-    normalized = unicodedata.normalize("NFKC", normalized).casefold()
-    return re.sub(r"[^\w]+", "", normalized, flags=re.UNICODE)
+    normalized = re.sub(r"\\(?:up)?pi\b", "p", title or "", flags=re.IGNORECASE)
+    normalized = re.sub(r"\\(?:up)?lambda\b", "l", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\\[A-Za-z]+\b", "", normalized)
+    normalized = re.sub(r"\blambda\b", "l", normalized, flags=re.IGNORECASE)
+    normalized = normalized.translate(str.maketrans({"π": "p", "λ": "l", "×": "x"}))
+    normalized = unicodedata.normalize("NFKC", normalized)
+    normalized = unicodedata.normalize("NFKD", normalized)
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[\W_]+", "", normalized.casefold(), flags=re.UNICODE)
 
 
 def merge_cvf_records(records: list[dict], official_records: list[dict]) -> list[dict]:

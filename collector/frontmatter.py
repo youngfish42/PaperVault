@@ -45,6 +45,14 @@ _ACM_PROCEEDINGS_TITLE_RE = re.compile(
 _SPRINGER_BOOK_DOI_RE = re.compile(r"^10\.1007/978-[^_]+$", re.IGNORECASE)
 _ACM_DOI_RE = re.compile(r"^10\.1145/\d+$", re.IGNORECASE)
 _ACM_LEGACY_DOI_RE = re.compile(r"^(?:doi/)?10\.1145/\d+$", re.IGNORECASE)
+_IEEE_PROCEEDINGS_TITLE_RE = re.compile(
+    r"\bIEEE(?:/CVF)?\b.*\bconference\b.*\b(?:19|20)\d{2}\b",
+    re.IGNORECASE,
+)
+_IEEE_PROCEEDINGS_DOI_RE = re.compile(
+    r"^10\.1109/[A-Za-z0-9]+\.(?:19|20)\d{2}$",
+    re.IGNORECASE,
+)
 
 _EDITOR_ROLE_RE = re.compile(r"\(\s*eds?\.?\s*\)|\beditors?\b", re.IGNORECASE)
 
@@ -61,7 +69,8 @@ def is_proceedings_record(rec: dict) -> bool:
     if not isinstance(rec, dict):
         return False
     title = (rec.get("paper_name") or "").strip()
-    if not PROCEEDINGS_TITLE_RE.search(title):
+    ieee_title = _IEEE_PROCEEDINGS_TITLE_RE.search(title)
+    if not PROCEEDINGS_TITLE_RE.search(title) and not ieee_title:
         return False
     try:
         parsed = urlparse((rec.get("paper_url") or "").strip())
@@ -73,6 +82,8 @@ def is_proceedings_record(rec: dict) -> bool:
     path = (parsed.path or "").strip("/")
 
     if host == "doi.org" and _SPRINGER_BOOK_DOI_RE.fullmatch(path):
+        return True
+    if ieee_title and host == "doi.org" and _IEEE_PROCEEDINGS_DOI_RE.fullmatch(path):
         return True
     acm_title = _ACM_PROCEEDINGS_TITLE_RE.search(title)
     if acm_title and host == "doi.org" and _ACM_DOI_RE.fullmatch(path):
