@@ -218,3 +218,49 @@ def test_miccai_recollects_cached_conf_once_then_uses_url_progress(
     calls.clear()
     collector.collect(cache_file=None)
     assert calls == []
+
+
+
+def test_ijcai_aggregates_repeated_volume_listings_before_title_merge(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    confs = [
+        {"name": "IJCAI2001", "url": "https://ijcai.org/proceedings/2001-1"},
+        {"name": "IJCAI2001", "url": "https://ijcai.org/proceedings/2001-2"},
+    ]
+    _install_stub_confs(monkeypatch, {"ijcai_conf.json": confs})
+    progress_sink: List[Dict[str, Any]] = []
+    _neuter_pkg_side_effects(monkeypatch, tmp_path, progress_sink)
+    progress_state = {}
+    monkeypatch.setattr(collector, "load_collect_progress", lambda: progress_state)
+    cached = {
+        "paper_name": "Official Paper",
+        "paper_url": "https://doi.org/10.24963/ijcai.2001/1",
+        "paper_authors": ["A"],
+        "paper_abstract": "",
+        "paper_code": "#",
+    }
+    monkeypatch.setattr(collector, "load_cache", lambda _p: {"IJCAI2001": [cached]})
+    cache_file = tmp_path / "cache.jsonl.gz"
+    cache_file.touch()
+    calls = []
+
+    def _stub_ijcai(url, name, res):
+        calls.append(url)
+        res.setdefault(name, []).append({
+            "paper_name": "Official Paper",
+            "paper_url": "https://ijcai.org/proceedings/2001/1",
+            "paper_authors": ["A"],
+            "paper_abstract": "Official abstract",
+            "paper_code": "#",
+        })
+        return res
+
+    monkeypatch.setattr(collector, "search_from_ijcai", _stub_ijcai)
+    result = collector.collect(cache_file=str(cache_file))
+
+    assert calls == [conf["url"] for conf in confs]
+    assert len(result["IJCAI2001"]) == 1
+    assert result["IJCAI2001"][0]["paper_url"] == cached["paper_url"]
+    assert result["IJCAI2001"][0]["paper_abstract"] == "Official abstract"
+    assert all("IJCAI::" + conf["url"] in progress_state for conf in confs)

@@ -53,6 +53,7 @@ from .sources.thecvf import (
     search_from_thecvf,
 )
 from .sources.miccai import search_from_miccai
+from .sources.ijcai import search_from_ijcai
 
 from .pipeline import collect, do_collect
 
