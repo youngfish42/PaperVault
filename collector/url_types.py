@@ -72,7 +72,7 @@ def _classify_aclanthology(path: str) -> UrlKind:
 # Individual papers always have a ``..._paper.html`` (or ``..._paper.pdf``)
 # in the URL; landing pages such as ``/CVPR2020`` or ``/menu`` do not.
 _THECVF_PAPER_RE = re.compile(
-    r"content[_/].*_paper\.(html|pdf)$", re.IGNORECASE
+    r"content[_/].*_paper(?:original)?\.(html|pdf)$", re.IGNORECASE
 )
 # Year landing pages: ``/CVPR2020``, ``/CVPR2020?day=...``, ``/menu``.
 _THECVF_LANDING_RE = re.compile(

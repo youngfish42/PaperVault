@@ -4,7 +4,7 @@
   1. 普通 front-matter：标题命中 :data:`FRONT_MATTER_RE`，且 URL 是
      venue-index，或无摘要且无真实代码链接（``paper_code`` 为空/``"#"``）。
   2. 整卷 proceedings：标题符合整卷形态，且具有 Springer 书籍 DOI、ACM
-     裸出版物 DOI/citation ID 或明确 venue-index URL。整卷即使已有摘要、
+     裸出版物 DOI/citation ID、IEEE 裸会议 DOI 或明确 venue-index URL。整卷即使已有摘要、
      代码或普通作者列表也可移除；章节 DOI 与单篇 workshop 论文保留。
 
 设计参照 ``cleanup_cache_dedupe.py``：流式读取，``.tmp`` + 回读校验 +
@@ -18,6 +18,7 @@
     python scripts/cleanup_cache_frontmatter.py --review         # dry-run + 完整待删清单
     python scripts/cleanup_cache_frontmatter.py --write          # 真正删除
     python scripts/cleanup_cache_frontmatter.py --write --no-sync
+    python scripts/cleanup_cache_frontmatter.py --conf CVPR2025 ICCV2025 --write --offline
 """
 
 import argparse
@@ -42,6 +43,7 @@ def cleanup(
     *,
     dry_run: bool = True,
     backup: bool = True,
+    conf_filter=None,
 ) -> dict:
     """读取 ``source``，移除 front-matter 记录，（除非 dry-run）原子写回。
 
@@ -66,7 +68,9 @@ def cleanup(
                 parse_errors += 1
                 continue
             total += 1
-            if is_frontmatter_record(rec):
+            if is_frontmatter_record(rec) and (
+                conf_filter is None or rec.get("conf") in conf_filter
+            ):
                 matched.append(
                     (rec.get("conf", ""), (rec.get("paper_name") or "").strip(),
                      rec.get("paper_url", ""))
@@ -80,6 +84,7 @@ def cleanup(
 
     stats = {
         "source": str(source),
+        "conf_filter": sorted(conf_filter) if conf_filter else None,
         "total_rows": total,
         "parse_errors": parse_errors,
         "matched_frontmatter": len(matched),
@@ -156,6 +161,8 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--source", type=Path, default=DEFAULT_CACHE,
                         help="cache jsonl.gz 路径，默认 cache/cache.jsonl.gz")
+    parser.add_argument("--conf", nargs="*", default=None,
+                        help="只清理这些 conf；默认清理全部匹配记录")
     g = parser.add_mutually_exclusive_group()
     g.add_argument("--dry-run", dest="dry_run", action="store_true", default=True,
                    help="只统计与生成报告，不写回（默认）")
@@ -170,6 +177,11 @@ def main(argv=None) -> int:
     parser.add_argument("--offline", action="store_true",
                         help="跳过 ensure_cache_local 并且不推送 HF")
     args = parser.parse_args(argv)
+    conf_names = None
+    if args.conf is not None:
+        conf_names = [name.strip() for name in args.conf if name.strip()]
+        if not conf_names:
+            parser.error("--conf requires at least one non-empty conference name")
 
     if not args.offline:
         ensure_cache_local(args.source, refresh=True)
@@ -179,6 +191,7 @@ def main(argv=None) -> int:
             args.source,
             dry_run=args.dry_run,
             backup=not args.no_backup,
+            conf_filter=set(conf_names) if conf_names is not None else None,
         )
     except FileNotFoundError as exc:
         print(f"[cleanup_frontmatter] ERROR: {exc}", file=sys.stderr)

@@ -87,6 +87,30 @@ def test_venue_index_url_suffices_even_with_abstract():
     assert cf.is_frontmatter_record(rec) is True
 
 
+def test_ieee_bare_conference_doi_is_whole_proceedings():
+    rec = _rec(
+        "IEEE/CVF Conference on Computer Vision and Pattern Recognition, CVPR 2024, Seattle, WA, USA",
+        url="https://doi.org/10.1109/CVPR52733.2024",
+    )
+    assert cf.is_frontmatter_record(rec) is True
+
+
+def test_ieee_conference_title_with_venue_index_is_whole_proceedings():
+    rec = _rec(
+        "IEEE Conference on Computer Vision and Pattern Recognition, CVPR 2021, virtual",
+        url="https://openaccess.thecvf.com/CVPR2021",
+    )
+    assert cf.is_frontmatter_record(rec) is True
+
+
+def test_ieee_chapter_doi_is_not_whole_proceedings():
+    rec = _rec(
+        "IEEE/CVF Conference on Computer Vision and Pattern Recognition, CVPR 2024, Seattle, WA, USA",
+        url="https://doi.org/10.1109/CVPR52733.2024.02628",
+    )
+    assert cf.is_frontmatter_record(rec) is False
+
+
 # ---------- predicate: negatives ------------------------------------------------
 
 @pytest.mark.parametrize(
@@ -201,6 +225,44 @@ def test_cleanup_write_removes_exactly_matched(tmp_path):
     bak = tmp_path / "cache.jsonl.gz.bak"
     assert bak.exists() and bak.read_bytes() == pre_bytes
     assert not (tmp_path / "cache.jsonl.gz.tmp").exists()
+
+
+def test_cleanup_conf_filter_preserves_other_conferences(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    records = _sample_records()
+    records[1]["conf"] = "ICSE2026"
+    records[-1]["conf"] = "CVPR2025"
+    _write_jsonl_gz(cache, records)
+
+    stats = cf.cleanup(cache, dry_run=False, backup=False, conf_filter={"CVPR2025"})
+
+    rows = _read_jsonl_gz(cache)
+    assert stats["matched_frontmatter"] == 1
+    assert len(rows) == len(records) - 1
+    assert "Table of Contents" not in {row["paper_name"] for row in rows}
+    assert "Proceedings of the IEEE/ACM 48th ICSE" in {row["paper_name"] for row in rows}
+
+
+def test_cleanup_empty_conf_is_rejected_before_write(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    _write_jsonl_gz(cache, _sample_records())
+    original = cache.read_bytes()
+
+    with pytest.raises(SystemExit) as exc_info:
+        cf.main(["--source", str(cache), "--conf", "--write", "--offline"])
+
+    assert exc_info.value.code == 2
+    assert cache.read_bytes() == original
+    assert not (tmp_path / "cache.jsonl.gz.tmp").exists()
+    assert not (tmp_path / "cache.jsonl.gz.bak").exists()
+
+
+def test_cleanup_empty_filter_selects_nothing(tmp_path):
+    cache = tmp_path / "cache.jsonl.gz"
+    _write_jsonl_gz(cache, _sample_records())
+    stats = cf.cleanup(cache, dry_run=False, backup=False, conf_filter=set())
+    assert stats["matched_frontmatter"] == 0
+    assert _read_jsonl_gz(cache) == _sample_records()
 
 
 def test_cleanup_is_idempotent(tmp_path):

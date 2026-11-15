@@ -1,37 +1,38 @@
 """
-针对 CVF Open Access 渠道（CVPR / ICCV / WACV 等）的论文，在本机批量回填缺失的 abstract。
+针对 CVF Open Access 渠道（CVPR / ICCV / WACV 等）的论文，在本机批量补全元数据和 abstract。
 
 不同于通用的 scripts/fetch_abstracts.py（依赖 Crossref/S2/arXiv/OpenAlex 且强依赖 DOI），
-本脚本直接抓取 https://openaccess.thecvf.com/content/.../*_paper.html 详情页里
-`<div id="abstract">` 段的纯文本，命中率极高。
+本脚本直接解析 https://openaccess.thecvf.com/content/.../*_paper.html 详情页的
+`<div id="abstract">`，未命中时回退到 meta description。
 
 工作流程：
     1. `ensure_cache_local(refresh=True)` 从 Hugging Face 拉最新 cache.jsonl.gz；
-    2. 扫描 cache 里所有 paper_url 指向 openaccess.thecvf.com 且 abstract 为空的记录；
-    3. 使用 ThreadPoolExecutor 并发抓取详情页；复用 collector.search_abs_from_thecvf
-       作为主选择器，未命中时回退到 <meta name="description"> / og:description；
+    2. 默认扫描缓存内所有合法 CVF 论文详情 URL；`--sync-official` 额外同步
+       conf/thecvf_conf.json 中 confirmed-conf 的目录，按规范 URL / 唯一标题合并；
+       单会议目录失败会记录并继续其他会议，最终以非零退出码报告部分失败；
+    3. 使用 ThreadPoolExecutor 并发抓取新增或缺摘要记录的详情页，并从新摘要提取代码链接；
     4. 增量写回 cache.jsonl.gz（.tmp + os.replace 原子替换），并维护独立进度文件；
     5. 结束时 `sync_cache_artifacts` 推 HF（可 --no-sync 关闭）。
 
 用法：
-    # 全量回填（默认）
+    # 全量回填缓存内 CVF 详情 URL（默认）
     python scripts/fetch_cvf_abstracts.py
 
-    # 只跑指定会议
-    python scripts/fetch_cvf_abstracts.py --conf CVPR2024
-    python scripts/fetch_cvf_abstracts.py --conf CVPR2024 ICCV2023
+    # 本地同步 confirmed-conf 官方目录，并按需补摘要
+    python scripts/fetch_cvf_abstracts.py --sync-official --no-sync
 
-    # 只跑指定年份
+    # 只跑指定会议 / 年份
+    python scripts/fetch_cvf_abstracts.py --conf CVPR2024 ICCV2023
     python scripts/fetch_cvf_abstracts.py --year 2023 2024
 
-    # 限制本次处理论文数（小样本试跑）
+    # 限制本次详情请求数（小样本试跑）
     python scripts/fetch_cvf_abstracts.py --conf CVPR2024 --limit 20 --no-sync
 
     # 演练（不请求、不写文件）
-    python scripts/fetch_cvf_abstracts.py --dry-run
+    python scripts/fetch_cvf_abstracts.py --sync-official --dry-run
 
-    # 重试之前 tried 但未拿到 abstract 的 URL
-    python scripts/fetch_cvf_abstracts.py --retry-failed
+    # 重试之前 tried 但未拿到 abstract 的 URL；连续本地分段须加 --offline
+    python scripts/fetch_cvf_abstracts.py --retry-failed --offline --no-sync
 """
 
 from __future__ import annotations
@@ -65,6 +66,13 @@ from data_artifacts import (  # noqa: E402
     ensure_progress_local,
     sync_cache_artifacts,
     upload_to_huggingface,
+)
+from collector.code_links import extract_github_link  # noqa: E402
+from collector.sources.thecvf import (  # noqa: E402
+    canonicalize_cvf_url,
+    collect_cvf_metadata,
+    merge_cvf_records,
+    normalize_cvf_title,
 )
 
 try:
@@ -114,6 +122,7 @@ if sys.platform == "win32":
 
 CACHE_DIR = ROOT / "cache"
 CACHE_FILE = CACHE_DIR / "cache.jsonl.gz"
+CONF_FILE = ROOT / "conf" / "thecvf_conf.json"
 BACKUP_FILE = CACHE_DIR / "cache.jsonl.gz.cvf.bak"
 PROGRESS_FILE = CACHE_DIR / "cvf_backfill_progress.json"
 
@@ -181,6 +190,61 @@ def conf_year(conf_name: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def load_conf_entries(
+    conf_filter: Optional[Set[str]], year_filter: Optional[Set[int]]
+) -> List[dict]:
+    with CONF_FILE.open("r", encoding="utf-8") as handle:
+        entries = json.load(handle)
+    return [
+        entry for entry in entries
+        if (not conf_filter or entry.get("name") in conf_filter)
+        and (not year_filter or conf_year(entry.get("name", "")) in year_filter)
+    ]
+
+
+def sync_official_records(
+    records: List[dict], entries: List[dict], metadata_fetcher=None
+) -> Tuple[Dict[str, List[dict]], dict]:
+    fetcher = metadata_fetcher or collect_cvf_metadata
+    official_by_conf: Dict[str, List[dict]] = {}
+    stats = {"added": 0, "duplicates_removed": 0, "changed": False, "confs": 0, "failures": []}
+    for entry in entries:
+        conf_name = entry["name"]
+        indices = [i for i, rec in enumerate(records) if rec.get("conf") == conf_name]
+        existing = [records[i] for i in indices]
+        before = json.dumps(existing, ensure_ascii=False, sort_keys=True)
+        existing_ids = {id(record) for record in existing}
+        try:
+            official = fetcher(entry["url"])
+        except Exception as exc:
+            stats["failures"].append({"name": conf_name, "url": entry["url"], "error": str(exc)})
+            print(f"    [!] {conf_name}: metadata sync failed: {exc}")
+            continue
+        merged = merge_cvf_records(existing, official)
+        for record in merged:
+            record.setdefault("conf", conf_name)
+        added = sum(id(record) not in existing_ids for record in merged)
+        duplicates_removed = len(existing) + added - len(merged)
+        changed = before != json.dumps(merged, ensure_ascii=False, sort_keys=True)
+
+        for idx in reversed(indices):
+            records.pop(idx)
+        insert_at = indices[0] if indices else len(records)
+        for offset, record in enumerate(merged):
+            records.insert(insert_at + offset, record)
+
+        official_by_conf[conf_name] = official
+        stats["added"] += added
+        stats["duplicates_removed"] += duplicates_removed
+        stats["changed"] = stats["changed"] or changed
+        stats["confs"] += 1
+        print(
+            f"    {conf_name}: official={len(official)}, cached={len(existing)}, "
+            f"merged={len(merged)}, added={added}, duplicates_removed={duplicates_removed}"
+        )
+    return official_by_conf, stats
+
+
 def build_task(
     records: List[dict],
     *,
@@ -189,21 +253,34 @@ def build_task(
     retry_failed: bool,
     progress: dict,
     force: bool = False,
+    official_by_conf: Optional[Dict[str, List[dict]]] = None,
 ) -> List[Tuple[int, str]]:
     filled_set = set(progress.get("filled", []))
     tried_set = set(progress.get("tried", []))
+    title_urls: Dict[str, Dict[str, str]] = {}
+    for conf_name, official_records in (official_by_conf or {}).items():
+        mapping: Dict[str, str] = {}
+        for official in official_records:
+            key = normalize_cvf_title(official.get("paper_name", ""))
+            if not key:
+                continue
+            mapping[key] = "" if key in mapping else canonicalize_cvf_url(official["paper_url"])
+        title_urls[conf_name] = mapping
 
     tasks: List[Tuple[int, str]] = []
     for idx, rec in enumerate(records):
-        url = (rec.get("paper_url") or "").strip()
-        if not is_cvf_paper_url(url):
-            continue
         if (rec.get("paper_abstract") or "").strip():
             continue
         conf_name = rec.get("conf") or ""
         if conf_filter and conf_name not in conf_filter:
             continue
         if year_filter and conf_year(conf_name) not in year_filter:
+            continue
+        url = canonicalize_cvf_url((rec.get("paper_url") or "").strip())
+        if not is_cvf_paper_url(url):
+            title_key = normalize_cvf_title(rec.get("paper_name", ""))
+            url = title_urls.get(conf_name, {}).get(title_key, "")
+        if not url:
             continue
         if not force and url in filled_set:
             continue
@@ -214,6 +291,9 @@ def build_task(
 
 
 def run(args) -> int:
+    if args.conf is not None and not [name for name in args.conf if name.strip()]:
+        print("[!] --conf requires at least one non-empty conference name", file=sys.stderr)
+        return 2
     if not args.offline:
         ensure_cache_local(CACHE_FILE, refresh=True)
         # Best-effort pull the CVF progress ledger from Hugging Face so that
@@ -235,17 +315,37 @@ def run(args) -> int:
         print("[*] Force mode: ENABLED — will retry CVF papers that previously failed to fetch an abstract")
 
     progress = load_progress()
-    conf_filter = set(args.conf) if args.conf else None
-    year_filter = set(args.year) if args.year else None
-
-    tasks = build_task(
-        records,
-        conf_filter=conf_filter,
-        year_filter=year_filter,
-        retry_failed=args.retry_failed,
-        progress=progress,
-        force=args.force,
+    conf_filter = (
+        {name.strip() for name in args.conf if name.strip()}
+        if args.conf is not None else None
     )
+    year_filter = set(args.year) if args.year else None
+    official_by_conf = None
+    sync_stats = {"added": 0, "duplicates_removed": 0, "changed": False, "confs": 0, "failures": []}
+
+    if args.sync_official:
+        entries = load_conf_entries(conf_filter, year_filter)
+        print(f"[*] Official CVF metadata sync: {len(entries)} confirmed conference(s)")
+        if args.dry_run:
+            print("[*] --dry-run: no requests sent, no file written.")
+            for entry in entries:
+                cached = sum(rec.get("conf") == entry["name"] for rec in records)
+                print(f"      - {entry['name']}: cached={cached}, url={entry['url']}")
+            return 0
+        official_by_conf, sync_stats = sync_official_records(records, entries)
+
+    if args.sync_official and not official_by_conf:
+        tasks = []
+    else:
+        tasks = build_task(
+            records,
+            conf_filter=conf_filter,
+            year_filter=year_filter,
+            retry_failed=args.retry_failed,
+            progress=progress,
+            force=args.force,
+            official_by_conf=official_by_conf,
+        )
 
     per_conf: Dict[str, int] = {}
     for i, _ in tasks:
@@ -265,14 +365,33 @@ def run(args) -> int:
             print(f"      sample: idx={i}  conf={records[i].get('conf')}  url={url}")
         return 0
 
-    if not tasks:
-        print("[*] Nothing to do.")
-        return 0
+    def _backup_cache():
+        if not BACKUP_FILE.exists():
+            print(f"[*] Backing up original cache to {BACKUP_FILE}")
+            import shutil
+            shutil.copy2(CACHE_FILE, BACKUP_FILE)
 
-    if not BACKUP_FILE.exists():
-        print(f"[*] Backing up original cache to {BACKUP_FILE}")
-        import shutil
-        shutil.copy2(CACHE_FILE, BACKUP_FILE)
+    if not tasks:
+        if sync_stats["changed"]:
+            _backup_cache()
+            save_cache_atomic(CACHE_FILE, records)
+            print("[*] Metadata changes saved; no abstract requests needed.")
+            if not args.no_sync and not args.offline:
+                sync_cache_artifacts(
+                    cache_path=CACHE_FILE,
+                    commit_message=(
+                        f"Sync CVF metadata (+{sync_stats['added']}, "
+                        f"-{sync_stats['duplicates_removed']} duplicates)"
+                    ),
+                    progress_path=None,
+                )
+        else:
+            print("[*] Nothing to do.")
+        if sync_stats["failures"]:
+            print(f"    Official sync had {len(sync_stats['failures'])} failed conference(s).")
+        return 1 if sync_stats["failures"] else 0
+
+    _backup_cache()
 
     filled_set: Set[str] = set(progress.get("filled", []))
     tried_set: Set[str] = set(progress.get("tried", []))
@@ -284,6 +403,7 @@ def run(args) -> int:
 
     total_filled = 0
     total_tried = 0
+    total_code_filled = 0
     pending_writeback = 0
     t0 = time.time()
 
@@ -337,6 +457,11 @@ def run(args) -> int:
                     total_tried += 1
                     if abs_ and abs_.strip():
                         records[idx]["paper_abstract"] = abs_.strip()
+                        if (records[idx].get("paper_code") or "#") == "#":
+                            code = extract_github_link(abs_)
+                            if code:
+                                records[idx]["paper_code"] = code
+                                total_code_filled += 1
                         filled_set.add(url)
                         failed_map.pop(url, None)
                         total_filled += 1
@@ -376,7 +501,7 @@ def run(args) -> int:
         tqdm.write("\n[!] KeyboardInterrupt detected; flushing in-memory progress...")
         raise
     finally:
-        if pending_writeback > 0 or args.always_flush:
+        if pending_writeback > 0 or sync_stats["changed"] or args.always_flush:
             save_cache_atomic(CACHE_FILE, records)
             tqdm.write(
                 f"    [*] Final flush (filled+={pending_writeback}, "
@@ -397,6 +522,13 @@ def run(args) -> int:
             f"\n[*] Done. Filled {total_filled}/{total_tried} abstracts in {elapsed:.0f}s "
             f"(cache: {CACHE_FILE})"
         )
+    if args.sync_official:
+        print(
+            f"    Official sync: added={sync_stats['added']}, "
+            f"duplicates_removed={sync_stats['duplicates_removed']}, "
+            f"failed_confs={len(sync_stats['failures'])}"
+        )
+    print(f"    GitHub links filled from abstracts: {total_code_filled}")
     if total_filled < total_tried:
         miss = total_tried - total_filled
         print(
@@ -406,15 +538,16 @@ def run(args) -> int:
 
     sync_failed = False
     if not args.no_sync and not args.offline:
-        # We push the CVF progress ledger even when total_filled == 0 so that
-        # freshly-recorded `tried`/`failed` counts don't get lost across runs.
-        # cache.jsonl.gz is only pushed when new abstracts landed to avoid
-        # wasting HF bandwidth on no-op ghost commits.
-        if total_filled > 0:
+        # Push the cache when either abstracts or official metadata changed.
+        if total_filled > 0 or sync_stats["changed"]:
             try:
                 sync_cache_artifacts(
                     cache_path=CACHE_FILE,
-                    commit_message=f"Backfill CVF abstracts (+{total_filled})",
+                    commit_message=(
+                        f"Backfill CVF data (+{total_filled} abstracts, "
+                        f"+{sync_stats['added']} papers, "
+                        f"-{sync_stats['duplicates_removed']} duplicates)"
+                    ),
                     progress_path=None,
                 )
             except Exception as exc:
@@ -427,10 +560,11 @@ def run(args) -> int:
                 )
         # Always try to push the CVF progress ledger (even on zero-fill runs)
         # so tried/failed counters survive across GitHub Actions runs.
-        # If cache sync failed after filling abstracts, skip pushing progress to
-        # avoid marking URLs as "filled" remotely when the cache update didn't land.
+        # If a required cache sync failed, skip progress to avoid acknowledging
+        # remote metadata or abstracts that did not land.
         try:
-            if (total_filled == 0 or not sync_failed) and PROGRESS_FILE.exists():
+            cache_unchanged = total_filled == 0 and not sync_stats["changed"]
+            if (cache_unchanged or not sync_failed) and PROGRESS_FILE.exists():
                 upload_to_huggingface(
                     [PROGRESS_FILE],
                     commit_message=(
@@ -440,7 +574,7 @@ def run(args) -> int:
                 )
         except Exception as exc:
             print(f"[!] cvf progress push skipped: {exc}")
-    return 1 if sync_failed else 0
+    return 1 if sync_failed or sync_stats["failures"] else 0
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -452,6 +586,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="只处理这些 conf 名（如 CVPR2024 ICCV2023）")
     p.add_argument("--year", nargs="*", type=int, default=None,
                    help="只处理这些年份（如 --year 2023 2024）")
+    p.add_argument("--sync-official", action="store_true",
+                   help="同步 confirmed-conf 官方目录，按唯一标题合并并只为缺摘要记录请求详情页")
     p.add_argument("--limit", type=int, default=0,
                    help="本次最多处理多少条（0 表示不限）")
     p.add_argument("--concurrency", type=int, default=4,
