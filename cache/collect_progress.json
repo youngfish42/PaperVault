@@ -24110,6 +24110,222 @@
     "DBLP::https://dblp.org/db/journals/ai/ai361.html": {
       "name": "AI2026",
       "ts": "2026-11-12T08:36:29"
+    },
+    "thecvf::https://openaccess.thecvf.com/CVPR2018": {
+      "name": "CVPR2018",
+      "ts": "2026-11-17T09:57:28",
+      "legacy": true
+    },
+    "thecvf::https://openaccess.thecvf.com/CVPR2019": {
+      "name": "CVPR2019",
+      "ts": "2026-11-17T09:57:28",
+      "legacy": true
+    },
+    "thecvf::https://openaccess.thecvf.com/CVPR2020": {
+      "name": "CVPR2020",
+      "ts": "2026-11-17T09:57:28",
+      "legacy": true
+    },
+    "thecvf::https://openaccess.thecvf.com/ICCV2019": {
+      "name": "ICCV2019",
+      "ts": "2026-11-17T09:57:28",
+      "legacy": true
+    },
+    "IJCAI::https://ijcai.org/proceedings/1969": {
+      "name": "IJCAI1969",
+      "ts": "2026-11-17T10:00:06"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1971": {
+      "name": "IJCAI1971",
+      "ts": "2026-11-17T10:01:00"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1973": {
+      "name": "IJCAI1973",
+      "ts": "2026-11-17T10:01:55"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1975": {
+      "name": "IJCAI1975",
+      "ts": "2026-11-17T10:02:51"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1977-1": {
+      "name": "IJCAI1977",
+      "ts": "2026-11-17T10:04:00"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1977-2": {
+      "name": "IJCAI1977",
+      "ts": "2026-11-17T10:04:55"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1979-1": {
+      "name": "IJCAI1979",
+      "ts": "2026-11-17T10:05:54"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1979-2": {
+      "name": "IJCAI1979",
+      "ts": "2026-11-17T10:06:46"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1981-1": {
+      "name": "IJCAI1981",
+      "ts": "2026-11-17T10:07:46"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1981-2": {
+      "name": "IJCAI1981",
+      "ts": "2026-11-17T10:08:39"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1983-1": {
+      "name": "IJCAI1983",
+      "ts": "2026-11-17T10:09:39"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1983-2": {
+      "name": "IJCAI1983",
+      "ts": "2026-11-17T10:10:33"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1985-1": {
+      "name": "IJCAI1985",
+      "ts": "2026-11-17T10:11:32"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1985-2": {
+      "name": "IJCAI1985",
+      "ts": "2026-11-17T10:12:25"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1987-1": {
+      "name": "IJCAI1987",
+      "ts": "2026-11-17T10:13:26"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1987-2": {
+      "name": "IJCAI1987",
+      "ts": "2026-11-17T10:14:18"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1989-1": {
+      "name": "IJCAI1989",
+      "ts": "2026-11-17T10:15:19"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1989-2": {
+      "name": "IJCAI1989",
+      "ts": "2026-11-17T10:16:12"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1991-1": {
+      "name": "IJCAI1991",
+      "ts": "2026-11-17T10:17:10"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1991-2": {
+      "name": "IJCAI1991",
+      "ts": "2026-11-17T10:18:02"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1993-1": {
+      "name": "IJCAI1993",
+      "ts": "2026-11-17T10:19:01"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1993-2": {
+      "name": "IJCAI1993",
+      "ts": "2026-11-17T10:19:56"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1995-1": {
+      "name": "IJCAI1995",
+      "ts": "2026-11-17T10:20:56"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1995-2": {
+      "name": "IJCAI1995",
+      "ts": "2026-11-17T10:21:49"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1997-1": {
+      "name": "IJCAI1997",
+      "ts": "2026-11-17T10:22:49"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1997-2": {
+      "name": "IJCAI1997",
+      "ts": "2026-11-17T10:23:42"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1999-1": {
+      "name": "IJCAI1999",
+      "ts": "2026-11-17T10:24:41"
+    },
+    "IJCAI::https://ijcai.org/proceedings/1999-2": {
+      "name": "IJCAI1999",
+      "ts": "2026-11-17T10:25:34"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2001-1": {
+      "name": "IJCAI2001",
+      "ts": "2026-11-17T10:26:32"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2001-2": {
+      "name": "IJCAI2001",
+      "ts": "2026-11-17T10:27:25"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2003": {
+      "name": "IJCAI2003",
+      "ts": "2026-11-17T10:28:26"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2005": {
+      "name": "IJCAI2005",
+      "ts": "2026-11-17T10:29:29"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2007": {
+      "name": "IJCAI2007",
+      "ts": "2026-11-17T10:30:33"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2009": {
+      "name": "IJCAI2009",
+      "ts": "2026-11-17T10:31:34"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2011": {
+      "name": "IJCAI2011",
+      "ts": "2026-11-17T10:32:39"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2013": {
+      "name": "IJCAI2013",
+      "ts": "2026-11-17T10:33:44"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2015": {
+      "name": "IJCAI2015",
+      "ts": "2026-11-17T10:34:52"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2016": {
+      "name": "IJCAI2016",
+      "ts": "2026-11-17T10:36:02"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2017": {
+      "name": "IJCAI2017",
+      "ts": "2026-11-17T10:37:14"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2018": {
+      "name": "IJCAI2018",
+      "ts": "2026-11-17T10:38:29"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2019": {
+      "name": "IJCAI2019",
+      "ts": "2026-11-17T10:39:46"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2020": {
+      "name": "IJCAI2020",
+      "ts": "2026-11-17T10:41:00"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2021": {
+      "name": "IJCAI2021",
+      "ts": "2026-11-17T10:42:13"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2022": {
+      "name": "IJCAI2022",
+      "ts": "2026-11-17T10:43:28"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2023": {
+      "name": "IJCAI2023",
+      "ts": "2026-11-17T10:44:43"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2024": {
+      "name": "IJCAI2024",
+      "ts": "2026-11-17T10:46:02"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2025": {
+      "name": "IJCAI2025",
+      "ts": "2026-11-17T10:47:27"
+    },
+    "IJCAI::https://ijcai.org/proceedings/2026": {
+      "name": "IJCAI2026",
+      "ts": "2026-11-17T10:48:45"
+    },
+    "DBLP::https://dblp.org/db/journals/urban/urban130.html": {
+      "name": "CEUS2026",
+      "ts": "2026-11-17T10:50:32"
     }
   }
 }
