@@ -84,6 +84,15 @@ def test_normalize_url_rejects_garbage():
     assert normalize_url("https://") == ""
 
 
+def test_normalize_url_preserves_openreview_paper_identity():
+    first = normalize_url("https://openreview.net/forum?id=HkGx2sAqFX")
+    second = normalize_url("https://openreview.net/forum?id=anotherPaper")
+    attachment = normalize_url("https://openreview.net/attachment?id=HkGx2sAqFX&name=pdf")
+    assert first == "https://openreview.net/forum?id=HkGx2sAqFX"
+    assert attachment == "https://openreview.net/attachment?id=HkGx2sAqFX"
+    assert first != second
+
+
 def test_extract_arxiv_id_strips_version():
     assert extract_arxiv_id("https://arxiv.org/abs/1805.10616v4") == "1805.10616"
     assert extract_arxiv_id("http://arxiv.org/pdf/1805.10616.pdf") == "1805.10616"
@@ -268,3 +277,31 @@ def test_backfill_conf_filter():
     assert stats["scanned"] == 1
     # ACL2023 被扫描但年份守卫拦截（proceeding 是 ICML 2024）
     assert stats["abstract_filled"] == 0
+
+
+def test_openreview_url_keys_never_share_unrelated_repositories():
+    rows = [
+        {
+            "paper_title": "First Paper",
+            "paper_arxiv_id": None,
+            "paper_url_abs": "https://openreview.net/forum?id=firstPaper",
+            "repo_url": "https://github.com/org/first",
+            "is_official": True,
+            "mentioned_in_paper": True,
+        },
+        {
+            "paper_title": "Second Paper",
+            "paper_arxiv_id": None,
+            "paper_url_abs": "https://openreview.net/forum?id=secondPaper",
+            "repo_url": "https://github.com/org/second",
+            "is_official": True,
+            "mentioned_in_paper": True,
+        },
+    ]
+    index = build_code_index(rows)
+    first, _ = match_repo(index, _cache_paper(paper_url="https://openreview.net/forum?id=firstPaper"))
+    second, _ = match_repo(index, _cache_paper(paper_url="https://openreview.net/forum?id=secondPaper"))
+    missing, _ = match_repo(index, _cache_paper(paper_url="https://openreview.net/forum?id=missingPaper"))
+    assert first == "https://github.com/org/first"
+    assert second == "https://github.com/org/second"
+    assert missing == ""

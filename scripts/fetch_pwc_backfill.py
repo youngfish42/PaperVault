@@ -99,6 +99,10 @@ def normalize_url(url: str) -> str:
     path = path.rstrip("/")
     if not host or not path:
         return ""
+    if host == "openreview.net":
+        match = re.search(r"(?:^|[?&])id=([\w\-]+)", parsed.query, re.IGNORECASE)
+        if match:
+            return f"https://{host}{path}?id={match.group(1)}"
     return f"https://{host}{path}"
 
 
