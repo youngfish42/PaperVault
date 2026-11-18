@@ -545,6 +545,118 @@ def import_records(
     return updated, stats
 
 
+def repair_records(
+    papers: list[dict],
+    manifest: list[Edition],
+    dry_run: bool = True,
+    rejected_urls: Optional[set[str]] = None,
+) -> tuple[list[dict], dict]:
+    """Repair only the two demonstrated ICLR mass-assignment clusters."""
+    stats = _new_stats("repair")
+    stats.update({"affected": 0, "replaced": 0, "cleared": 0, "kept": 0, "changes": []})
+    rejected_urls = rejected_urls or set()
+    updated = [dict(paper) for paper in papers]
+    local_by_conf = defaultdict(list)
+    for index, paper in enumerate(updated):
+        local_by_conf[paper.get("conf") or ""].append((index, paper))
+
+    for edition in (item for item in manifest if item.venue == "ICLR"):
+        indexed = local_by_conf.get(edition.conf, [])
+        local_records = [paper for _, paper in indexed]
+        _, local_titles = _build_indices(local_records, "paper_url")
+        entries = parse_markdown(edition.path)
+        external_records = _external_records(entries)
+        external_identities, external_titles = _build_indices(external_records, "paper_url")
+        stats["parsed_external"] += len(entries)
+        stats["scanned_local"] += len(local_records)
+
+        for global_index, paper in indexed:
+            existing = (paper.get("paper_code") or "").strip()
+            repo = normalize_repo_url(existing)
+            if repo not in BLOCKED_ICLR_REPOS:
+                continue
+            stats["affected"] += 1
+            change = {
+                "_index": global_index,
+                "conf": edition.conf,
+                "title": paper.get("paper_name"),
+                "paper_url": paper.get("paper_url"),
+                "old_code": existing,
+                "new_code": "",
+                "action": "clear",
+                "method": "",
+            }
+            if repo in (paper.get("paper_abstract") or "").casefold():
+                change.update(action="keep", new_code=existing, method="abstract")
+                stats["kept"] += 1
+                stats["by_method"]["abstract"] += 1
+                stats["changes"].append(change)
+                continue
+
+            external_matches = set()
+            method = ""
+            for key in paper_identity_keys(paper.get("paper_url") or ""):
+                matches = external_identities.get(key, [])
+                if matches:
+                    external_matches.update(matches)
+                    method = key[0]
+            if not external_matches:
+                title = normalize_title(paper.get("paper_name") or "")
+                if title and len(local_titles.get(title, [])) == 1:
+                    matches = external_titles.get(title, [])
+                    if matches:
+                        external_matches.update(matches)
+                        method = "title"
+            change["method"] = method
+            if not external_matches:
+                stats["cleared"] += 1
+                stats["by_method"]["unmatched"] += 1
+                stats["changes"].append(change)
+                _sample(stats, "cleared", change)
+                continue
+
+            valid_codes = []
+            for external_index in sorted(external_matches):
+                for raw_code in external_records[external_index]["entry"].code_urls:
+                    code, _ = classify_code_url(raw_code)
+                    if code and code not in rejected_urls and code not in valid_codes:
+                        valid_codes.append(code)
+            if not valid_codes:
+                stats["cleared"] += 1
+                stats["by_method"]["no_valid_external_code"] += 1
+                stats["changes"].append(change)
+                _sample(stats, "cleared", change)
+                continue
+            if any(normalize_repo_url(code) == repo for code in valid_codes):
+                change.update(action="keep", new_code=existing)
+                stats["kept"] += 1
+                stats["by_method"][f"external_{method}"] += 1
+                stats["changes"].append(change)
+                continue
+            if len({normalize_repo_url(code) for code in valid_codes}) > 1:
+                stats["cleared"] += 1
+                stats["by_method"]["ambiguous_external_code"] += 1
+                stats["changes"].append(change)
+                _sample(stats, "cleared", change)
+                continue
+
+            change.update(action="replace", new_code=valid_codes[0])
+            stats["replaced"] += 1
+            stats["by_conf"][edition.conf] += 1
+            stats["by_method"][method] += 1
+            stats["changes"].append(change)
+            _sample(stats, "replaced", change)
+
+    if _non_code_projection(papers) != _non_code_projection(updated):
+        raise AssertionError("Repair changed a field other than paper_code")
+    for change in stats["changes"]:
+        if change["action"] != "keep":
+            updated[change["_index"]]["paper_code"] = change["new_code"] or "#"
+    if dry_run:
+        return papers, stats
+    return updated, stats
+
+
 def _anomaly_groups(local_records: list[dict], conf: str) -> set[str]:
     by_repo = defaultdict(list)
     for paper in local_records:
@@ -817,7 +929,39 @@ def run_import(args: argparse.Namespace) -> dict:
                 progress_path=None,
             )
     write_report(args.report, stats, args.repo.resolve(), cache_path)
-    print(json.dumps(_jsonable(stats), ensure_ascii=False, indent=2))
+    print(json.dumps(_jsonable(stats), ensure_ascii=True, indent=2))
+    return stats
+
+
+def run_repair(args: argparse.Namespace) -> dict:
+    if args.offline:
+        os.environ["PAPERVAULT_OFFLINE"] = "1"
+    cache_path = args.cache.resolve()
+    ensure_cache_local(cache_path, refresh=True)
+    manifest = _selected_manifest(args.repo.resolve(), ["ICLR"])
+    papers = load_papers(cache_path)
+    updated, stats = repair_records(papers, manifest, dry_run=False)
+    if args.check_links:
+        candidates = [change["new_code"] for change in stats["changes"] if change["action"] == "replace"]
+        checks = check_urls(candidates)
+        rejected = {url for url, status in checks.items() if status == "not_found"}
+        if rejected:
+            updated, stats = repair_records(
+                papers, manifest, dry_run=False, rejected_urls=rejected
+            )
+        stats["url_checks"] = Counter(checks.values())
+        stats["url_check_details"] = checks
+    if not args.dry_run and (stats["replaced"] or stats["cleared"]):
+        shutil.copy2(cache_path, BACKUP_FILE)
+        write_papers_atomic(cache_path, updated)
+        if not args.no_sync:
+            sync_cache_artifacts(
+                cache_path=cache_path,
+                commit_message="Repair anomalous ICLR code link assignments",
+                progress_path=None,
+            )
+    write_report(args.report, stats, args.repo.resolve(), cache_path)
+    print(json.dumps(_jsonable(stats), ensure_ascii=True, indent=2))
     return stats
 
 
@@ -859,14 +1003,14 @@ def run_export(args: argparse.Namespace) -> dict:
     if not args.dry_run:
         apply_additions(manifest, additions)
     write_report(args.report, stats, args.repo.resolve(), cache_path, additions=additions)
-    print(json.dumps(_jsonable(stats), ensure_ascii=False, indent=2))
+    print(json.dumps(_jsonable(stats), ensure_ascii=True, indent=2))
     return stats
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("import", "export"):
+    for command in ("import", "export", "repair"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("--repo", type=Path, required=True, help="Local MLNLP repository clone")
         subparser.add_argument("--cache", type=Path, default=CACHE_FILE)
@@ -884,8 +1028,10 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.command == "import":
         run_import(args)
-    else:
+    elif args.command == "export":
         run_export(args)
+    else:
+        run_repair(args)
 
 
 if __name__ == "__main__":

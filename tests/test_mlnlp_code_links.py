@@ -17,6 +17,7 @@ from scripts.sync_mlnlp_code_links import (  # noqa: E402
     normalize_title,
     paper_identity_keys,
     parse_markdown,
+    repair_records,
 )
 
 
@@ -310,3 +311,60 @@ def test_export_skips_duplicate_local_identity_with_different_titles(tmp_path):
     assert additions == {}
     assert stats["ambiguous"] == 2
     assert all(item["reason"] == "multiple_local_identity_matches" for item in stats["samples"]["ambiguous"])
+
+
+def _repair_fixture(tmp_path):
+    return _edition(
+        tmp_path,
+        """#### Replace Me
+- Paper Link: https://openreview.net/forum?id=replace
+- Code Link: https://github.com/org/correct
+
+#### Genuine FFA Paper
+- Paper Link: https://openreview.net/forum?id=genuine
+- Code Link: https://github.com/mlii0117/FFA-IR
+""",
+    )
+
+
+def test_repair_replaces_clears_and_preserves_evidence(tmp_path):
+    edition = _repair_fixture(tmp_path)
+    papers = [
+        _paper(title="Replace Me", url="https://openreview.net/pdf?id=replace", code="https://github.com/mlii0117/FFA-IR"),
+        _paper(title="Genuine FFA Paper", url="https://openreview.net/pdf?id=genuine", code="https://github.com/mlii0117/FFA-IR"),
+        _paper(title="Unknown Bad Assignment", url="https://openreview.net/pdf?id=unknown", code="https://github.com/A4Bio/OpenCPD"),
+        _paper(title="Abstract Evidence", url="https://openreview.net/pdf?id=abstract", code="https://github.com/A4Bio/OpenCPD"),
+        _paper(title="Unrelated", url="https://openreview.net/pdf?id=unrelated", code="https://github.com/org/good"),
+    ]
+    papers[3]["paper_abstract"] = "Code: https://github.com/A4Bio/OpenCPD"
+    original = [dict(paper) for paper in papers]
+    updated, stats = repair_records(papers, [edition], dry_run=False)
+    assert [paper["paper_code"] for paper in updated] == [
+        "https://github.com/org/correct",
+        "https://github.com/mlii0117/FFA-IR",
+        "#",
+        "https://github.com/A4Bio/OpenCPD",
+        "https://github.com/org/good",
+    ]
+    assert stats["affected"] == 4
+    assert stats["replaced"] == 1
+    assert stats["cleared"] == 1
+    assert stats["kept"] == 2
+    assert papers == original
+
+
+def test_repair_dry_run_and_rejected_replacement(tmp_path):
+    edition = _repair_fixture(tmp_path)
+    papers = [_paper(title="Replace Me", url="https://openreview.net/pdf?id=replace", code="https://github.com/mlii0117/FFA-IR")]
+    dry, dry_stats = repair_records(papers, [edition], dry_run=True)
+    assert dry is papers and dry[0]["paper_code"].endswith("FFA-IR")
+    assert dry_stats["replaced"] == 1
+    updated, stats = repair_records(
+        papers,
+        [edition],
+        dry_run=False,
+        rejected_urls={"https://github.com/org/correct"},
+    )
+    assert updated[0]["paper_code"] == "#"
+    assert stats["cleared"] == 1
+    assert stats["replaced"] == 0
