@@ -828,7 +828,7 @@ def apply_additions(manifest: list[Edition], additions: dict[str, list[dict]]) -
             original = handle.read()
         newline = "\r\n" if b"\r\n" in original else "\n"
         prefix = "" if original.endswith((b"\n", b"\r")) else newline
-        rendered = prefix + newline + render_additions(items).replace("\n", newline) + newline
+        rendered = prefix + newline + render_additions(items).replace("\n", newline)
         with edition.path.open("ab") as handle:
             handle.write(rendered.encode("utf-8"))
 

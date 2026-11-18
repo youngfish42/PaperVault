@@ -254,7 +254,9 @@ def test_export_appends_only_missing_paper_and_is_idempotent(tmp_path):
     assert additions["ICLR2024"][0]["title"] == "New Paper"
     original_prefix = edition.path.read_bytes()
     apply_additions([edition], additions)
-    assert edition.path.read_bytes().startswith(original_prefix)
+    rendered = edition.path.read_bytes()
+    assert rendered.startswith(original_prefix)
+    assert not rendered.endswith((b"\n\n", b"\r\n\r\n"))
     additions_again, stats_again = export_records(papers, [edition])
     assert additions_again == {}
     assert stats_again["added"] == 0
