@@ -356,6 +356,8 @@ def backfill_records(
     abstract_index: dict,
     code_index: dict,
     conf_filter: Optional[set] = None,
+    fill_abstract: bool = True,
+    fill_code: bool = True,
 ) -> dict:
     """原地回填 papers 列表中的空字段，返回统计字典。"""
     stats = {
@@ -375,7 +377,7 @@ def backfill_records(
             continue
         stats["scanned"] += 1
 
-        if not (paper.get("paper_abstract") or "").strip():
+        if fill_abstract and not (paper.get("paper_abstract") or "").strip():
             row, method = match_abstract(abstract_index, paper)
             if row is not None:
                 abstract = clean_abstract(row.get("abstract"))
@@ -396,7 +398,7 @@ def backfill_records(
                         )
 
         code = (paper.get("paper_code") or "").strip()
-        if code in ("", "#"):
+        if fill_code and code in ("", "#"):
             repo, method = match_repo(code_index, paper)
             if repo:
                 paper["paper_code"] = repo
@@ -480,19 +482,29 @@ def run(
     report_path: Optional[Path] = None,
     conf_filter: Optional[set] = None,
     upload: bool = True,
+    code_only: bool = False,
 ) -> dict:
     ensure_cache_local(CACHE_FILE, refresh=True)
 
-    print("[*] Loading PwC papers-with-abstracts ...")
-    abstract_index = build_abstract_index(load_pwc_abstract_rows())
+    abstract_index = {"arxiv": {}, "openreview": {}, "url": {}, "title": {}}
+    if not code_only:
+        print("[*] Loading PwC papers-with-abstracts ...")
+        abstract_index = build_abstract_index(load_pwc_abstract_rows())
     print("[*] Loading PwC links-between-paper-and-code ...")
     code_index = build_code_index(load_pwc_link_rows())
 
     papers = load_papers(CACHE_FILE)
     print(f"[*] Cache papers: {len(papers)}")
 
-    stats = backfill_records(papers, abstract_index, code_index, conf_filter=conf_filter)
+    stats = backfill_records(
+        papers,
+        abstract_index,
+        code_index,
+        conf_filter=conf_filter,
+        fill_abstract=not code_only,
+    )
     stats["dry_run"] = dry_run
+    stats["code_only"] = code_only
 
     print(f"[*] Scanned: {stats['scanned']}")
     print(f"[*] Abstract filled: {stats['abstract_filled']}  by_method={dict(stats['abstract_by_method'])}")
@@ -523,7 +535,11 @@ def run(
     if upload:
         sync_cache_artifacts(
             cache_path=CACHE_FILE,
-            commit_message="Backfill abstracts and code links from PwC archive datasets",
+            commit_message=(
+                "Backfill code links from PwC archive datasets"
+                if code_only
+                else "Backfill abstracts and code links from PwC archive datasets"
+            ),
             progress_path=None,
         )
     return stats
@@ -540,10 +556,12 @@ if __name__ == "__main__":
         help="只处理指定 conf（可重复传入），默认处理全部",
     )
     parser.add_argument("--no-upload", action="store_true", help="跳过 HF 上传")
+    parser.add_argument("--code-only", action="store_true", help="只回填代码链接，不读取或修改摘要")
     args = parser.parse_args()
     run(
         dry_run=args.dry_run,
         report_path=args.report,
         conf_filter=set(args.conf) if args.conf else None,
         upload=not args.no_upload,
+        code_only=args.code_only,
     )

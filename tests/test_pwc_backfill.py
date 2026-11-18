@@ -305,3 +305,25 @@ def test_openreview_url_keys_never_share_unrelated_repositories():
     assert first == "https://github.com/org/first"
     assert second == "https://github.com/org/second"
     assert missing == ""
+
+
+def test_code_only_backfill_does_not_read_or_modify_abstract():
+    abstract_index = build_abstract_index([_abs_row(title="Some Paper", proceeding="ICML 2024")])
+    code_index = build_code_index(
+        [
+            {
+                "paper_title": "Some Paper",
+                "paper_arxiv_id": None,
+                "paper_url_abs": None,
+                "repo_url": "https://github.com/owner/repo",
+                "is_official": True,
+                "mentioned_in_paper": False,
+            }
+        ]
+    )
+    papers = [_cache_paper()]
+    stats = backfill_records(papers, abstract_index, code_index, fill_abstract=False)
+    assert stats["code_filled"] == 1
+    assert stats["abstract_filled"] == 0
+    assert papers[0]["paper_code"] == "https://github.com/owner/repo"
+    assert papers[0]["paper_abstract"] == ""
