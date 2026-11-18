@@ -198,17 +198,37 @@ const wordcloudData = {{wordcloud_data}};
 // ---------- Papers by Category ----------
 const chartCat = echarts.init(document.getElementById('chart-category'));
 chartCat.setOption({
-  title: { text: '各研究领域论文分布 (Papers by Research Field)', left: 'center', textStyle: { fontSize: 16, fontWeight: 'bold' } },
-  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  grid: { left: '3%', right: '8%', bottom: '3%', top: '12%', containLabel: true },
+  title: { text: '各研究领域论文分布 (Papers by Research Field)', left: 'center', top: 0, textStyle: { fontSize: 16, fontWeight: 'bold' } },
+  legend: { data: ['论文总数 / Total papers', '含开源代码 / With code'], top: 30, left: 'center', itemWidth: 18, itemHeight: 10 },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: (params) => {
+      const i = params[0].dataIndex;
+      return `${params[0].name}<br/>论文 / Papers: ${catData.values[i].toLocaleString()}<br/>开源代码 / Code: ${catData.code_values[i].toLocaleString()}`;
+    }
+  },
+  grid: { left: '3%', right: '8%', bottom: '3%', top: '18%', containLabel: true },
   xAxis: { type: 'value', name: '论文数量 (Paper Count)', nameTextStyle: { fontWeight: 'bold' } },
   yAxis: { type: 'category', data: catData.labels, axisLabel: { fontWeight: 'bold' }, inverse: true },
-  series: [{
-    type: 'bar',
-    data: catData.values.map((v, i) => ({ value: v, itemStyle: { color: catData.colors[i] } })),
-    barWidth: '55%',
-    label: { show: true, position: 'right', fontWeight: 'bold', color: '#1a1a1a' }
-  }]
+  series: [
+    {
+      name: '论文总数 / Total papers',
+      type: 'bar',
+      data: catData.values.map((v, i) => ({ value: v, itemStyle: { color: catData.colors[i], opacity: 0.26 } })),
+      barWidth: '60%',
+      label: { show: true, position: 'right', fontWeight: 'bold', color: '#1a1a1a' }
+    },
+    {
+      name: '含开源代码 / With code',
+      type: 'bar',
+      data: catData.code_values.map((v, i) => ({ value: v, itemStyle: { color: catData.colors[i] } })),
+      barWidth: '60%',
+      barGap: '-100%',
+      z: 2,
+      label: { show: true, position: 'right', fontSize: 10, color: '#444444' }
+    }
+  ]
 });
 
 // ---------- Papers by Year ----------
@@ -293,6 +313,7 @@ def compute_stats(cache_data: dict):
     total_code = 0
     papers_by_year = defaultdict(int)
     papers_by_conf = defaultdict(int)
+    code_by_conf = defaultdict(int)
     papers_by_year_cat = defaultdict(lambda: defaultdict(int))
     for conf_key, papers in cache_data.items():
         m = re.match(r"([A-Za-z]+)(\d{4})", conf_key)
@@ -306,6 +327,7 @@ def compute_stats(cache_data: dict):
             code_link = str(p.get("paper_code") or "").strip()
             if code_link and code_link != "#":
                 total_code += 1
+                code_by_conf[conf_base] += 1
         # Categorize by year for stacked chart
         for cat, names in CATEGORY_MAP.items():
             if conf_base in names:
@@ -318,9 +340,10 @@ def compute_stats(cache_data: dict):
 
     # Category stats
     cat_stats = {}
+    cat_code_stats = {}
     for cat, names in CATEGORY_MAP.items():
-        cnt = sum(papers_by_conf.get(n, 0) for n in names)
-        cat_stats[cat] = cnt
+        cat_stats[cat] = sum(papers_by_conf.get(n, 0) for n in names)
+        cat_code_stats[cat] = sum(code_by_conf.get(n, 0) for n in names)
 
     return {
         "total_papers": total_papers,
@@ -332,7 +355,19 @@ def compute_stats(cache_data: dict):
         "papers_by_year_cat": {y: dict(papers_by_year_cat[y]) for y in sorted(papers_by_year_cat.keys())},
         "papers_by_conf": dict(papers_by_conf),
         "cat_stats": cat_stats,
+        "cat_code_stats": cat_code_stats,
     }
+
+
+def _chart_years(papers_by_year_cat: dict):
+    numeric_years = [
+        int(year) for year in papers_by_year_cat
+        if re.fullmatch(r"\d{4}", str(year))
+    ]
+    latest_year = max(numeric_years, default=1999)
+    if latest_year < 2000:
+        return []
+    return [str(year) for year in range(2000, latest_year + 1)]
 
 
 def generate_stats_html(stats: dict):
@@ -342,10 +377,11 @@ def generate_stats_html(stats: dict):
     # Prepare category data
     cat_labels = [f"{zh} ({en})" for zh, en in zip(CATEGORY_MAP.keys(), CATEGORY_MAP_EN.keys())]
     cat_values = [stats["cat_stats"][cat] for cat in CATEGORY_MAP.keys()]
+    cat_code_values = [stats["cat_code_stats"][cat] for cat in CATEGORY_MAP.keys()]
     cat_colors = [NATURE_COLORS[i % len(NATURE_COLORS)] for i in range(len(CATEGORY_MAP))]
 
     # Prepare year data
-    years = sorted(stats["papers_by_year_cat"].keys())
+    years = _chart_years(stats["papers_by_year_cat"])
     cat_names = list(CATEGORY_MAP.keys())
     cat_labels = [f"{zh} ({en})" for zh, en in zip(CATEGORY_MAP.keys(), CATEGORY_MAP_EN.keys())]
     year_series = []
@@ -374,6 +410,7 @@ def generate_stats_html(stats: dict):
     html = html.replace("{{cat_data}}", json.dumps({
         "labels": cat_labels,
         "values": cat_values,
+        "code_values": cat_code_values,
         "colors": cat_colors,
     }, ensure_ascii=False))
     html = html.replace("{{year_data}}", json.dumps({
@@ -606,35 +643,54 @@ def generate_charts_svg(stats: dict):
         ]
 
     # ---------- Chart 1: Papers by Category (horizontal bar) ----------
-    fig, ax = plt.subplots(figsize=(11, 6))
+    fig, ax = plt.subplots(figsize=(11.5, 6.4))
     cats = list(stats["cat_stats"].keys())
     vals = list(stats["cat_stats"].values())
+    code_vals = [stats["cat_code_stats"][cat] for cat in cats]
+    max_total = max(vals)
     colors = [NATURE_COLORS[i % len(NATURE_COLORS)] for i in range(len(cats))]
 
-    bars = ax.barh(cat_labels, vals, color=colors, height=0.55, edgecolor="white", linewidth=0.5)
-    ax.set_xlabel(xlabel_cat, fontsize=13, fontweight="bold")
-    ax.set_title(title_cat, fontsize=15, fontweight="bold", pad=18)
+    total_bars = ax.barh(cat_labels, vals, color=colors, height=0.60, alpha=0.26, edgecolor="none")
+    ax.barh(cat_labels, code_vals, color=colors, height=0.60, edgecolor="none")
+    ax.set_xlabel(xlabel_cat, fontsize=11, color="#333333", labelpad=10)
+    ax.set_title(title_cat, fontsize=15, fontweight="bold", pad=44)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_linewidth(0.8)
-    ax.spines["bottom"].set_linewidth(0.8)
+    ax.spines["left"].set_color("#666666")
+    ax.spines["bottom"].set_color("#666666")
+    ax.spines["left"].set_linewidth(0.7)
+    ax.spines["bottom"].set_linewidth(0.7)
     ax.tick_params(axis="both", labelsize=10, labelcolor="#1a1a1a")
     ax.invert_yaxis()
 
-    for bar in bars:
-        width = bar.get_width()
-        ax.text(width + max(vals) * 0.01, bar.get_y() + bar.get_height() / 2,
-                f"{int(width):,}", ha="left", va="center", fontsize=10, fontweight="bold", color="#1a1a1a")
+    total_legend = "论文总数 / Total papers" if has_cjk else "Total papers"
+    code_legend = "含开源代码 / With code" if has_cjk else "With code"
+    legend_handles = [
+        plt.Rectangle((0, 0), 1, 1, facecolor="#777777", alpha=0.26),
+        plt.Rectangle((0, 0), 1, 1, facecolor="#777777"),
+    ]
+    ax.legend(legend_handles, [total_legend, code_legend], loc="upper center",
+              bbox_to_anchor=(0.5, 1.025), ncol=2, frameon=False, fontsize=10,
+              handlelength=1.6, columnspacing=2.5)
 
-    ax.set_xlim(0, max(vals) * 1.15)
-    ax.grid(axis="x", linestyle="--", linewidth=0.4, alpha=0.5)
+    for total_bar, code_count in zip(total_bars, code_vals):
+        total = total_bar.get_width()
+        label_y = total_bar.get_y() + total_bar.get_height() / 2
+        ax.text(total + max_total * 0.008, label_y, f"{int(total):,}",
+                ha="left", va="center", fontsize=10, fontweight="bold", color="#1a1a1a")
+        ax.text(code_count + max_total * 0.008, label_y, f"{code_count:,}",
+                ha="left", va="center", fontsize=9, color="#444444")
+
+    ax.set_xlim(0, max_total * 1.14)
+    ax.set_axisbelow(True)
+    ax.grid(axis="x", color="#D8D8D8", linestyle="-", linewidth=0.5, alpha=0.55)
     fig.tight_layout()
     fig.savefig(os.path.join(stats_dir, "papers_by_category.svg"), format="svg", bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
     # ---------- Chart 2: Papers by Year (stacked vertical bar) ----------
     fig, ax = plt.subplots(figsize=(11, 6.2))
-    years = sorted(stats["papers_by_year_cat"].keys())
+    years = _chart_years(stats["papers_by_year_cat"])
     bottom = np.zeros(len(years))
 
     cat_keys = list(CATEGORY_MAP.keys() if has_cjk else CATEGORY_MAP_EN.keys())
