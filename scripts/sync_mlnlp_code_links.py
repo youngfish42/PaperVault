@@ -49,6 +49,14 @@ BLOCKED_ICLR_REPOS = {
     "https://github.com/mlii0117/ffa-ir",
     "https://github.com/a4bio/opencpd",
 }
+GENERIC_RESOURCE_REPOS = {
+    "https://github.com/evanzd/iclr2021-openreviewdata",
+    "https://github.com/linxuanzhang/clusteringpaperreading",
+    "https://github.com/hhw11/ai-for-science-paper-oral-and-spotlight-",
+    "https://github.com/donquixotemzt/nas-paper",
+    "https://github.com/datake/papers-of-distributionalrl",
+    "https://github.com/wanyugroup/ai-for-crystal-materials",
+}
 MAX_SAMPLES = 50
 
 
@@ -558,17 +566,21 @@ def repair_records(
     manifest: list[Edition],
     dry_run: bool = True,
     rejected_urls: Optional[set[str]] = None,
+    blocked_repos: Optional[set[str]] = None,
+    only_iclr: bool = True,
+    keep_evidence: bool = True,
 ) -> tuple[list[dict], dict]:
-    """Repair only the two demonstrated ICLR mass-assignment clusters."""
+    """Repair demonstrated bad repository assignments without touching other records."""
     stats = _new_stats("repair")
     stats.update({"affected": 0, "replaced": 0, "cleared": 0, "kept": 0, "changes": []})
     rejected_urls = rejected_urls or set()
+    blocked_repos = blocked_repos or BLOCKED_ICLR_REPOS
     updated = [dict(paper) for paper in papers]
     local_by_conf = defaultdict(list)
     for index, paper in enumerate(updated):
         local_by_conf[paper.get("conf") or ""].append((index, paper))
 
-    for edition in (item for item in manifest if item.venue == "ICLR"):
+    for edition in (item for item in manifest if not only_iclr or item.venue == "ICLR"):
         indexed = local_by_conf.get(edition.conf, [])
         local_records = [paper for _, paper in indexed]
         _, local_titles = _build_indices(local_records, "paper_url")
@@ -581,7 +593,7 @@ def repair_records(
         for global_index, paper in indexed:
             existing = (paper.get("paper_code") or "").strip()
             repo = normalize_repo_url(existing)
-            if repo not in BLOCKED_ICLR_REPOS:
+            if repo not in blocked_repos:
                 continue
             stats["affected"] += 1
             change = {
@@ -594,7 +606,7 @@ def repair_records(
                 "action": "clear",
                 "method": "",
             }
-            if repo in (paper.get("paper_abstract") or "").casefold():
+            if keep_evidence and repo in (paper.get("paper_abstract") or "").casefold():
                 change.update(action="keep", new_code=existing, method="abstract")
                 stats["kept"] += 1
                 stats["by_method"]["abstract"] += 1
@@ -627,7 +639,12 @@ def repair_records(
             for external_index in sorted(external_matches):
                 for raw_code in external_records[external_index]["entry"].code_urls:
                     code, _ = classify_code_url(raw_code)
-                    if code and code not in rejected_urls and code not in valid_codes:
+                    if (
+                        code
+                        and code not in rejected_urls
+                        and code not in valid_codes
+                        and (keep_evidence or normalize_repo_url(code) not in blocked_repos)
+                    ):
                         valid_codes.append(code)
             if not valid_codes:
                 stats["cleared"] += 1
@@ -635,7 +652,7 @@ def repair_records(
                 stats["changes"].append(change)
                 _sample(stats, "cleared", change)
                 continue
-            if any(normalize_repo_url(code) == repo for code in valid_codes):
+            if keep_evidence and any(normalize_repo_url(code) == repo for code in valid_codes):
                 change.update(action="keep", new_code=existing)
                 stats["kept"] += 1
                 stats["by_method"][f"external_{method}"] += 1
@@ -968,12 +985,19 @@ def run_import(args: argparse.Namespace) -> dict:
 def run_repair(args: argparse.Namespace) -> dict:
     if args.offline:
         os.environ["PAPERVAULT_OFFLINE"] = "1"
+    resource_mode = getattr(args, "command", "") == "repair-resources"
     cache_path = args.cache.resolve()
     _, parent_commit = ensure_cache_local(cache_path, refresh=True)
     _require_sync_baseline(args, parent_commit)
-    manifest = _selected_manifest(args.repo.resolve(), ["ICLR"])
+    manifest = _selected_manifest(args.repo.resolve(), args.venue if resource_mode else ["ICLR"])
     papers = load_papers(cache_path)
-    updated, stats = repair_records(papers, manifest, dry_run=False)
+    repair_options = {
+        "blocked_repos": GENERIC_RESOURCE_REPOS if resource_mode else BLOCKED_ICLR_REPOS,
+        "only_iclr": not resource_mode,
+        "keep_evidence": not resource_mode,
+    }
+    updated, stats = repair_records(papers, manifest, dry_run=False, **repair_options)
+    stats["repair_mode"] = "generic_resources" if resource_mode else "iclr_clusters"
     if args.check_links:
         checks = {}
         rejected = set()
@@ -994,7 +1018,7 @@ def run_repair(args: argparse.Namespace) -> dict:
                 break
             rejected.update(new_rejected)
             updated, stats = repair_records(
-                papers, manifest, dry_run=False, rejected_urls=rejected
+                papers, manifest, dry_run=False, rejected_urls=rejected, **repair_options
             )
         stats["url_checks"] = Counter(checks.values())
         stats["url_check_details"] = checks
@@ -1004,7 +1028,11 @@ def run_repair(args: argparse.Namespace) -> dict:
         if not args.no_sync:
             sync_cache_artifacts(
                 cache_path=cache_path,
-                commit_message="Repair anomalous ICLR code link assignments",
+                commit_message=(
+                    "Remove generic paper-list repositories from paper code fields"
+                    if resource_mode
+                    else "Repair anomalous ICLR code link assignments"
+                ),
                 progress_path=None,
             )
     write_report(args.report, stats, args.repo.resolve(), cache_path)
@@ -1057,7 +1085,7 @@ def run_export(args: argparse.Namespace) -> dict:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("import", "export", "repair"):
+    for command in ("import", "export", "repair", "repair-resources"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("--repo", type=Path, required=True, help="Local MLNLP repository clone")
         subparser.add_argument("--cache", type=Path, default=CACHE_FILE)

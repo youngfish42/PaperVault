@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.sync_mlnlp_code_links import (  # noqa: E402
     BLOCKED_ICLR_REPOS,
+    GENERIC_RESOURCE_REPOS,
     Edition,
     _require_sync_baseline,
     _source_commit,
@@ -495,3 +496,39 @@ def test_repair_rechecks_fallback_repository_url(tmp_path, monkeypatch):
     assert stats["replaced"] == 1
     assert stats["changes"][0]["new_code"] == second
     assert checked == [{first}, {second}]
+
+
+def test_generic_resource_repair_replaces_or_clears_without_keeping_list_repos(tmp_path):
+    edition = _edition(
+        tmp_path,
+        """#### Replace Me
+- Paper Link: https://openreview.net/forum?id=replace
+- Code Link: https://github.com/org/correct
+""",
+        venue="ICML",
+        year=2021,
+    )
+    generic = next(iter(GENERIC_RESOURCE_REPOS))
+    papers = [
+        _paper(conf="ICML2021", title="Replace Me", url="https://openreview.net/pdf?id=replace", code=generic),
+        _paper(conf="ICML2021", title="Clear Me", url="https://openreview.net/pdf?id=clear", code=generic),
+        _paper(conf="ICML2021", title="List Citation Is Not Code", url="https://openreview.net/pdf?id=list", code=generic),
+    ]
+    papers[2]["paper_abstract"] = f"Resources: {generic}"
+    updated, stats = repair_records(
+        papers,
+        [edition],
+        dry_run=False,
+        blocked_repos={generic},
+        only_iclr=False,
+        keep_evidence=False,
+    )
+    assert [paper["paper_code"] for paper in updated] == [
+        "https://github.com/org/correct",
+        "#",
+        "#",
+    ]
+    assert stats["affected"] == 3
+    assert stats["replaced"] == 1
+    assert stats["cleared"] == 2
+    assert stats["kept"] == 0
