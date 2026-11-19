@@ -84,6 +84,15 @@ def test_normalize_url_rejects_garbage():
     assert normalize_url("https://") == ""
 
 
+def test_normalize_url_preserves_openreview_paper_identity():
+    first = normalize_url("https://openreview.net/forum?id=HkGx2sAqFX")
+    second = normalize_url("https://openreview.net/forum?id=anotherPaper")
+    attachment = normalize_url("https://openreview.net/attachment?id=HkGx2sAqFX&name=pdf")
+    assert first == "https://openreview.net/forum?id=HkGx2sAqFX"
+    assert attachment == "https://openreview.net/attachment?id=HkGx2sAqFX"
+    assert first != second
+
+
 def test_extract_arxiv_id_strips_version():
     assert extract_arxiv_id("https://arxiv.org/abs/1805.10616v4") == "1805.10616"
     assert extract_arxiv_id("http://arxiv.org/pdf/1805.10616.pdf") == "1805.10616"
@@ -268,3 +277,93 @@ def test_backfill_conf_filter():
     assert stats["scanned"] == 1
     # ACL2023 被扫描但年份守卫拦截（proceeding 是 ICML 2024）
     assert stats["abstract_filled"] == 0
+
+
+def test_openreview_url_keys_never_share_unrelated_repositories():
+    rows = [
+        {
+            "paper_title": "First Paper",
+            "paper_arxiv_id": None,
+            "paper_url_abs": "https://openreview.net/forum?id=firstPaper",
+            "repo_url": "https://github.com/org/first",
+            "is_official": True,
+            "mentioned_in_paper": True,
+        },
+        {
+            "paper_title": "Second Paper",
+            "paper_arxiv_id": None,
+            "paper_url_abs": "https://openreview.net/forum?id=secondPaper",
+            "repo_url": "https://github.com/org/second",
+            "is_official": True,
+            "mentioned_in_paper": True,
+        },
+    ]
+    index = build_code_index(rows)
+    first, _ = match_repo(index, _cache_paper(paper_url="https://openreview.net/forum?id=firstPaper"))
+    second, _ = match_repo(index, _cache_paper(paper_url="https://openreview.net/forum?id=secondPaper"))
+    missing, _ = match_repo(index, _cache_paper(paper_url="https://openreview.net/forum?id=missingPaper"))
+    assert first == "https://github.com/org/first"
+    assert second == "https://github.com/org/second"
+    assert missing == ""
+
+
+def test_code_only_backfill_does_not_read_or_modify_abstract():
+    abstract_index = build_abstract_index([_abs_row(title="Some Paper", proceeding="ICML 2024")])
+    code_index = build_code_index(
+        [
+            {
+                "paper_title": "Some Paper",
+                "paper_arxiv_id": None,
+                "paper_url_abs": None,
+                "repo_url": "https://github.com/owner/repo",
+                "is_official": True,
+                "mentioned_in_paper": False,
+            }
+        ]
+    )
+    papers = [_cache_paper()]
+    stats = backfill_records(papers, abstract_index, code_index, fill_abstract=False)
+    assert stats["code_filled"] == 1
+    assert stats["abstract_filled"] == 0
+    assert papers[0]["paper_code"] == "https://github.com/owner/repo"
+    assert papers[0]["paper_abstract"] == ""
+
+
+def test_run_code_only_skips_abstract_pipeline(monkeypatch):
+    from scripts.fetch_pwc_backfill import run as run_pwc_backfill
+
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.ensure_cache_local", lambda *a, **k: (a[0], "parent"))
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.load_papers", lambda path: [])
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.load_pwc_link_rows", lambda: [])
+
+    def fail_abstract_pipeline():
+        raise AssertionError("abstract dataset must not be loaded in code-only mode")
+
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.build_abstract_index", fail_abstract_pipeline)
+    stats = run_pwc_backfill(dry_run=True, code_only=True)
+    assert stats["code_only"] is True
+    assert stats["abstract_filled"] == 0
+    assert stats["code_filled"] == 0
+
+
+def test_normalize_url_preserves_acm_identity_and_ignores_tracking():
+    first = normalize_url("http://dl.acm.org/citation.cfm?id=3271800&utm_source=test")
+    second = normalize_url("https://dl.acm.org/citation.cfm?id=644108.644252")
+    assert first == "https://dl.acm.org/citation.cfm?id=3271800"
+    assert second == "https://dl.acm.org/citation.cfm?id=644108.644252"
+    assert first != second
+    assert normalize_url("https://dl.acm.org/citation.cfm?doid=3271800") == (
+        "https://dl.acm.org/citation.cfm?doid=3271800"
+    )
+    assert normalize_url("https://portal.acm.org/citation.cfm?id=3271800") == (
+        "https://portal.acm.org/citation.cfm?id=3271800"
+    )
+
+
+def test_normalize_url_preserves_citeseerx_and_ieee_identity():
+    assert normalize_url("https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1.1234") == (
+        "https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1.1234"
+    )
+    assert normalize_url("https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=123456&download=true") == (
+        "https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=123456"
+    )
