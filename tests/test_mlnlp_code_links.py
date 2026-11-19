@@ -18,6 +18,7 @@ from scripts.sync_mlnlp_code_links import (  # noqa: E402
     export_records,
     import_records,
     load_manifest,
+    normalize_repo_url,
     normalize_title,
     paper_identity_keys,
     parse_markdown,
@@ -549,3 +550,7 @@ def test_import_never_reintroduces_generic_resource_repo(tmp_path):
     assert updated[0]["paper_code"] == "#"
     assert stats["filled"] == 0
     assert stats["rejections"]["generic_resource"] == 1
+
+
+def test_normalize_repo_url_unifies_scheme_www_and_git_suffix():
+    assert normalize_repo_url("http://www.github.com/Org/Repo.git/") == "https://github.com/org/repo"

@@ -34,7 +34,7 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -81,6 +81,9 @@ _CASE_INSENSITIVE_PATH_HOSTS = {
 }
 
 
+_IDENTITY_QUERY_KEYS = {"id", "doid", "doi", "arnumber", "piid", "cfid"}
+
+
 # ---------- 规范化与键提取 ----------
 def normalize_url(url: str) -> str:
     """规范化 URL 用于精确相等匹配。空/非法输入返回 ""."""
@@ -99,10 +102,14 @@ def normalize_url(url: str) -> str:
     path = path.rstrip("/")
     if not host or not path:
         return ""
-    if host == "openreview.net":
-        match = re.search(r"(?:^|[?&])id=([\w\-]+)", parsed.query, re.IGNORECASE)
-        if match:
-            return f"https://{host}{path}?id={match.group(1)}"
+    identity_params = []
+    for key, values in parse_qs(parsed.query).items():
+        normalized_key = key.casefold()
+        if normalized_key in _IDENTITY_QUERY_KEYS:
+            identity_params.extend((normalized_key, value) for value in values if value)
+    if identity_params:
+        identity_params.sort(key=lambda item: item[0])
+        return f"https://{host}{path}?{urlencode(identity_params)}"
     return f"https://{host}{path}"
 
 

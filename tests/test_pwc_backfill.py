@@ -344,3 +344,26 @@ def test_run_code_only_skips_abstract_pipeline(monkeypatch):
     assert stats["code_only"] is True
     assert stats["abstract_filled"] == 0
     assert stats["code_filled"] == 0
+
+
+def test_normalize_url_preserves_acm_identity_and_ignores_tracking():
+    first = normalize_url("http://dl.acm.org/citation.cfm?id=3271800&utm_source=test")
+    second = normalize_url("https://dl.acm.org/citation.cfm?id=644108.644252")
+    assert first == "https://dl.acm.org/citation.cfm?id=3271800"
+    assert second == "https://dl.acm.org/citation.cfm?id=644108.644252"
+    assert first != second
+    assert normalize_url("https://dl.acm.org/citation.cfm?doid=3271800") == (
+        "https://dl.acm.org/citation.cfm?doid=3271800"
+    )
+    assert normalize_url("https://portal.acm.org/citation.cfm?id=3271800") == (
+        "https://portal.acm.org/citation.cfm?id=3271800"
+    )
+
+
+def test_normalize_url_preserves_citeseerx_and_ieee_identity():
+    assert normalize_url("https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1.1234") == (
+        "https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.1.1234"
+    )
+    assert normalize_url("https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=123456&download=true") == (
+        "https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=123456"
+    )

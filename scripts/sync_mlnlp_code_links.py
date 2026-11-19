@@ -118,7 +118,7 @@ def normalize_repo_url(url: str) -> str:
     if host == "github.com":
         parts = [part for part in path.split("/") if part]
         if len(parts) >= 2:
-            path = "/" + "/".join(parts[:2])
+            path = "/" + parts[0] + "/" + re.sub(r"\.git$", "", parts[1], flags=re.IGNORECASE)
     return f"https://{host}{path}".casefold()
 
 
