@@ -148,6 +148,7 @@ def test_code_link_quality_gate():
     assert classify_code_url("https://org.github.io/project")[1] == "project_page"
     assert classify_code_url("https://youtu.be/abc")[1] == "video"
     assert classify_code_url("https://example.org/paper")[1] == "non_repository"
+    assert classify_code_url(next(iter(GENERIC_RESOURCE_REPOS)))[1] == "generic_resource"
 
 
 def test_tex_title_normalization_is_deterministic():
@@ -495,6 +496,7 @@ def test_repair_rechecks_fallback_repository_url(tmp_path, monkeypatch):
     stats = run_repair(_cli_args(tmp_path))
     assert stats["replaced"] == 1
     assert stats["changes"][0]["new_code"] == second
+    assert stats["repair_mode"] == "iclr_clusters"
     assert checked == [{first}, {second}]
 
 
@@ -532,3 +534,18 @@ def test_generic_resource_repair_replaces_or_clears_without_keeping_list_repos(t
     assert stats["replaced"] == 1
     assert stats["cleared"] == 2
     assert stats["kept"] == 0
+
+
+def test_import_never_reintroduces_generic_resource_repo(tmp_path):
+    generic = next(iter(GENERIC_RESOURCE_REPOS))
+    edition = _edition(
+        tmp_path,
+        f"""#### A Paper
+- Paper Link: https://openreview.net/forum?id=abc123
+- Code Link: {generic}
+""",
+    )
+    updated, stats = import_records([_paper()], [edition], dry_run=False)
+    assert updated[0]["paper_code"] == "#"
+    assert stats["filled"] == 0
+    assert stats["rejections"]["generic_resource"] == 1

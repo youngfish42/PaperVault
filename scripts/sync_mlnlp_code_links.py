@@ -138,6 +138,8 @@ def classify_code_url(url: str) -> tuple[str, str]:
         return "", "malformed"
     path = parsed.path or ""
     parts = [part for part in path.split("/") if part]
+    if normalize_repo_url(cleaned) in GENERIC_RESOURCE_REPOS:
+        return "", "generic_resource"
     if host in DIRECT_CODE_HOSTS and len(parts) >= 2:
         return cleaned, ""
     if host == "anonymous.4open.science" and parts and parts[0] in {"r", "w"}:
@@ -997,7 +999,6 @@ def run_repair(args: argparse.Namespace) -> dict:
         "keep_evidence": not resource_mode,
     }
     updated, stats = repair_records(papers, manifest, dry_run=False, **repair_options)
-    stats["repair_mode"] = "generic_resources" if resource_mode else "iclr_clusters"
     if args.check_links:
         checks = {}
         rejected = set()
@@ -1022,6 +1023,7 @@ def run_repair(args: argparse.Namespace) -> dict:
             )
         stats["url_checks"] = Counter(checks.values())
         stats["url_check_details"] = checks
+    stats["repair_mode"] = "generic_resources" if resource_mode else "iclr_clusters"
     if not args.dry_run and (stats["replaced"] or stats["cleared"]):
         shutil.copy2(cache_path, BACKUP_FILE)
         write_papers_atomic(cache_path, updated)
