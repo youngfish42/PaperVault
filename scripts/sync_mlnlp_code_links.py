@@ -280,7 +280,7 @@ def parse_markdown(path: Path) -> list[ExternalPaper]:
 
     def flush() -> None:
         nonlocal current_title, paper_url, code_urls, position
-        if current_title and paper_url and code_urls:
+        if current_title and paper_url:
             position += 1
             entries.append(ExternalPaper(current_title, paper_url, code_urls, position))
         current_title = ""
@@ -334,7 +334,7 @@ def parse_markdown(path: Path) -> list[ExternalPaper]:
             continue
         row_paper = _markdown_urls(cells[1])
         row_code = _markdown_urls(cells[2])
-        if cells[0] and row_paper and row_code:
+        if cells[0] and row_paper:
             flush()
             position += 1
             entries.append(ExternalPaper(cells[0], row_paper[0], row_code, position))
@@ -371,12 +371,15 @@ def write_papers_atomic(cache_path: Path, papers: list[dict]) -> None:
 
 
 def _source_commit(repo: Path) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return ""
     return result.stdout.strip()
 
 
@@ -531,6 +534,11 @@ def import_records(
                 else:
                     stats["conflicts"] += 1
                     _sample(stats, "conflicts", sample)
+                continue
+            if len({normalize_repo_url(item) for item in valid_codes}) > 1:
+                stats["ambiguous"] += 1
+                sample["reason"] = "multiple_external_codes"
+                _sample(stats, "ambiguous", sample)
                 continue
             paper["paper_code"] = code
             stats["filled"] += 1
@@ -897,23 +905,47 @@ def _selected_manifest(repo: Path, venues: Optional[list[str]]) -> list[Edition]
     return [edition for edition in manifest if edition.venue in selected]
 
 
+def _require_sync_baseline(args: argparse.Namespace, parent_commit: Optional[str]) -> None:
+    if args.dry_run or args.no_sync:
+        return
+    if args.offline:
+        raise RuntimeError("Refusing to upload from --offline mode; pass --no-sync for local-only writes")
+    if not parent_commit:
+        raise RuntimeError(
+            "Cannot establish the Hugging Face parent commit; refusing to upload a stale cache. "
+            "Retry online or pass --no-sync for a local-only write"
+        )
+
+
 def run_import(args: argparse.Namespace) -> dict:
     if args.offline:
         os.environ["PAPERVAULT_OFFLINE"] = "1"
     cache_path = args.cache.resolve()
-    ensure_cache_local(cache_path, refresh=True)
+    _, parent_commit = ensure_cache_local(cache_path, refresh=True)
+    _require_sync_baseline(args, parent_commit)
     manifest = _selected_manifest(args.repo.resolve(), args.venue)
     papers = load_papers(cache_path)
     updated, stats = import_records(papers, manifest, dry_run=False)
     if args.check_links:
-        candidates = [
-            updated[index]["paper_code"]
-            for index in range(len(papers))
-            if updated[index].get("paper_code") != papers[index].get("paper_code")
-        ]
-        checks = check_urls(candidates)
-        rejected = {url for url, status in checks.items() if status == "not_found"}
-        if rejected:
+        checks = {}
+        rejected = set()
+        while True:
+            candidates = [
+                updated[index]["paper_code"]
+                for index in range(len(papers))
+                if updated[index].get("paper_code") != papers[index].get("paper_code")
+                and updated[index].get("paper_code") not in checks
+            ]
+            if not candidates:
+                break
+            new_checks = check_urls(candidates)
+            checks.update(new_checks)
+            new_rejected = {
+                url for url, status in new_checks.items() if status == "not_found"
+            } - rejected
+            if not new_rejected:
+                break
+            rejected.update(new_rejected)
             updated, stats = import_records(
                 papers, manifest, dry_run=False, rejected_urls=rejected
             )
@@ -937,15 +969,30 @@ def run_repair(args: argparse.Namespace) -> dict:
     if args.offline:
         os.environ["PAPERVAULT_OFFLINE"] = "1"
     cache_path = args.cache.resolve()
-    ensure_cache_local(cache_path, refresh=True)
+    _, parent_commit = ensure_cache_local(cache_path, refresh=True)
+    _require_sync_baseline(args, parent_commit)
     manifest = _selected_manifest(args.repo.resolve(), ["ICLR"])
     papers = load_papers(cache_path)
     updated, stats = repair_records(papers, manifest, dry_run=False)
     if args.check_links:
-        candidates = [change["new_code"] for change in stats["changes"] if change["action"] == "replace"]
-        checks = check_urls(candidates)
-        rejected = {url for url, status in checks.items() if status == "not_found"}
-        if rejected:
+        checks = {}
+        rejected = set()
+        while True:
+            candidates = [
+                change["new_code"]
+                for change in stats["changes"]
+                if change["action"] == "replace" and change["new_code"] not in checks
+            ]
+            if not candidates:
+                break
+            new_checks = check_urls(candidates)
+            checks.update(new_checks)
+            new_rejected = {
+                url for url, status in new_checks.items() if status == "not_found"
+            } - rejected
+            if not new_rejected:
+                break
+            rejected.update(new_rejected)
             updated, stats = repair_records(
                 papers, manifest, dry_run=False, rejected_urls=rejected
             )

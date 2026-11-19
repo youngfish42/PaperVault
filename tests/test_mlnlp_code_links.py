@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +10,8 @@ sys.path.insert(0, str(ROOT))
 from scripts.sync_mlnlp_code_links import (  # noqa: E402
     BLOCKED_ICLR_REPOS,
     Edition,
+    _require_sync_baseline,
+    _source_commit,
     apply_additions,
     classify_code_url,
     export_records,
@@ -18,6 +21,8 @@ from scripts.sync_mlnlp_code_links import (  # noqa: E402
     paper_identity_keys,
     parse_markdown,
     repair_records,
+    run_import,
+    run_repair,
 )
 
 
@@ -370,3 +375,123 @@ def test_repair_dry_run_and_rejected_replacement(tmp_path):
     assert updated[0]["paper_code"] == "#"
     assert stats["cleared"] == 1
     assert stats["replaced"] == 0
+
+
+def test_export_treats_upstream_paper_without_code_as_existing(tmp_path):
+    edition = _edition(
+        tmp_path,
+        """#### Already Listed Without Code
+- Paper Link: https://openreview.net/forum?id=existing
+- Code Link:
+
+| Title | 论文链接 | 开源代码 |
+|-------|---------|---------|
+| Table Without Code | [paper](https://ijcai.org/proceedings/2024/999) |  |
+""",
+    )
+    entries = parse_markdown(edition.path)
+    assert len(entries) == 2 and all(entry.code_urls == [] for entry in entries)
+    papers = [
+        _paper(title="Already Listed Without Code", url="https://openreview.net/pdf?id=existing", code="https://github.com/org/existing"),
+        _paper(title="Table Without Code", url="https://ijcai.org/proceedings/2024/999", code="https://github.com/org/table"),
+    ]
+    additions, stats = export_records(papers, [edition])
+    assert additions == {}
+    assert stats["already_present"] == 2
+
+
+def test_import_rejects_multiple_distinct_repositories(tmp_path):
+    edition = _edition(
+        tmp_path,
+        """#### A Paper
+- Paper Link: https://openreview.net/forum?id=abc123
+- Code Link: https://github.com/org/first https://github.com/another/second
+""",
+    )
+    updated, stats = import_records([_paper()], [edition], dry_run=False)
+    assert updated[0]["paper_code"] == "#"
+    assert stats["filled"] == 0
+    assert stats["ambiguous"] == 1
+    assert stats["samples"]["ambiguous"][0]["reason"] == "multiple_external_codes"
+
+
+def test_upload_requires_online_parent_commit():
+    with pytest.raises(RuntimeError, match="offline"):
+        _require_sync_baseline(SimpleNamespace(dry_run=False, no_sync=False, offline=True), "parent")
+    with pytest.raises(RuntimeError, match="parent commit"):
+        _require_sync_baseline(SimpleNamespace(dry_run=False, no_sync=False, offline=False), None)
+    _require_sync_baseline(SimpleNamespace(dry_run=False, no_sync=False, offline=False), "parent")
+    _require_sync_baseline(SimpleNamespace(dry_run=False, no_sync=True, offline=True), None)
+
+
+def test_source_commit_is_optional_for_reports(tmp_path):
+    assert _source_commit(tmp_path) == ""
+
+
+def _cli_args(tmp_path, **overrides):
+    args = SimpleNamespace(
+        cache=tmp_path / "cache.jsonl.gz",
+        repo=tmp_path,
+        venue=None,
+        dry_run=True,
+        offline=True,
+        no_sync=True,
+        check_links=True,
+        report=tmp_path / "report.json",
+    )
+    return args
+
+
+def test_import_rechecks_fallback_repository_url(tmp_path, monkeypatch):
+    first = "https://github.com/org/repo/tree/dead"
+    second = "https://github.com/org/repo/tree/main"
+    edition = _edition(
+        tmp_path,
+        f"""#### A Paper
+- Paper Link: https://openreview.net/forum?id=abc123
+- Code Link: {first} {second}
+""",
+    )
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.ensure_cache_local", lambda *a, **k: (a[0], "parent"))
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links._selected_manifest", lambda *a: [edition])
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.load_papers", lambda path: [_paper()])
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.write_report", lambda *a, **k: None)
+    checked = []
+
+    def fake_check(urls):
+        checked.append(set(urls))
+        return {url: ("not_found" if url == first else "reachable") for url in urls}
+
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.check_urls", fake_check)
+    stats = run_import(_cli_args(tmp_path))
+    assert stats["filled"] == 1
+    assert checked == [{first}, {second}]
+    assert stats["url_check_details"] == {first: "not_found", second: "reachable"}
+
+
+def test_repair_rechecks_fallback_repository_url(tmp_path, monkeypatch):
+    first = "https://github.com/org/repo/tree/dead"
+    second = "https://github.com/org/repo/tree/main"
+    edition = _edition(
+        tmp_path,
+        f"""#### A Paper
+- Paper Link: https://openreview.net/forum?id=abc123
+- Code Link: {first} {second}
+""",
+    )
+    paper = _paper(code="https://github.com/mlii0117/FFA-IR")
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.ensure_cache_local", lambda *a, **k: (a[0], "parent"))
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links._selected_manifest", lambda *a: [edition])
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.load_papers", lambda path: [paper])
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.write_report", lambda *a, **k: None)
+    checked = []
+
+    def fake_check(urls):
+        checked.append(set(urls))
+        return {url: ("not_found" if url == first else "reachable") for url in urls}
+
+    monkeypatch.setattr("scripts.sync_mlnlp_code_links.check_urls", fake_check)
+    stats = run_repair(_cli_args(tmp_path))
+    assert stats["replaced"] == 1
+    assert stats["changes"][0]["new_code"] == second
+    assert checked == [{first}, {second}]

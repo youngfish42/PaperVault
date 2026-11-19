@@ -327,3 +327,20 @@ def test_code_only_backfill_does_not_read_or_modify_abstract():
     assert stats["abstract_filled"] == 0
     assert papers[0]["paper_code"] == "https://github.com/owner/repo"
     assert papers[0]["paper_abstract"] == ""
+
+
+def test_run_code_only_skips_abstract_pipeline(monkeypatch):
+    from scripts.fetch_pwc_backfill import run as run_pwc_backfill
+
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.ensure_cache_local", lambda *a, **k: (a[0], "parent"))
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.load_papers", lambda path: [])
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.load_pwc_link_rows", lambda: [])
+
+    def fail_abstract_pipeline():
+        raise AssertionError("abstract dataset must not be loaded in code-only mode")
+
+    monkeypatch.setattr("scripts.fetch_pwc_backfill.build_abstract_index", fail_abstract_pipeline)
+    stats = run_pwc_backfill(dry_run=True, code_only=True)
+    assert stats["code_only"] is True
+    assert stats["abstract_filled"] == 0
+    assert stats["code_filled"] == 0
