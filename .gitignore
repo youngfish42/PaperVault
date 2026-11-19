@@ -1,6 +1,8 @@
 # custom
 .DS_Store
 cache/dblp_discovery_cache.json
+cache/acm_*.json
+cache/abstract_code_*.json
 cache/mlnlp_*.json
 cache/mlnlp_*.log
 cache/*.parquet
