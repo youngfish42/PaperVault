@@ -1,0 +1,567 @@
+[
+    {
+        "name": "EMNLP2000",
+        "tag": "^W00-*",
+        "url": "https://aclanthology.org/events/emnlp-2000/"
+    },
+    {
+        "name": "EMNLP2001",
+        "tag": "^W01-*",
+        "url": "https://aclanthology.org/events/emnlp-2001/"
+    },
+    {
+        "name": "EMNLP2002",
+        "tag": "^W02-*",
+        "url": "https://aclanthology.org/events/emnlp-2002/"
+    },
+    {
+        "name": "EMNLP2003",
+        "tag": "^W03-*",
+        "url": "https://aclanthology.org/events/emnlp-2003/"
+    },
+    {
+        "name": "EMNLP2004",
+        "tag": "^W04-*",
+        "url": "https://aclanthology.org/events/emnlp-2004/"
+    },
+    {
+        "name": "EMNLP2005",
+        "tag": "^H05-*",
+        "url": "https://aclanthology.org/events/emnlp-2005/"
+    },
+    {
+        "name": "EMNLP2006",
+        "tag": "^W06-*",
+        "url": "https://aclanthology.org/events/emnlp-2006/"
+    },
+    {
+        "name": "EMNLP2007",
+        "tag": "^D07-*",
+        "url": "https://aclanthology.org/events/emnlp-2007/"
+    },
+    {
+        "name": "EMNLP2008",
+        "tag": "^D08-*",
+        "url": "https://aclanthology.org/events/emnlp-2008/"
+    },
+    {
+        "name": "EMNLP2009",
+        "tag": "^D09-*",
+        "url": "https://aclanthology.org/events/emnlp-2009/"
+    },
+    {
+        "name": "EMNLP2010",
+        "tag": "^D10-*",
+        "url": "https://aclanthology.org/events/emnlp-2010/"
+    },
+    {
+        "name": "EMNLP2011",
+        "tag": "^D11-*",
+        "url": "https://aclanthology.org/events/emnlp-2011/"
+    },
+    {
+        "name": "EMNLP2012",
+        "tag": "^D12-*",
+        "url": "https://aclanthology.org/events/emnlp-2012/"
+    },
+    {
+        "name": "EMNLP2013",
+        "tag": "^D13-*",
+        "url": "https://aclanthology.org/events/emnlp-2013/"
+    },
+    {
+        "name": "EMNLP2014",
+        "tag": "^D14-*",
+        "url": "https://aclanthology.org/events/emnlp-2014/"
+    },
+    {
+        "name": "EMNLP2015",
+        "tag": "^D15-*",
+        "url": "https://aclanthology.org/events/emnlp-2015/"
+    },
+    {
+        "name": "EMNLP2016",
+        "tag": "^D16-*",
+        "url": "https://aclanthology.org/events/emnlp-2016/"
+    },
+    {
+        "name": "EMNLP2017",
+        "tag": "^D17-*",
+        "url": "https://aclanthology.org/events/emnlp-2017/"
+    },
+    {
+        "name": "EMNLP2018",
+        "tag": "^D18-*",
+        "url": "https://aclanthology.org/events/emnlp-2018/"
+    },
+    {
+        "name": "EMNLP2021",
+        "tag": "^/2021.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2021/"
+    },
+    {
+        "name": "EMNLP2021",
+        "tag": "^/2021.findings*",
+        "url": "https://aclanthology.org/volumes/2021.findings-emnlp/"
+    },
+    {
+        "name": "ACL2000",
+        "tag": "^P00-*",
+        "url": "https://aclanthology.org/events/acl-2000/"
+    },
+    {
+        "name": "ACL2001",
+        "tag": "^P01-*",
+        "url": "https://aclanthology.org/events/acl-2001/"
+    },
+    {
+        "name": "ACL2002",
+        "tag": "^P02-*",
+        "url": "https://aclanthology.org/events/acl-2002/"
+    },
+    {
+        "name": "ACL2003",
+        "tag": "^P03-*",
+        "url": "https://aclanthology.org/events/acl-2003/"
+    },
+    {
+        "name": "ACL2004",
+        "tag": "^P04-*",
+        "url": "https://aclanthology.org/events/acl-2004/"
+    },
+    {
+        "name": "ACL2005",
+        "tag": "^P05-*",
+        "url": "https://aclanthology.org/events/acl-2005/"
+    },
+    {
+        "name": "ACL2006",
+        "tag": "^P06-*",
+        "url": "https://aclanthology.org/events/acl-2006/"
+    },
+    {
+        "name": "ACL2007",
+        "tag": "^P07-*",
+        "url": "https://aclanthology.org/events/acl-2007/"
+    },
+    {
+        "name": "ACL2008",
+        "tag": "^P08-*",
+        "url": "https://aclanthology.org/events/acl-2008/"
+    },
+    {
+        "name": "ACL2009",
+        "tag": "^P09-*",
+        "url": "https://aclanthology.org/events/acl-2009/"
+    },
+    {
+        "name": "ACL2010",
+        "tag": "^P10-*",
+        "url": "https://aclanthology.org/events/acl-2010/"
+    },
+    {
+        "name": "ACL2011",
+        "tag": "^P11-*",
+        "url": "https://aclanthology.org/events/acl-2011/"
+    },
+    {
+        "name": "ACL2012",
+        "tag": "^P12-*",
+        "url": "https://aclanthology.org/events/acl-2012/"
+    },
+    {
+        "name": "ACL2013",
+        "tag": "^P13-*",
+        "url": "https://aclanthology.org/events/acl-2013/"
+    },
+    {
+        "name": "ACL2014",
+        "tag": "^P14-*",
+        "url": "https://aclanthology.org/events/acl-2014/"
+    },
+    {
+        "name": "ACL2015",
+        "tag": "^P15-*",
+        "url": "https://aclanthology.org/events/acl-2015/"
+    },
+    {
+        "name": "ACL2016",
+        "tag": "^P16-*",
+        "url": "https://aclanthology.org/events/acl-2016/"
+    },
+    {
+        "name": "ACL2017",
+        "tag": "^P17-*",
+        "url": "https://aclanthology.org/events/acl-2017/"
+    },
+    {
+        "name": "ACL2018",
+        "tag": "^P18-*",
+        "url": "https://aclanthology.org/events/acl-2018/"
+    },
+    {
+        "name": "ACL2021",
+        "tag": "^/2021.acl*",
+        "url": "https://aclanthology.org/events/acl-2021/"
+    },
+    {
+        "name": "ACL2021",
+        "tag": "^/2021.findings*",
+        "url": "https://aclanthology.org/volumes/2021.findings-acl/"
+    },
+    {
+        "name": "NAACL2000",
+        "tag": "^A00-*",
+        "url": "https://aclanthology.org/events/naacl-2000/"
+    },
+    {
+        "name": "NAACL2001",
+        "tag": "^N01-*",
+        "url": "https://aclanthology.org/events/naacl-2001/"
+    },
+    {
+        "name": "NAACL2003",
+        "tag": "^N03-*",
+        "url": "https://aclanthology.org/events/naacl-2003/"
+    },
+    {
+        "name": "NAACL2004",
+        "tag": "^N04-*",
+        "url": "https://aclanthology.org/events/naacl-2004/"
+    },
+    {
+        "name": "NAACL2006",
+        "tag": "^N06-*",
+        "url": "https://aclanthology.org/events/naacl-2006/"
+    },
+    {
+        "name": "NAACL2007",
+        "tag": "^N07-*",
+        "url": "https://aclanthology.org/events/naacl-2007/"
+    },
+    {
+        "name": "NAACL2009",
+        "tag": "^N09-*",
+        "url": "https://aclanthology.org/events/naacl-2009/"
+    },
+    {
+        "name": "NAACL2010",
+        "tag": "^N10-*",
+        "url": "https://aclanthology.org/events/naacl-2010/"
+    },
+    {
+        "name": "NAACL2012",
+        "tag": "^N12-*",
+        "url": "https://aclanthology.org/events/naacl-2012/"
+    },
+    {
+        "name": "NAACL2013",
+        "tag": "^N13-*",
+        "url": "https://aclanthology.org/events/naacl-2013/"
+    },
+    {
+        "name": "NAACL2015",
+        "tag": "^N15-*",
+        "url": "https://aclanthology.org/events/naacl-2015/"
+    },
+    {
+        "name": "NAACL2016",
+        "tag": "^N16-*",
+        "url": "https://aclanthology.org/events/naacl-2016/"
+    },
+    {
+        "name": "NAACL2018",
+        "tag": "^N18-*",
+        "url": "https://aclanthology.org/events/naacl-2018/"
+    },
+    {
+        "name": "NAACL2021",
+        "tag": "^/2021.naacl*",
+        "url": "https://aclanthology.org/events/naacl-2021/"
+    },
+    {
+        "name": "EMNLP2020",
+        "tag": "^/2020.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2020/"
+    },
+    {
+        "name": "EMNLP2020",
+        "tag": "^/2020.findings*",
+        "url": "https://aclanthology.org/volumes/2020.findings-emnlp/"
+    },
+    {
+        "name": "ACL2020",
+        "tag": "^/2020.acl*",
+        "url": "https://aclanthology.org/events/acl-2020/"
+    },
+    {
+        "name": "COLING2000",
+        "tag": "^C00-*",
+        "url": "https://aclanthology.org/events/coling-2000/"
+    },
+    {
+        "name": "COLING2002",
+        "tag": "^C02-*",
+        "url": "https://aclanthology.org/events/coling-2002/"
+    },
+    {
+        "name": "COLING2004",
+        "tag": "^C04-*",
+        "url": "https://aclanthology.org/events/coling-2004/"
+    },
+    {
+        "name": "COLING2006",
+        "tag": "^P06-*",
+        "url": "https://aclanthology.org/events/coling-2006/"
+    },
+    {
+        "name": "COLING2008",
+        "tag": "^C08-*",
+        "url": "https://aclanthology.org/events/coling-2008/"
+    },
+    {
+        "name": "COLING2010",
+        "tag": "^C10-*",
+        "url": "https://aclanthology.org/events/coling-2010/"
+    },
+    {
+        "name": "COLING2012",
+        "tag": "^C12-*",
+        "url": "https://aclanthology.org/events/coling-2012/"
+    },
+    {
+        "name": "COLING2014",
+        "tag": "^C14-*",
+        "url": "https://aclanthology.org/events/coling-2014/"
+    },
+    {
+        "name": "COLING2016",
+        "tag": "^C16-*",
+        "url": "https://aclanthology.org/events/coling-2016/"
+    },
+    {
+        "name": "COLING2018",
+        "tag": "^C18-*",
+        "url": "https://aclanthology.org/events/coling-2018/"
+    },
+    {
+        "name": "COLING2020",
+        "tag": "^/2020.coling*",
+        "url": "https://aclanthology.org/events/coling-2020/"
+    },
+    {
+        "name": "ACL2019",
+        "tag": "^/P19-*",
+        "url": "https://aclanthology.org/events/acl-2019/"
+    },
+    {
+        "name": "EMNLP2019",
+        "tag": "^/D19-*",
+        "url": "https://aclanthology.org/events/emnlp-2019/"
+    },
+    {
+        "name": "NAACL2019",
+        "tag": "^/N19-*",
+        "url": "https://aclanthology.org/events/naacl-2019/"
+    },
+    {
+        "name": "ACL2022",
+        "url": "https://aclanthology.org/events/acl-2022/",
+        "tag": "^/2022.acl*"
+    },
+    {
+        "name": "ACL2022",
+        "url": "https://aclanthology.org/volumes/2022.findings-acl/",
+        "tag": "^/2022.findings*"
+    },
+    {
+        "name": "NAACL2022",
+        "url": "https://aclanthology.org/events/naacl-2022/",
+        "tag": "^/2022.naacl*"
+    },
+    {
+        "name": "NAACL2022",
+        "url": "https://aclanthology.org/volumes/2022.findings-naacl/",
+        "tag": "^/2022.findings*"
+    },
+    {
+        "name": "COLING2022",
+        "url": "https://aclanthology.org/events/coling-2022/",
+        "tag": "^/2022.coling*"
+    },
+    {
+        "name": "EMNLP2022",
+        "url": "https://aclanthology.org/events/emnlp-2022/",
+        "tag": "^/2022.emnlp*"
+    },
+    {
+        "name": "ACL2023",
+        "url": "https://aclanthology.org/events/acl-2023/",
+        "tag": "^/2023.acl*"
+    },
+    {
+        "name": "ACL2024",
+        "tag": "^2024.acl*",
+        "url": "https://aclanthology.org/events/acl-2024/"
+    },
+    {
+        "name": "ACL2024",
+        "tag": "^2024.findings*",
+        "url": "https://aclanthology.org/volumes/2024.findings-acl/"
+    },
+    {
+        "name": "ACL2025",
+        "tag": "^2025.acl*",
+        "url": "https://aclanthology.org/events/acl-2025/"
+    },
+    {
+        "name": "ACL2025",
+        "tag": "^2025.findings*",
+        "url": "https://aclanthology.org/volumes/2025.findings-acl/"
+    },
+    {
+        "name": "ACL2026",
+        "tag": "^2026.findings*",
+        "url": "https://aclanthology.org/volumes/2026.findings-acl/"
+    },
+    {
+        "name": "ACL2026",
+        "tag": "^2026.acl*",
+        "url": "https://aclanthology.org/events/acl-2026/"
+    },
+    {
+        "name": "EMNLP2024",
+        "tag": "^2024.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2024/"
+    },
+    {
+        "name": "EMNLP2024",
+        "tag": "^2024.findings*",
+        "url": "https://aclanthology.org/volumes/2024.findings-emnlp/"
+    },
+    {
+        "name": "EMNLP2025",
+        "tag": "^2025.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2025/"
+    },
+    {
+        "name": "EMNLP2025",
+        "tag": "^2025.findings*",
+        "url": "https://aclanthology.org/volumes/2025.findings-emnlp/"
+    },
+    {
+        "name": "NAACL2024",
+        "tag": "^2024.naacl*",
+        "url": "https://aclanthology.org/events/naacl-2024/"
+    },
+    {
+        "name": "NAACL2024",
+        "tag": "^2024.findings*",
+        "url": "https://aclanthology.org/volumes/2024.findings-naacl/"
+    },
+    {
+        "name": "NAACL2025",
+        "tag": "^2025.naacl*",
+        "url": "https://aclanthology.org/events/naacl-2025/"
+    },
+    {
+        "name": "NAACL2025",
+        "tag": "^2025.findings*",
+        "url": "https://aclanthology.org/volumes/2025.findings-naacl/"
+    },
+    {
+        "name": "EACL2003",
+        "tag": "^E03-*",
+        "url": "https://aclanthology.org/events/eacl-2003/"
+    },
+    {
+        "name": "EACL2006",
+        "tag": "^E06-*",
+        "url": "https://aclanthology.org/events/eacl-2006/"
+    },
+    {
+        "name": "EACL2009",
+        "tag": "^E09-*",
+        "url": "https://aclanthology.org/events/eacl-2009/"
+    },
+    {
+        "name": "EACL2012",
+        "tag": "^E12-*",
+        "url": "https://aclanthology.org/events/eacl-2012/"
+    },
+    {
+        "name": "EACL2014",
+        "tag": "^E14-*",
+        "url": "https://aclanthology.org/events/eacl-2014/"
+    },
+    {
+        "name": "EACL2017",
+        "tag": "^E17-*",
+        "url": "https://aclanthology.org/events/eacl-2017/"
+    },
+    {
+        "name": "EACL2024",
+        "tag": "^2024.eacl*",
+        "url": "https://aclanthology.org/events/eacl-2024/"
+    },
+    {
+        "name": "EACL2024",
+        "tag": "^2024.findings*",
+        "url": "https://aclanthology.org/volumes/2024.findings-eacl/"
+    },
+    {
+        "name": "COLING2024",
+        "tag": "^2024.coling*",
+        "url": "https://aclanthology.org/events/coling-2024/"
+    },
+    {
+        "name": "COLING2025",
+        "tag": "^2025.coling*",
+        "url": "https://aclanthology.org/events/coling-2025/"
+    },
+    {
+        "name": "EMNLP2023",
+        "tag": "^2023.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2023/"
+    },
+    {
+        "name": "EMNLP2023",
+        "tag": "^2023.findings*",
+        "url": "https://aclanthology.org/volumes/2023.findings-emnlp/"
+    },
+    {
+        "name": "EMNLP2026",
+        "tag": "^2026.emnlp*",
+        "url": "https://aclanthology.org/events/emnlp-2026/"
+    },
+    {
+        "name": "EMNLP2026",
+        "tag": "^2026.findings*",
+        "url": "https://aclanthology.org/volumes/2026.findings-emnlp/"
+    },
+    {
+        "name": "EACL2021",
+        "tag": "^2021.eacl*",
+        "url": "https://aclanthology.org/events/eacl-2021/"
+    },
+    {
+        "name": "EACL2023",
+        "tag": "^2023.eacl*",
+        "url": "https://aclanthology.org/events/eacl-2023/"
+    },
+    {
+        "name": "EACL2023",
+        "tag": "^2023.findings*",
+        "url": "https://aclanthology.org/volumes/2023.findings-eacl/"
+    },
+    {
+        "name": "EACL2026",
+        "tag": "^2026.eacl*",
+        "url": "https://aclanthology.org/events/eacl-2026/"
+    },
+    {
+        "name": "EACL2026",
+        "tag": "^2026.findings*",
+        "url": "https://aclanthology.org/volumes/2026.findings-eacl/"
+    }
+]

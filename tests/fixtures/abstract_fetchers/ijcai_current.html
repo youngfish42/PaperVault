@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions | IJCAI</title>
+<meta name='robots' content='max-image-preview:large' />
+<meta name="citation_title" content="Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions">
+<meta name="citation_author" content="Abate, Alessandro">
+<meta name="citation_author_institution" content="University of Oxford">
+<meta name="citation_author" content="De Giacomo, Giuseppe">
+<meta name="citation_author_institution" content="University of Oxford">
+<meta name="citation_author" content="Jackermeier, Mathias">
+<meta name="citation_author_institution" content="University of Oxford">
+<meta name="citation_author" content="Křetínský, Jan">
+<meta name="citation_author_institution" content="Technical University of Munich; Masaryk University Brno">
+<meta name="citation_author" content="Prokop, Maximilian">
+<meta name="citation_author_institution" content="Technical University of Munich; Masaryk University Brno">
+<meta name="citation_author" content="Weinhuber, Christoph">
+<meta name="citation_author_institution" content="University of Oxford">
+<meta name="citation_publication_date" content="2026">
+<meta name="citation_conference_title" content="Proceedings of the Thirty-Fifth International Joint Conference on Artificial Intelligence">
+<meta name="citation_publisher" content="International Joint Conferences on Artificial Intelligence Organization">
+<meta name="citation_firstpage" content="3">
+<meta name="citation_lastpage" content="11">
+<meta name="citation_doi" content="10.24963/ijcai.2026/1">
+<meta name="citation_pdf_url" content="https://ijcai.org/proceedings/2026/0001.pdf">
+<meta name="citation_abstract_html_url" content="https://ijcai.org/proceedings/2026/1">
+<link rel="canonical" href="https://ijcai.org/proceedings/2026/1">
+<link rel="alternate" type="text/markdown" href="https://ijcai.org/proceedings/2026/1.md">
+<link rel="alternate" type="application/json" href="https://ijcai.org/proceedings/2026/1.json">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"ScholarlyArticle","headline":"Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions","name":"Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions","abstract":"We study multi-task reinforcement learning (RL), a setting in which an agent learns a single, universal policy capable of generalising to arbitrary, possibly unseen tasks. We consider tasks specified as linear temporal logic (LTL) formulae, which are commonly used in formal methods to specify properties of systems, and have recently been successfully adopted in RL. In this setting, we present a novel task embedding technique leveraging a new generation of semantic LTL-to-automata translations, originally developed for temporal synthesis. The resulting semantically labelled automata contain rich, structured information in each state that allow us to (i) compute the automaton efficiently on-the-fly, (ii) extract expressive task embeddings used to condition the policy, and (iii) naturally support full LTL. Experimental results in a variety of domains demonstrate that our approach achieves state-of-the-art performance and is able to scale to complex specifications where existing methods fail.","author":[{"@type":"Person","name":"Alessandro Abate","url":"https://ijcai.org/authors/alessandro-abate/","affiliation":{"@type":"Organization","name":"University of Oxford"}},{"@type":"Person","name":"Giuseppe De Giacomo","url":"https://ijcai.org/authors/giuseppe-de-giacomo/","affiliation":{"@type":"Organization","name":"University of Oxford"}},{"@type":"Person","name":"Mathias Jackermeier","url":"https://ijcai.org/authors/mathias-jackermeier/","affiliation":{"@type":"Organization","name":"University of Oxford"}},{"@type":"Person","name":"Jan Křetínský","url":"https://ijcai.org/authors/jan-kretinsky/","affiliation":{"@type":"Organization","name":"Technical University of Munich; Masaryk University Brno"}},{"@type":"Person","name":"Maximilian Prokop","url":"https://ijcai.org/authors/maximilian-prokop/","affiliation":{"@type":"Organization","name":"Technical University of Munich; Masaryk University Brno"}},{"@type":"Person","name":"Christoph Weinhuber","url":"https://ijcai.org/authors/christoph-weinhuber/","affiliation":{"@type":"Organization","name":"University of Oxford"}}],"datePublished":"2026","isPartOf":{"@type":"Book","name":"Proceedings of the Thirty-Fifth International Joint Conference on Artificial Intelligence","isbn":"978-1-956792-09-6","url":"https://ijcai.org/proceedings/2026/"},"publisher":{"@type":"Organization","name":"International Joint Conferences on Artificial Intelligence Organization"},"url":"https://ijcai.org/proceedings/2026/1","keywords":"Knowledge Representation and Reasoning: Reasoning about actions; Knowledge Representation and Reasoning: Learning and reasoning; Machine Learning: Multi-task and transfer learning; Agent-based and Multi-agent Systems: Formal verification, validation and synthesis; Machine Learning: Reinforcement learning","identifier":{"@type":"PropertyValue","propertyID":"DOI","value":"10.24963/ijcai.2026/1"},"sameAs":"https://doi.org/10.24963/ijcai.2026/1","pageStart":3,"pageEnd":11,"encoding":{"@type":"MediaObject","encodingFormat":"application/pdf","contentUrl":"https://ijcai.org/proceedings/2026/0001.pdf"}}</script>
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<style id="wp-emoji-styles-inline-css">
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+/*# sourceURL=wp-emoji-styles-inline-css */
+</style>
+<style id="wp-block-library-inline-css">
+:root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient-background{background:linear-gradient(135deg,#fafae1,#67a671)}:root .has-atomic-cream-gradient-background{background:linear-gradient(135deg,#fdd79a,#004a59)}:root .has-nightshade-gradient-background{background:linear-gradient(135deg,#330968,#31cdcf)}:root .has-midnight-gradient-background{background:linear-gradient(135deg,#020381,#2874fc)}:root{--wp--preset--font-size--normal:16px;--wp--preset--font-size--huge:42px}.has-regular-font-size{font-size:1em}.has-larger-font-size{font-size:2.625em}.has-normal-font-size{font-size:var(--wp--preset--font-size--normal)}.has-huge-font-size{font-size:var(--wp--preset--font-size--huge)}:root .has-text-align-center{text-align:center}:root .has-text-align-left{text-align:left}:root .has-text-align-right{text-align:right}.has-fit-text{white-space:nowrap!important}#end-resizable-editor-section{display:none}.aligncenter{clear:both}.items-justified-left{justify-content:flex-start}.items-justified-center{justify-content:center}.items-justified-right{justify-content:flex-end}.items-justified-space-between{justify-content:space-between}.screen-reader-text{word-wrap:normal!important;border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;word-break:normal!important}.screen-reader-text:focus{background-color:#ddd;clip-path:none;color:#444;display:block;font-size:1em;height:auto;left:5px;line-height:normal;padding:15px 23px 14px;text-decoration:none;top:5px;width:auto;z-index:100000}html :where(.has-border-color){border-style:solid}html :where([style^=border-color],[style*=";border-color"],[style*="; border-color"]){border-style:solid}html :where([style^=border-top-color],[style*=";border-top-color"],[style*="; border-top-color"]){border-top-style:solid}html :where([style^=border-right-color],[style*=";border-right-color"],[style*="; border-right-color"]){border-right-style:solid}html :where([style^=border-bottom-color],[style*=";border-bottom-color"],[style*="; border-bottom-color"]){border-bottom-style:solid}html :where([style^=border-left-color],[style*=";border-left-color"],[style*="; border-left-color"]){border-left-style:solid}html :where([style^=border-width],[style*=";border-width"],[style*="; border-width"]){border-style:solid}html :where([style^=border-top-width],[style*=";border-top-width"],[style*="; border-top-width"]){border-top-style:solid}html :where([style^=border-right-width],[style*=";border-right-width"],[style*="; border-right-width"]){border-right-style:solid}html :where([style^=border-bottom-width],[style*=";border-bottom-width"],[style*="; border-bottom-width"]){border-bottom-style:solid}html :where([style^=border-left-width],[style*=";border-left-width"],[style*="; border-left-width"]){border-left-style:solid}html :where(img[class*=wp-image-]){height:auto;max-width:100%}:where(figure){margin:0 0 1em}html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:var(--wp-admin--admin-bar--height,0px)}@media screen and (max-width:600px){html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:0px}}
+/*# sourceURL=/wp-includes/css/dist/block-library/common.min.css */
+</style>
+<style id="classic-theme-styles-inline-css">
+/*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+/*# sourceURL=/wp-includes/css/classic-themes.min.css */
+</style>
+<style id="wp-block-styles-placeholder-inline-css">
+:root { --wp-internal-comment: "Placeholder for wp_hoist_late_printed_styles() to replace with the block styles printed at wp_footer." }
+/*# sourceURL=wp-block-styles-placeholder-inline-css */
+</style>
+<style id="wp-global-styles-placeholder-inline-css">
+:root { --wp-internal-comment: "Placeholder for wp_hoist_late_printed_styles() to replace with the global-styles printed at wp_footer." }
+/*# sourceURL=wp-global-styles-placeholder-inline-css */
+</style>
+<link rel='stylesheet' id='ijcai-main-css' href='https://ijcai.org/wp-content/themes/ijcai/assets/css/main.css?ver=1.0.14' media='all' />
+<link rel='stylesheet' id='ijcai-archive-css' href='https://ijcai.org/wp-content/themes/ijcai/assets/css/archive.css?ver=1.1.1' media='all' />
+<link rel="https://api.w.org/" href="https://ijcai.org/wp-json/" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://ijcai.org/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 7.1.4" />
+<link rel="icon" href="https://ijcai.org/wp-content/themes/ijcai/assets/img/favicon.ico?v=2" sizes="any">
+<link rel="icon" href="https://ijcai.org/wp-content/themes/ijcai/assets/img/favicon.svg?v=2" type="image/svg+xml">
+<link rel="apple-touch-icon" href="https://ijcai.org/wp-content/themes/ijcai/assets/img/apple-touch-icon.png?v=2">
+</head>
+<body class="wp-theme-ijcai ijcai-archive ijcai-archive--article">
+
+<header class="site-header">
+    <div class="site-header__bar">
+        <span class="site-header__spacer"></span>
+        <a href="https://ijcai.org/" class="site-logo">
+            <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/logo.svg"
+                 width="247" height="105" alt="IJCAI">
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation"
+                aria-expanded="false" aria-controls="nav-panel">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+    <nav id="nav-panel" class="nav-panel" aria-label="Primary Navigation">
+        <ul id="menu-primary" class="nav-panel__menu"><li id="menu-item-230" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-230"><a href="https://ijcai.org/future_conferences/">Conferences</a>
+<ul class="sub-menu">
+	<li id="menu-item-231" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-231"><a href="https://ijcai.org/future_conferences/">Future Conferences</a></li>
+	<li id="menu-item-232" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-232"><a href="https://ijcai.org/past_conferences/">Past Conferences</a></li>
+</ul>
+</li>
+<li id="menu-item-233" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-233"><a href="https://ijcai.org/all_proceedings/">Proceedings</a>
+<ul class="sub-menu">
+	<li id="menu-item-234" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-234"><a href="/proceedings/2026/">IJCAI 2026 Proceedings</a></li>
+	<li id="menu-item-235" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-235"><a href="https://ijcai.org/all_proceedings/">All Proceedings</a></li>
+</ul>
+</li>
+<li id="menu-item-236" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-236"><a href="https://ijcai.org/awards/">Awards</a></li>
+<li id="menu-item-237" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-237"><a href="https://ijcai.org/trustees/current_trustees/">Trustees/officers</a>
+<ul class="sub-menu">
+	<li id="menu-item-238" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-238"><a href="https://ijcai.org/trustees/current_trustees/">Current trustees</a></li>
+	<li id="menu-item-239" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-239"><a href="https://ijcai.org/trustees/trustees_elect/">Trustees Elect</a></li>
+	<li id="menu-item-240" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-240"><a href="https://ijcai.org/officers/ijcai_secretariat/">IJCAI Secretariat</a></li>
+	<li id="menu-item-241" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-241"><a href="https://ijcai.org/officers/sponsorship_publicity/">IJCAI Sponsorship and Publicity Officers</a></li>
+	<li id="menu-item-242" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-242"><a href="https://ijcai.org/officers/ijcai_team/">IJCAI Team</a></li>
+	<li id="menu-item-243" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-243"><a href="https://ijcai.org/officers/local_arrangements_chairs/">Local Arrangements Chairs</a></li>
+	<li id="menu-item-244" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-244"><a href="https://ijcai.org/trustees/former_trustees_serving_on_the_executive_committee/">Former Trustees serving on the Executive Committee</a></li>
+	<li id="menu-item-245" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-245"><a href="https://ijcai.org/officers/other_former_officers/">Other Former Officers</a></li>
+</ul>
+</li>
+<li id="menu-item-246" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-246"><a href="https://ijcai.org/aijd/">AI Journal</a></li>
+<li id="menu-item-247" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-247"><a href="https://ijcai.org/aboutijcai/">About</a>
+<ul class="sub-menu">
+	<li id="menu-item-248" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-248"><a href="https://ijcai.org/aboutijcai/">About IJCAI</a></li>
+	<li id="menu-item-314" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-314"><a href="https://ijcai.org/documents/">Documents</a></li>
+	<li id="menu-item-249" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-249"><a href="https://ijcai.org/contact/">Contact Information</a></li>
+</ul>
+</li>
+</ul>    </nav>
+</header>
+
+<main id="main" class="site-main">
+    <div class="page-banner" style="background-image: url('https://ijcai.org/wp-content/themes/ijcai/assets/img/banners/proceedings.jpg?v=1');">
+    <details class="section-nav section-nav--overlay">
+    <summary>Proceedings</summary>
+    <ul>
+                    <li>
+                <a href="/proceedings/2026/">
+                    IJCAI 2026 Proceedings                </a>
+            </li>
+                    <li>
+                <a href="https://ijcai.org/all_proceedings/">
+                    All Proceedings                </a>
+            </li>
+            </ul>
+</details>
+</div>
+    <article class="panel archive-record">
+        <nav class="archive-crumbs" aria-label="Breadcrumb">
+            <a href="https://ijcai.org/all_proceedings/">Proceedings</a>
+                            <span aria-hidden="true">›</span>
+                <a href="https://ijcai.org/proceedings/2026/">IJCAI 2026</a>
+                    </nav>
+
+
+        <div class="entry-content">
+            <div class="article">
+    <div class="article__grid">
+        <div class="article__main">
+            <h1 class="article__title">Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions</h1>
+
+            <p class="article__authors">
+                <span title="University of Oxford"><a href="https://ijcai.org/authors/alessandro-abate/">Alessandro Abate</a></span>, <span title="University of Oxford"><a href="https://ijcai.org/authors/giuseppe-de-giacomo/">Giuseppe De Giacomo</a></span>, <span title="University of Oxford"><a href="https://ijcai.org/authors/mathias-jackermeier/">Mathias Jackermeier</a></span>, <span title="Technical University of Munich; Masaryk University Brno"><a href="https://ijcai.org/authors/jan-kretinsky/">Jan Křetínský</a></span>, <span title="Technical University of Munich; Masaryk University Brno"><a href="https://ijcai.org/authors/maximilian-prokop/">Maximilian Prokop</a></span>, <span title="University of Oxford"><a href="https://ijcai.org/authors/christoph-weinhuber/">Christoph Weinhuber</a></span>            </p>
+
+            <div class="article__actions">
+                                                    <a class="action action--pdf" href="/proceedings/2026/0001.pdf"><span class="action__icon" aria-hidden="true">PDF</span>Download</a>
+                                <a class="action action--bib" href="/proceedings/2026/bibtex/1"><span class="action__icon" aria-hidden="true">Bib</span>BibTeX</a>
+                <a class="action action--cite" href="#cite" data-tab-open="cite"><span class="action__icon" aria-hidden="true">“”</span>Cite</a>
+            </div>
+
+            <p class="article__venue">
+                <a href="/proceedings/2026/">Proceedings of the Thirty-Fifth International Joint Conference on Artificial Intelligence</a>.
+                Main Track. Pages 3-11.
+            </p>
+                            <p class="article__doi"><a href="https://doi.org/10.24963/ijcai.2026/1">https://doi.org/10.24963/ijcai.2026/1</a></p>
+                                    <p class="article__copyright">&copy; 2026 International Joint Conferences on Artificial Intelligence</p>
+
+                            <div class="article__keywords">
+                    <p class="eyebrow">Keywords</p>
+                    <ul>
+                                                    <li>Knowledge Representation and Reasoning: Reasoning about actions</li>
+                                                    <li>Knowledge Representation and Reasoning: Learning and reasoning</li>
+                                                    <li>Machine Learning: Multi-task and transfer learning</li>
+                                                    <li>Agent-based and Multi-agent Systems: Formal verification, validation and synthesis</li>
+                                                    <li>Machine Learning: Reinforcement learning</li>
+                                            </ul>
+                </div>
+                    </div>
+
+        <div class="article__abstract">
+            <p class="eyebrow">Abstract</p>
+                            <p>We study multi-task reinforcement learning (RL), a setting in which an agent learns a single, universal policy capable of generalising to arbitrary, possibly unseen tasks. We consider tasks specified as linear temporal logic (LTL) formulae, which are commonly used in formal methods to specify properties of systems, and have recently been successfully adopted in RL. In this setting, we present a novel task embedding technique leveraging a new generation of semantic LTL-to-automata translations, originally developed for temporal synthesis. The resulting semantically labelled automata contain rich, structured information in each state that allow us to (i) compute the automaton efficiently on-the-fly, (ii) extract expressive task embeddings used to condition the policy, and (iii) naturally support full LTL. Experimental results in a variety of domains demonstrate that our approach achieves state-of-the-art performance and is able to scale to complex specifications where existing methods fail.</p>                    </div>
+    </div>
+
+    <div class="article-tabs" data-tabs>
+        <div class="article-tabs__list" role="tablist">
+                            <button role="tab" id="tab-references" aria-controls="references" aria-selected="true">References (36)</button>
+                                        <button role="tab" id="tab-fulltext" aria-controls="fulltext" aria-selected="false">Full text</button>
+                                    <button role="tab" id="tab-cite" aria-controls="cite" aria-selected="false">Cite</button>
+            <button role="tab" id="tab-data" aria-controls="data" aria-selected="false">Data</button>
+        </div>
+
+                    <section role="tabpanel" id="references" aria-labelledby="tab-references">
+                <ol class="references">
+                                            <li value="1">
+                            [Abate et al., 2026] Alessandro Abate, Giuseppe De Gia- como, Mathias Jackermeier, Jan Kretínský, Maximilian Prokop, and Christoph Weinhuber. Semantically labelled automata for multi-task reinforcement learning with ltl in- structions, 2026.                                                                                </li>
+                                            <li value="2">
+                            [Aminof et al., 2025] Benjamin Aminof, Giuseppe De Gi- acomo, Sasha Rubin, and Moshe Y. Vardi. Ltlf+ and PPLTL+: extending ltlf and PPLTL to infinite traces. In IJCAI, pages 8447-8455. ijcai.org, 2025.                                                            <a class="ref-link ref-link--ijcai" href="/proceedings/2025/939">IJCAI</a>
+                                                                                </li>
+                                            <li value="3">
+                            [Bacchus and Kabanza, 1996] Fahiem Bacchus and Frodu- ald Kabanza. Planning for temporally extended goals. In AAAI/IAAI, Vol. 2, pages 1215-1222. AAAI Press / The MIT Press, 1996.                                                                                </li>
+                                            <li value="4">
+                            [Bozkurt et al., 2020] Alper Kamil Bozkurt, Yu Wang, Michael M. Zavlanos, and Miroslav Pajic. Control synthe- sis from linear temporal logic specifications using model- free reinforcement learning. In ICRA, pages 10349-10355. IEEE, 2020.                                                                                </li>
+                                            <li value="5">
+                            [Brázdil et al., 2014] Tomás Brázdil, Krishnendu Chatterjee, Martin Chmelik, Vojtech Forejt, Jan Křetínský, Marta Z. Kwiatkowska, David Parker, and Mateusz Ujma. Verifi- cation of markov decision processes using learning algo- rithms. In ATVA, volume 8837 of Lecture Notes in Com- puter Science, pages 98-114. Springer, 2014.                                                                                </li>
+                                            <li value="6">
+                            [De Giacomo et al., 2025] Giuseppe De Giacomo, Yong Li, Sven Schewe, Christoph Weinhuber, and Pian Yu. Solv- ing mdps with ltlf+ and PPLTL+ temporal objectives. In IJCAI, pages 8491-8499. ijcai.org, 2025.                                                            <a class="ref-link ref-link--ijcai" href="/proceedings/2025/944">IJCAI</a>
+                                                                                </li>
+                                            <li value="7">
+                            [Esparza and Křetínský, 2014] Javier Esparza and Jan Křetínský. From LTL to deterministic automata: A safraless compositional approach. In Armin Biere and Roderick Bloem, editors, Computer Aided Verification - 26th International Conference, CAV 2014, Held as Part of the Vienna Summer of Logic, VSL 2014, Vienna, Austria, July 18-22, 2014. Proceedings, volume 8559 of Lecture Notes in Computer Science, pages 192-208. Springer, 2014.                                                                                </li>
+                                            <li value="8">
+                            [Esparza et al., 2020] Javier Esparza, Jan Křetínský, and Sa- lomon Sickert. A unified translation of linear temporal logic to ω-automata. J. ACM, 67(6):33:1-33:61, 2020.                                                                                </li>
+                                            <li value="9">
+                            [Giuri et al., 2025] Mattia Giuri, Mathias Jackermeier, and Alessandro Abate. Zero-shot instruction following in rl via structured LTL representations. In ICML Workshop on Programmatic Representations for Agent Learning, 2025.                                                                                </li>
+                                            <li value="10">
+                            [Guo et al., 2025] Zijian Guo, Ilker Isik, H. M. Sabbir Ah- mad, and Wenchao Li. One subgoal at a time: Zero-shot generalization to arbitrary linear temporal logic require- ments in multi-task reinforcement learning. In NeurIPS, 2025.                                                                                </li>
+                                            <li value="11">
+                            [Hahn et al., 2019] Ernst Moritz Hahn, Mateo Perez, Sven Schewe, Fabio Somenzi, Ashutosh Trivedi, and Dominik Wojtczak. Omega-regular objectives in model-free rein- forcement learning. In TACAS (1), volume 11427 of Lec- ture Notes in Computer Science, pages 395-412. Springer, 2019.                                                                                </li>
+                                            <li value="12">
+                            [Hahn et al., 2022] Ernst Moritz Hahn, Mateo Perez, Sven Schewe, Fabio Somenzi, Ashutosh Trivedi, and Dominik Wojtczak. An impossibility result in automata-theoretic reinforcement learning. In Automated Technology for Ver- ification and Analysis: 20th International Symposium, ATVA 2022, Virtual Event, October 25-28, 2022, Pro- ceedings, page 42-57, Berlin, Heidelberg, 2022. Springer- Verlag.                                                                                </li>
+                                            <li value="13">
+                            [Hasanbeig et al., 2022] Mohammadhosein Hasanbeig, Daniel Kroening, and Alessandro Abate. LCRL: certified policy synthesis via logically-constrained reinforcement learning. In QEST, volume 13479 of Lecture Notes in Computer Science, pages 217-231. Springer, 2022.                                                                                </li>
+                                            <li value="14">
+                            [Jackermeier and Abate, 2025] Mathias Jackermeier and Alessandro Abate. Deepltl: Learning to efficiently satisfy complex LTL specifications for multi-task RL. In ICLR. OpenReview.net, 2025.                                                                                </li>
+                                            <li value="15">
+                            [Křetínský and Esparza, 2012] Jan Křetínský and Javier Es- parza. Deterministic automata for the (f, g)-fragment of LTL. In P. Madhusudan and Sanjit A. Seshia, editors, Computer Aided Verification -24th International Confer- ence, CAV 2012, Berkeley, CA, USA, July 7-13, 2012 Pro- ceedings, volume 7358 of Lecture Notes in Computer Sci- ence, pages 7-22. Springer, 2012.                                                                                </li>
+                                            <li value="16">
+                            [Křetínský et al., 2018] Jan Křetínský, Tobias Meggendor- fer, and Salomon Sickert. Owl: A library for ω-words, au- tomata, and LTL. In Shuvendu K. Lahiri and Chao Wang, editors, Automated Technology for Verification and Anal- ysis -16th International Symposium, ATVA 2018, Los An- geles, CA, USA, October 7-10, 2018, Proceedings, volume 11138 of Lecture Notes in Computer Science, pages 543- 550. Springer, 2018.                                                                                </li>
+                                            <li value="17">
+                            [Křetínský et al., 2019] Jan Křetínský, Alexander Manta, and Tobias Meggendorfer. Semantic labelling and learning for parity game solving in LTL synthesis. In ATVA, vol- ume 11781 of Lecture Notes in Computer Science, pages 404-422. Springer, 2019.                                                                                </li>
+                                            <li value="18">
+                            [Křetínský et al., 2023] Jan Křetínský, Tobias Meggendor- fer, Maximilian Prokop, and Sabine Rieder. Guessing win- ning policies in LTL synthesis by semantic learning. In CAV (1), volume 13964 of Lecture Notes in Computer Sci- ence, pages 390-414. Springer, 2023.                                                                                </li>
+                                            <li value="19">
+                            [Křetínský et al., 2025] Jan Křetínský, Tobias Meggendor- fer, Maximilian Prokop, and Ashkan Zarkhah. Semml: Enhancing automata-theoretic LTL synthesis with ma- chine learning. In TACAS (1), volume 15696 of Lec- ture Notes in Computer Science, pages 233-253. Springer, 2025.                                                                                </li>
+                                            <li value="20">
+                            [León et al., 2022] Borja G. León, Murray Shanahan, and Francesco Belardinelli. In a nutshell, the human asked for this: Latent goals for following temporal specifications. In ICLR. OpenReview.net, 2022.                                                                                </li>
+                                            <li value="21">
+                            [Li et al., 2013] Jianwen Li, Lijun Zhang, Geguang Pu, Moshe Y. Vardi, and Jifeng He. Ltl satisfiability checking revisited. In Proceedings of the 2013 20th International Symposium on Temporal Representation and Reasoning, TIME &#039;13, page 91-98, USA, 2013. IEEE Computer So- ciety.                                                                                </li>
+                                            <li value="22">
+                            [Liu et al., 2022] Minghuan Liu, Menghui Zhu, and Weinan Zhang. Goal-conditioned reinforcement learning: Prob- lems and solutions. In IJCAI, pages 5502-5511. ijcai.org, 2022.                                                            <a class="ref-link ref-link--ijcai" href="/proceedings/2022/770">IJCAI</a>
+                                                                                </li>
+                                            <li value="23">
+                            [Liu et al., 2024] Jason Xinyu Liu, Ankit Shah, Eric Rosen, Mingxi Jia, George Konidaris, and Stefanie Tellex. Skill transfer for temporal task specification. In ICRA, pages 2535-2541. IEEE, 2024.                                                                                </li>
+                                            <li value="24">
+                            [Oh et al., 2017] Junhyuk Oh, Satinder Singh, Honglak Lee, and Pushmeet Kohli. Zero-shot task generalization with multi-task deep reinforcement learning. CoRR, abs/1706.05064, 2017.                                                                                </li>
+                                            <li value="25">
+                            [Pnueli, 1977] Amir Pnueli. The temporal logic of programs. In FOCS, pages 46-57. IEEE Computer Society, 1977.                                                                                </li>
+                                            <li value="26">
+                            [Qiu et al., 2023] Wenjie Qiu, Wensen Mao, and He Zhu. In- structing goal-conditioned reinforcement learning agents with temporal logic objectives. In NeurIPS, 2023.                                                                                </li>
+                                            <li value="27">
+                            [Sadigh et al., 2014] Dorsa Sadigh, Eric S. Kim, Samuel Coogan, S. Shankar Sastry, and Sanjit A. Seshia. A learn- ing based approach to control synthesis of markov decision processes for linear temporal logic specifications. In CDC, pages 1091-1096. IEEE, 2014.                                                                                </li>
+                                            <li value="28">
+                            [Scarselli et al., 2009] Franco Scarselli, Marco Gori, Ah Chung Tsoi, Markus Hagenbuchner, and Gabriele Monfardini. The graph neural network model. IEEE Trans. Neural Networks, 20(1):61-80, 2009.                                                                                </li>
+                                            <li value="29">
+                            [Schulman et al., 2017] John Schulman, Filip Wolski, Pra- fulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. CoRR, abs/1707.06347, 2017.                                                                                </li>
+                                            <li value="30">
+                            [Sickert and Esparza, 2020] Salomon Sickert and Javier Es- parza. An efficient normalisation procedure for linear tem- poral logic and very weak alternating automata. In Pro- ceedings of the 35th Annual ACM/IEEE Symposium on Logic in Computer Science, LICS &#039;20, page 831-844, New York, NY, USA, 2020. Association for Computing Ma- chinery. [Sickert et al., 2016] Salomon Sickert, Javier Esparza, Ste- fan Jaax, and Jan Křetínský. Limit-deterministic büchi automata for linear temporal logic. In CAV (2), volume 9780 of Lecture Notes in Computer Science, pages 312- 332. Springer, 2016.                                                                                </li>
+                                            <li value="31">
+                            [Sutton and Barto, 2018] Richard S. Sutton and Andrew G. Barto. Reinforcement learning -an introduction, 2nd Edi- tion. MIT Press, 2018.                                                                                </li>
+                                            <li value="32">
+                            [Sutton et al., 1999] Richard S. Sutton, Doina Precup, and Satinder Singh. Between mdps and semi-mdps: A frame- work for temporal abstraction in reinforcement learning. Artif. Intell., 112(1-2):181-211, 1999.                                                                                </li>
+                                            <li value="33">
+                            [Vaezipoor et al., 2021] Pashootan Vaezipoor, Andrew C. Li, Rodrigo Toro Icarte, and Sheila A. McIlraith. Ltl2action: Generalizing LTL instructions for multi-task RL. In ICML, volume 139 of Proceedings of Machine Learning Re- search, pages 10497-10508. PMLR, 2021.                                                                                </li>
+                                            <li value="34">
+                            [Voloshin et al., 2023] Cameron Voloshin, Abhinav Verma, and Yisong Yue. Eventual discounting temporal logic counterfactual experience replay. In ICML, volume 202 of Proceedings of Machine Learning Research, pages 35137-35150. PMLR, 2023.                                                                                </li>
+                                            <li value="35">
+                            [Weinhuber et al., 2026] Christoph Weinhuber, Giuseppe De Giacomo, Yong Li, Sven Schewe, and Qiyi Tang. Good- for-mdp state reduction for stochastic ltl planning. In AAAI. AAAI Press, 2026.                                                                                </li>
+                                            <li value="36">
+                            [Xu and Fekri, 2024] Duo Xu and Faramarz Fekri. Gener- alization of temporal logic tasks via future dependent op- tions. Mach. Learn., 113(10):7509-7540, 2024.                                                                                </li>
+                                    </ol>
+                <p class="tab-note">References were extracted automatically from the PDF and may contain errors.</p>
+            </section>
+
+                    <section role="tabpanel" id="fulltext" aria-labelledby="tab-fulltext" hidden>
+                <p class="tab-note">Full text extracted automatically from the PDF; figures, tables and equations may differ. The PDF is the version of record.</p>
+                <div class="fulltext"><h2>1 Introduction</h2>
+<p>Developing reinforcement learning (RL) agents capable of executing complex, temporally extended tasks, such as those expressed in Linear Temporal Logic (LTL) [Pnueli, 1977], is an active area of research in artificial intelligence. A long line of existing research investigates training RL agents to execute a single LTL instruction [Sadigh et al., 2014; Br´azdil et al., 2014; Hahn et al., 2019; Hasanbeig et al., 2022; Voloshin et al., 2023]. Traditionally, the inherent memory requirement of LTL specifications is addressed by constructing an automaton (typically a variant of a B¨uchi automaton) corresponding to the LTL specification. However, this couples the resulting policy to that specific LTL formula. Consequently, even minor changes in the objective, e.g. altering the items that a warehouse robot needs to collect, requires retraining the agent. Thus, single-task approaches are ineffective at agent deployment time, where retraining is infeasible, or when task specifications change frequently.</p>
+<p>∗ For full version and appendicies see [Abate et al., 2026]</p>
+<p>As a result, recent years have seen increased interest in the multi-task RL setting [Oh et al., 2017]. Generally speaking, multi-task RL focuses on training a single, generalist policy capable of executing arbitrary tasks that may not be known apriori. Intuitively, such a policy learns a set of reusable behaviours and how to compose them in order to achieve new tasks. This is particularly challenging for LTL tasks, as the agent must additionally manage the required memory.</p>
+<p>Recent approaches to tackle multi-task RL with LTL specifications can be broadly categorised into decomposition-based methods [Le´on et al., 2022; Qiu et al., 2023; Guo et al., 2025], which break down the objective into several subtasks, and holistic approaches that consider the full specification [Vaezipoor et al., 2021; Xu and Fekri, 2024; Jackermeier and Abate, 2025]. While decomposition into subtasks facilitates generalisation by allowing the agent to recombine learned subtask policies, it may lead to suboptimal solutions due to missing context. For instance, given the task "approach shelf, then pick up hammer", a warehouse robot focusing only on the first objective is unaware of which shelf to approach. To avoid these kinds of problems, holistic approaches seek policies that consider the full context of the task. This, however, is significantly more challenging, as the generalisation must be achieved solely through learning, which necessitates an amenable task embedding. In particular, arbitrary tasks must be embedded in a finite-dimensional feature space that preserves the semantic similarity of tasks, while also effectively encoding the necessary memory.</p>
+<p>Our contribution. In this paper, we propose novel task embeddings based on a new generation of LTL-to-automata translations [Esparza and Kˇret´ınsk´y, 2014; Esparza et al., 2020]. Unlike traditional translations, these approaches are semantic: each automaton state is annotated with additional information (so-called semantic labelling) that intuitively describes the semantic meaning of that state. Recent work already exploited semantic labelling successfully in challenging problems from formal methods such as parity game solving [Kˇret´ınsk´y et al., 2019; Kˇret´ınsk´y et al., 2023] and reactive synthesis [Kˇret´ınsk´y et al., 2025]. In this work, we demonstrate that semantic labelling enables an effective embedding of arbitrary LTL tasks, while naturally addressing their memory requirements. In contrast to previous methods, our approach is both (i) applicable to full LTL and (ii) lightweight, as it can be computed efficiently on the fly. Finally, we design a policy around these embeddings and demonstrate that this enables successful generalisation to specifications of previously infeasible complexity.</p>
+<h2>2 Preliminaries</h2>
+<p>Linear temporal logic. Let AP be a finite set of atomic propositions. LTL formulas are generated by φ ::= tt | a | ¬φ | φ ∧ φ | Xφ | φ U φ. where a ∈ AP, and X ("Next"), U ("Until") are temporal operators. Further, we define the common abbreviations , F φ ≡ tt Uφ ("Finally/Eventually") and Gφ ≡ ¬F¬φ ("Globally/Always") [Pnueli, 1977].</p>
+<p>An ω-word w is an infinite sequence of letters w[0] w[1] w[2] . . . with w[i] ∈ Σ = 2AP . We denote the infinite suffix w[i] w[i+1] . . . by wi and present the full satisfaction relation w |= φ in Appendix A.1. The language of φ, is the set of all satisfying words, denoted by [φ]. LTL has several fragments, most prominently Safety and Guarantee. Intuitively, they denote that something bad never happens and that something good happens eventually, respectively. Further, we consider recurrence (a guarantee holds infinitely often) and persistence (a safety formula holds eventually).</p>
+<p>Limit-deterministic B¨uchi automata. We define a limitdeterministic B¨uchi automaton (LDBA) as a tuple B = (Q, Σ, δ, E, q0, F ), where Q is a finite set of states, Σ := 2AP is an alphabet, δ : Q × Σ → Q is a transition function, E : Q → 2Q are (non-deterministic) epsilon transitions, q0 ∈ Q the initial state, and F ⊆ Q is a set of accepting states, satisfying the following. There exists a partitioning Q = QI ⊎ QA such that (i) the transition function never changes the component, (ii) epsilon transitions only exist from QI to QA, (iii) every accepting state is in QA, and (iv) the initial state is in QI .</p>
+<p>A run on an ω-word ω = σ0σ1 · · · is an infinite sequence of states q0q1 · · · that begins in the initial state and evolves according to the transition function except for at most one index where it may take an ϵ-transition to QA and remain in QA thereafter. Let j be the index of the epsilon transition. Then, formally, for all i ≥ 0 with i ̸= j, qi+1 = δ(qi, σi) and qj ∈ QI, qj+1 ∈ E(qj). A run is accepting if it visits F infinitely often and a word is accepted by the LDBA if there exists at least one accepting run. For any LTL formula φ there exists an LDBA that accepts [φ], e.g. [Sickert et al., 2016].</p>
+<p>Markov decision processes. We define a Markov decision process (MDP) as a tuple M = (S,A, P, µ, r, γ), where S is the state space, A the action space, P : S ×A → ∆(S) the (unknown) transition kernel, µ ∈ ∆(S) the initial state distribution, r : S ×A× S → R the reward function, and γ ∈ [0, 1) the discount factor. Here ∆(X) denotes the set of probability distributions over set X and we write x ∼ µ to denote that x is sampled from a distribution µ. A (memoryless) policy is a map π : S → ∆(A), from state s to a distribution over actions. Rolling out π in M yields a trajectory τ = (s0, a0, r0, s1, a1, r1, . . .) with s0 ∼ µ, at ∼ π(· | st), st+1 ∼ P(st, at), and rt = r(st, at, st+1). A policy conditioned on task φ is denoted as π | φ or π(· | st, φ) when applied to a concrete state st. We interpret MDPs via a labelling map L : S → 2AP . Given a trajectory τ , L induces an ω-word w = L(s0)L(s1) · · · ∈ (2AP )ω , on which we evaluate LTL .</p>
+<p>Reinforcement learning. Following [Sutton and Barto, 2018], the objective of reinforcement learning (RL) is to find a policy π⋆ that maximises the expected discounted return J(π) = Eτ∼π[∑∞t=0 γ t rt]. We write τ ∼ π to emphasise that the trajectory distribution depends on π. The state-value function of a policy π is V π (s) = Eτ∼π[∑∞t=0 γ t rt | s0 = s] and corresponds to the expected discounted return starting from state s and following policy π. In addition, we also consider a specification-driven objective, namely maximizing the probability of satisfying an LTL task φ. For a policy π, we define this satisfaction probability as Pr(π |= φ) = Eτ∼π [1[τ |= φ]], where 1[τ |= φ] is 1 if the trace induced by τ satisfies φ, and 0 otherwise.</p>
+<h2>3 ProblemDefinition</h2>
+<p>We study multi-task RL with LTL specifications, following [Vaezipoor et al., 2021; Jackermeier and Abate, 2025]. In contrast to single-task RL, we consider task-conditioned policies π | φ that receive a current task φ as input. Such policies can adapt to a new task φ without requiring any retraining. In particular, the MDP is inacessible and solely φ itself may be subject to any computation before and during the execution. Formally, the goal is to learn a single universal policy that maximises the overall satisfaction probability over some distribution D over LTL tasks:</p>
+<div class="formula-not-decoded">Formula not decoded</div>
+<p>The following two key challenges arise in this setting.</p>
+<p>Memory requirements of LTL tasks. Notice that LTL tasks are inherently non-Markovian: the agent needs to be aware of already observed labels to decide its next action, as exemplified by our running example Fr ∧FGy. In the same MDP state, the agent has to perform different actions depending on whether it has already seen r; if it has, it can focus on continuously achieving y; otherwise, it needs to satisfy the finite goal Fr first. While it is in principle possible to learn a non-Markovian policy π(· | s0, . . . , st, φ) conditioned on the entire trajectory history, this introduces significant complexity in practice. Hence most RL approaches with LTL tasks aim to recover a Markovian view by augmenting the MDP state with memory (typically the states of an automaton for φ) that keeps track of the current task's "progress" (intuitively, tracking the already achieved subgoals of φ).</p>
+<p>Universal progress interface. In single-task RL, tracking progress of subgoals and conditioning a policy on it is straightforward. The common approach is to construct an automaton for the given LTL task, as by design, the automaton states form sufficient memory for deciding what to do next in the given task. We then retrieve a Markovian setting by training a separate sub policy for each state. At test time, the conditioning on task progress is achieved by tracking the current automaton state and employing the respective sub-policy.</p>
+<p>However, in multi-task RL, conditioning via statedependent sub-policies is no longer feasible, since the automaton is not fixed a priori, but changes with every new task. Instead, a universal policy capable of being conditioned on any possible task needs to be capable of processing any possible automaton. This necessitates a universal progress interface (UPI) which is a finite-dimensional embedding of arbitrary tasks, that the policy can be conditioned on. A UPI should (i) reduce any tasks to a common, learnable representation (ii) update that representation depending on achieved progress, and (iii) be computationally cheap, as at test time, it needs to be computed online during interaction with the environment. To achieve the task-conditioned behaviour of the policy, the UPI needs to be semantically meaningful: if two different tasks require similar behaviour, they should have similar embeddings. For instance, Fr∧FGy and Fr should have similar embeddings as both require an r to proceed.</p>
+<h2>4 Existing Approaches</h2>
+<p>We proceed to discuss two current approaches to constructing a UPI which we build upon.</p>
+<h2>4.1 Formula Progression Approach</h2>
+<p>In LTL2ACTION [Vaezipoor et al., 2021], the LTL formula itself is embedded as the universal progress interface. Crucially, task progress can be updated by so-called formula progression [Bacchus and Kabanza, 1996]. Intuitively, for a formula φt and a letter σ the progressed formula prog(σ, φt) captures what remains to be satisfied after seeing σ. For example, if φt = F(r∧FGy) and σ = {r}, then prog(σ, φt) = FGy (see Appendix A.2 for a full definition).</p>
+<p>LTL2ACTION then embeds the current (progressed) formula via a graph neural network (GNN) [Scarselli et al., 2009] g that operates on LTL syntax trees. The GNN is trained end-to-end with the task-conditioned policy π(· | st, g(φt)) via RL by issuing a reward of 1 exactly when φt progressed to tt , which denotes satisfaction of the task.</p>
+<p>A benefit of this approach is that formula progression can be computed efficiently and on the fly, i.e. each step is only computed when it is actually required. However, its reliance on eventually progressing to tt to give rewards limits this approach to the co-safety (guarantee) fragment of LTL. Giving rewards for general LTL tasks requires tracking additional information which plain formula progression does not provide.</p>
+<h2>4.2 Automata-Theoretic Approach</h2>
+<p>The common approach to support full LTL is to convert the current task to an automaton and keep track of the current automaton state as a UPI. This is the approach taken by DEEPLTL [Jackermeier and Abate, 2025], which employs LDBAs as suitable automata. Formally, the task-conditioned policy π | φ then operates over the product MDP Mφ, whose state space consists of the MDP state space S augmented with the LDBA state space Q. Non-deterministic ε-transitions are handled by introducing special ε-actions εq′ that update the current LDBA state q to q′ ∈ E(q) without modifying the MDP state. Assigning positive rewards of 1 to visiting accepting states F in the LDBA then enables learning a taskconditioned policy. Formally, the policy is optimised via the following objective, where 1F is the indicator function of F:</p>
+<div class="formula-not-decoded">Formula not decoded</div>
+<p>The key question in the automata-theoretic approach is how to obtain meaningful features of LDBA states from arbitrary formulae that are not known apriori. DEEPLTL proposes so-called reach-avoid sequences as a common representation of automaton states. Intuitively, these are sequences of letters to reach and avoid that would result in visiting accepting states infinitely often. They hence form a complete plan on how to produce a satisfying trace from the current state. To chose between the many sequences that could represent a state, DEEPLTL learns a critic network that judges the feasibility of any sequence in the given MDP. Formally, DEEPLTL learns a policy π(· | st, e(ς)) conditioned on a reach-avoid sequence ς embedded via an embedding network e. At test time, the agent tracks the current state of the LDBA and continually searches for the optimal (according to the critic) reach-avoid sequence ς ⋆ for representing the current state qt, and executes actions given by π(· | st, e(ς ⋆ )).</p>
+<p>While this approach works for full LTL, the search for reach-avoid sequences is prohibitively expensive as (i) the entire LDBA, needs to be constructed upfront and (ii) all of its accepting paths need to be exhaustively enumerated to find the optimal reach-avoid sequence (see Appendix B for an exact derivation of the complexity). This limits DEEPLTL to relatively simple tasks, where computing and enumerating sequences of the entire automaton is feasible.</p>
+<p>Rationale for LDBAs. The choice of LDBA as automata is important as they combine several useful properties. First, their B¨uchi acceptance can be converted naturally to a reward signal s.t. maximizing rewards coincides with optimising satisfaction probability [Hahn et al., 2019]. Crucially, this is not possible for other acceptance conditions like Rabin, and impractical for parity [Hahn et al., 2022]. Note however, that this requires slightly more sophisticated objectives than the one we presented in Equation 2, in order to address the bias introduced by the discount factor γ [Hahn et al., 2019; Bozkurt et al., 2020; Voloshin et al., 2023]. Further, while some non-determinism is unavoidable when aiming for a B¨uchi automaton that captures full LTL, the non-determinism of LDBAs is very manageable. Specifically, their nondeterminism is good-for-MDP, meaning that it can be resolved by the agent (i.e. the epsilon transitions turn into new actions) without sacrificing any optimality of the policy. 1</p>
+<h2>4.3 Other RelatedWork</h2>
+<p>Several other works recently addressed the problem of multitask RL with LTL specifications. Many of these approaches decompose the LTL specification into sub-tasks, which are then completed one-by-one [Le´on et al., 2022; Qiu et al., 2023; Liu et al., 2024; Guo et al., 2025]. However, this generally still requires constructing the entire automaton upfront and furthermore, can lead to myopic solutions due to missing context. In contrast, we specifically design our approach to not suffer from such suboptimality. Xu and Fekri [2024] propose a non-myopic approach based on the option framework [Sutton et al., 1999], but this is limited to a small fragment of LTL. Recently, Giuri et al. [2025] investigated GNNs to improve the representation learning capabilities of DEEPLTL, but their approach suffers from the same fundamental drawbacks as DEEPLTL.</p>
+<p>1 Technically, not every LDBA is good-for-MDPs, but the ones produced by [Sickert et al., 2016; Esparza et al., 2020] are.</p>
+<figure><figcaption><div class="caption">Figure 1: Schematic overview of our approach for the ZoneEnv environment (a robot navigating a 2D plane with zones of different colours) and the LTL task φ = F red ∧FGyellow. We first convert the task to an LDBA with semantic labelling (see Section 5.1). Note that initially only q0 is constructed. Then the semantic labelling of the current state q0 is embedded and passed to the policy (see Section 5.2). Together with the current state of the MDP st, the policy yields action a in the MDP. The robot&#x27;s trajectory in the MDP (green line) enters a zone with MDP label red which is used to update the automaton. Only then, the corresponding successor q1 is constructed in the automaton.</div></figcaption><img src="/proceedings/2026/fulltext/1/image_000000_9698252e75eff5fc0c2d41a2dfec779287b80d3d6e005b839763baa36fadbd30.png"></figure>
+<h2>5 Semantically Labelled Automata Approach</h2>
+<p>We start by giving an overview of our approach. We follow the automata-theoretic approach in the sense that we construct an LDBA for the current task, update its state to track progress and condition our policy on the current state. The crux is to compute a meaningful embedding of any possible automaton state for any possible LTL formula (and ideally just by looking at that state alone, without considering the entire automaton). Since there are infinitely many automaton states and we can only observe finitely many in training, the key question is how to embed the states into a structured feature space amenable to learning, i.e. where semantically similar states are close to each other. Traditionally, states of (limit-)deterministic automata for LTL formulae bear no logical structure and are simply identified with a numeric index produced by the translation algorithm, so this may seem ambitious. However, we employ more modern, semantic translations to construct the LDBA, which are the product of a long line of research on constructing small automata [Kˇret´ınsk´y and Esparza, 2012; Esparza and Kˇret´ınsk´y, 2014; Esparza et al., 2020]. The key property of these translations is that each state is identified with a simple structure (e.g. a pair or a vector) of LTL formulae. This so-called semantic labelling fully describes the semantics of a state (that is, which subgoals remain to be achieved from here on) and thus, embedding this information can inform the policy about progress of the task and remaining obligations. Crucially, the semantic labelling of a state is available without having to compute the entire automaton. Instead, required parts of the automaton can be computed on-demand, depending on the observed MDP labels. See Figure 1 for an illustration of this approach.</p>
+<h2>5.1 Semantic Labelling</h2>
+<p>The semantic labelling of our automaton states originates from the translation presented in [Esparza et al., 2020], which is implemented in OWL [Kˇret´ınsk´y et al., 2018]. Their LDBAs require keeping track of only two LTL formulae, which is achieved through upfront normalisation [Sickert and Esparza, 2020]. First, we have the Main formula, which is the entire formula in the initial state and for every subsequent state is derived using formula progression. Intuitively, the main formula can be thought of as the "remaining language" from the current state onwards. However, for a recurrence formula like GFr (i.e. reach r infinitely often), the remaining obligation will never change and thus, just tracking the main formula cannot distinguish between words that satisfy this property and ones that do not. Thus, a second formula, the Breakpoint formula is required to track the inner formula of recurring obligations (Fr in this case). Whenever this formula progresses to tt, it resets and emits a B¨uchi acceptance signal. That way, seeing a B¨uchi signal infinitely often corresponds directly to satisfying the inner formula infinitely often.</p>
+<p>As an example, consider the automaton of Figure 1. The main formula of q0 is the entire task and once we observe r, the automaton updates to state q1 in which the main formula has progressed to FGy. The ε-transition guesses when the safety formula Gy starts to hold and q2 verifies that guess through formula progression. This example has no breakpoint formulae due to the lack of recurrence formulae; see Appendix C for an example with a breakpoint formula.</p>
+<h2>5.2 Embedding the Semantic Labelling</h2>
+<p>Embedding the semantic labelling requires capturing the relevant information of two LTL formulae, which we tackle individually and concatenate the result. Recall that the embedding space needs to create numerical proximity of semantically similar states (or rather similar formulae) to enable generalisation. Intuitively, the similarity of two formulae is proportional to how much their languages overlap. Hence, our features intuitively approximate a formula's language by probing the effects of letters when seen at the current- or subsequent steps. Additionally, we employ simple complexity measures of formulae (e.g. the height of the syntax tree as suggested in [Kˇret´ınsk´y et al., 2023]) to allow the agent to choose less complex states when resolving ε-transitions.</p>
+<p>Exploiting trueness. This feature approximates the immediate effect of observing a letter by measuring how much each letter progresses the formula towards or away from satisfaction. We thus need a measure of proximity to satisfaction. Intuitively, it is clear that FGy is closer to satisfaction than Fr ∧FGy, since the former already achieved a subgoal. To capture this, we resort to trueness which was first introduced in [Kˇret´ınsk´y et al., 2019]. Intuitively, trueness measures how easy it is to satisfy an LTL formula, by propositional approximation of the temporal behaviour. Formally, to compute the trueness tr(φ) of a formula φ we replace all temporal subformulae ψ by new propositional variables xψ and compute the ratio of satisfying assignments to total assignments in the resulting propositional formula. For example for Fr∧FGy, we replace all temporal subformulae, and get xFr ∧ xFGy. In the resulting conjunction, 1 out of 4 assignments satisfy the formula and thus tr(Fr ∧ FGy) = 0.25. Further, we have tr(FGy) = 0.5, which indicates that the latter formula is easier to satisfy and progressing to the latter is desirable.</p>
+<p>We use trueness to compute a feature value for every MDP label of L. As we are interested in the impact of a letter, we compare the change in trueness before and after seeing that letter, i.e. after progressing the formula using that letter. Formally, for a formula φ and a letter σ the trueness feature ftr is defined as:</p>
+<div class="formula-not-decoded">Formula not decoded</div>
+<p>In the embedding vector of Figure 1, the first two red numbers correspond to the feature values ftr(φ, {r}) and ftr(φ, {y}), where φ = Fr ∧ FGy. By looking at these two numbers, the agent can infer that an {r} would make progress while seeing {y} currently has no effect. Symmetrically to progress, this feature also captures violations. E.g. in q2 where the main formula is Gy we have the feature value ftr(Gy, {}) = -0.5, indicating that not seeing a y (terminally) hurts the progress towards satisfying Gy. We further refine this feature be employing different normalisations (e.g. among all letters, or among all positive/negative values) that result in slightly different semantic meanings. For a full list and explanation of these, we refer to Appendix D. Ultimately, despite being unable to capture deep temporal relations (e.g. F r ∧G¬r having trueness 0.25 despite being unsatisfiable), trueness yields a great propositional approximation of taskprogress, especially for formulae appearing in practice.</p>
+<p>Propositional attention. Trueness alone yields a myopic embedding, meaning that it only considers the immediate effect of seeing a letter while disregarding what happens afterwards. For example, the trueness feature values of Fr∧FGy alone, do not yield any indication that after seeing {r}, {y} will be important, which can result in suboptimal behaviour in certain environments. To combat this, we propose an attention-like feature, where we relate pairs of propositions by how reliant one is on the other for satisfying the formula.</p>
+<p>Formally, for a formula φ and a pair of propositions (p, q), we first compute the formula after seeing {p} denoted as φ′ . Then, we compute the obligation sets [Li et al., 2013] of φ′ , denoted by ob(φ′ ). A single obligation set is a letter σ ∈ 2AP</p>
+<p>that if seen infinitely often, satisfies the formula, i.e. σω |= φ′ . We provide the full definition of obligation sets in Appendix A.3, but intuitively, the obligation sets approximate the infinite behaviours of φ′ on a propositional level. To compute the feature value, we then count how often q appears in the obligation set (treating q and ¬q separately) and divide by the total number of obligation sets. Putting it all together, the positive propositional attention feature f + att for a formula φ and a pair of propositions (p, q) is given by</p>
+<div class="formula-not-decoded">Formula not decoded</div>
+<p>where φ′ = prog(φ, {p}) (and when |ob(φ′ )| = 0, the feature defaults to 0). Symmetrically, the negative propositional attention feature f - att counts the appearances of ¬q.</p>
+<p>In the embedding vector from Figure 1, the two teal numbers correspond to the feature values f + att (φ, r, r) and f + att (φ, r, y), where φ = Fr ∧ FGy. The first value being 0.0 indicates that after seeing {r} once, it is completely irrelevant. Further, the second value being 1.0 indicates that after seeing {r}, seeing letters containing y is highly promising. Crucially, this information is already present in the embedding of q0, allowing the agent to consider its future obligation of FGy while still primarily focussing on achieving F r.</p>
+<h2>5.3 Policy Architecture</h2>
+<p>Our approach is realised in a deep RL setting. We next describe our policy architecture. Our policies take the current MDP state s and the semantic embedding of the current LDBA state q as input, and produce an action distribution over the MDP action space A and possible ε-actions. Recall that ε-actions εq′ (where q′ ∈ E(q)) correspond to following an ε-transition to q′ while remaining in the same MDP state.</p>
+<p>To handle this complex hybrid action space (note in particular that Amay be continuous, and |E| is not known apriori), we propose a multi-headed neural network architecture for the policy. Given the current MDP state s and LDBA state q, we first compute latent representations of all LDBA states u in the ε-closure E(q) ∪ {q} as follows: first, the MDP state s is encoded via a state encoder, which is either a multilayer perceptron (MLP) or a convolutional neural network (CNN), depending on the domain. Then, the semantic embedding of each LDBA state u ∈ E(q) ∪ {q} is processed via a learnable linear projection layer. These feature vectors are concatenated and passed through a shared representation MLP for each LDBA state, producing latent embeddings zu ∈ Rd .</p>
+<p>The latent embeddings are then fed into a linear scoring head λ: Rd → R that assigns logits to ε-actions, and the embedding of the current LDBA state q is additionally processed by an environment actor head πenv that outputs the parameters of a distribution over the MDP action space A (e.g. the mean and standard deviation of aGaussian distribution). Intuitively, the scores λ(zu) model the probability of taking the ε-action that transitions to u, and λ(zq) corresponds to the probability of executing an MDP action rather than an ε-action. Formally, the policy induces the hybrid action distribution</p>
+<div class="formula-not-decoded">Formula not decoded</div>
+<p>where εu is the ε-action that transitions to u and</p>
+<div class="formula-not-decoded">Formula not decoded</div>
+<p>denotes the softmax-normalised score function. Note that if no ε-actions are available (i.e. E(q) = ∅), then the action distribution reduces to simply πenv(a | zq).</p>
+<p>Training procedure. We train the policy end-to-end via goal-conditioned RL [Liu et al., 2022]: at the beginning of each episode, we sample a random LTL specification φ ∼ D and assign a reward of 1 to visits to accepting states. To make training converge faster in practice, we follow the approach of Jackermeier and Abate (2025) and design a training curriculum consisting of different stages of increasingly challenging formulae. For example, we generally first train the agent with simple formulae of the form Fa before sampling more complex tasks. Once the agent performs sufficiently well on tasks sampled from the current stage, we move on to the next stage. Our approach is independent of the underlying RL algorithm. Throughout our experiments, we use proximal policy optimisation (PPO) [Schulman et al., 2017]. We provide further details on training, including on curricula, in Appendix E.</p>
+<h2>6 Experiments</h2>
+<p>We evaluate our approach, named SEMLTL, across a variety of domains and specifications. 2 We aim to answer the following research questions: (RQ1) Are our embeddings expressive enough to overcome the myopia of decompositionbased methods? (RQ2) Can SEMLTL successfully learn generalist policies for zero-shot executing arbitrary LTL instructions? (RQ3) Does our approach successfully scale to complex specifications, where previous methods fail?</p>
+<p>RQ1. Consider the grid-world environment depicted in Figure 2 (left), inspired by [Vaezipoor et al., 2021]. The agent, located on the left, receives one of the following two goals: F(parcel ∧ F hammer) or F(parcel ∧ Fwrench), requiring it to enter the correct room via the one-way conveyor belts. For decomposition based approaches, the first subtask is Fparcel in both cases. The agent thus has to choose a room (in order to pick up a parcel) without knowing the entire specification. Since both specifications are equally likely, but the agent has no way of differentiating between them, it can achieve a maximum success rate of 50%. In contrast, we observe that SEMLTL does not suffer from such myopia and quickly converges to the optimal policy (Figure 2, right).</p>
+<h2>RQ2 and RQ3</h2>
+<p>We now proceed to conduct a large-scale experimental study to investigate RQ2 and RQ3.</p>
+<p>Environments. We rely on established benchmarks to evaluate SEMLTL: the LetterWorld environment [Vaezipoor et al., 2021], which consists of a 7 × 7 grid with randomly placed letters corresponding to atomic propositions, and ZoneEnv [Vaezipoor et al., 2021], a high-dimensional robotic navigation environment with a continuous action space, where randomly placed zones of different colours form the atomic propositions. We consider a more difficult variant of ZoneEnv with 8 colours (instead of 4) and a more complex observation space based on an RGB lidar sensor. For further details, see Appendix F.1.</p>
+<p><a href="https://github.com/mathiasj33/semltl">2 Code available at: github.com/mathiasj33/semltl</a></p>
+<figure><figcaption><div class="caption">Figure 2: Conveyor environment example. The task is either F(parcel ∧ Fhammer) or F(parcel ∧ Fwrench). Once the agent is on a conveyor belt, it cannot go back. Without our propositional attention feature we can only achieve 50% (like other decomposition based approaches), whereas our full approach finds the optimal solution.</div></figcaption><img src="/proceedings/2026/fulltext/1/image_000001_86173ec238ca5c19384d4164cb743555c35ff5d459daf9da1dd56bb0355623ec.png"></figure>
+<p>Baselines. We compare our approach to LTL2ACTION, the only other approach that does not have to compute the entire automaton upfront, and DEEPLTL, the state-of-the-art, automata-conditioned approach that does not suffer frommyopia and is applicable to full LTL. See Appendix F for implementation details and hyperparameters of SEMLTL and the baselines, including training curricula.</p>
+<p>Tasks. We consider a wide range of tasks for our evaluation. First, we compare to a set of established LTL tasks from the literature [Jackermeier and Abate, 2025], which we aggregate and refer to as SMALL in our results. Since these tasks are of limited complexity, we furthermore introduce several parameterised families of both finite- and infinitehorizon tasks that enable us to systematically assess the scalability of our approach. The LOCAL-SAFETY[k,m] family ("avoidance" in [Vaezipoor et al., 2021]), consists of m disjunctions of reach-avoid specifications φ[k] where φ[k] ≡ ¬a1 U (r1 ∧ (¬a2 U (r2 ∧ · · · ∧ (¬ak U rk)))). Further, we define the variant GLOBAL-SAFETY[k,m], which fixes a single global proposition a to avoid throughout the entire task. We also introduce the FINITE-REACTIVE[k,m] family, where a simple finite-goal needs to be reached. However, whenever a trigger variable t is observed, the agent needs to react by achieving specified response variables. The overall task consists of k such reaction rules, where each permits m response variables. An example is ((t → F(r1 ∨ r2)) U g.</p>
+<p>For infinite-horizon tasks, we first consider the COMPLEXPATROL[k,m] family. This consists of a disjunction of sequential reach tasks ψ[k] ≡ F(r1 ∧ F(. . . ∧ Frk)) that need to be satisfied recurrently while avoiding a global safety constraint. We also investigate the REACH-STAY[k] family of the form ψ[k] ∧ FGa, where a is an eventual safety target. Note that we do not consider this task family in LetterWorld, since the agent has to move at every timestep, and hence cannot stay continuously at the same proposition. These two families cover complex tasks of the persistence and recurrence fragment, respectively. We furthermore introduce the ALWAYSREACTIVE[k,m] family, where tasks require maintaining reactive responses over an infinite horizon. Concretely, a trigger t0 must be seen infinitely often (GF t0), while responding to a set of k global reaction rules with m response variables each (e.g. G(t0 → F(r1 ∨ t1)), where in particular t1 could be another trigger). We choose suitable parameters to cover a broad spectrum of automaton sizes, and randomly sample 5 tasks per family for our experiments.</p>
+<table><caption><div class="caption">Table 1: Evaluation results of SEMLTL and the baselines. For each task family, |Q| denotes the average number of LDBA states, and |δ| the average number of transitions. We report success rate (SR) for finite tasks and number of visits to accepting states (µacc) for infinite tasks, as well as number of constructed LDBA states (µstates) for SEMLTL. &quot;TO&quot; denotes failure to produce a single action within a time limit of 600s. Results are averaged over 5 seeds and 500 episodes per seed. SEMLTL demonstrates strong performance and robust scalability across tasks.</div></caption><tbody><tr><td></td><td></td><th>Task Specification Type</th><th>|δ|</th><td></td><th>LTL2ACTION DEEPLTL</th><th colspan="2">SEMLTL (Ours)</th></tr><tr><td></td><td></td><th>|Q|</th><td></td><th>SR / µacc</th><th>SR / µacc</th><th>SR / µacc</th><th>µstates</th></tr><tr><td></td><th>SMALL</th><td></td><td>9</td><td>23</td><td>0.67±0.12</td><td>0.98±0.01</td><td>4.12±0.02</td></tr><tr><td></td><td></td><td>LOCAL-SAFETY[3, 3]</td><td>233</td><td>1, 372</td><td>0.98±0.01 0.57±0.07 TO</td><td>0.99±0.00</td><td>5.38±0.00</td></tr><tr><td></td><th>Letter GLOBAL-SAFETY[4, 6]</th><td>1, 072</td><td>6, 414</td><td>0.12±0.03</td><td>TO</td><td>0.91±0.01</td><td>6.77±0.04</td></tr><tr><td></td><th>Finite-horizon FINITE-REACTIVE[8, 2]</th><td>300</td><td>2, 115</td><td>0.74±0.04</td><td>TO</td><td>1.00±0.00</td><td>2.80±0.10</td></tr><tr><td></td><th>SMALL</th><td>9</td><td>23</td><td>0.52±0.07</td><td>0.93±0.02</td><td>0.92±0.02</td><td>3.40±0.01</td></tr><tr><td></td><th>Zones LOCAL-SAFETY[3, 3]</th><td>83</td><td>379</td><td>0.66±0.11</td><td>0.98±0.01</td><td>0.93±0.06</td><td>5.09±0.14</td></tr><tr><td></td><th>GLOBAL-SAFETY[4, 8]</th><td>1, 162</td><td>6, 510</td><td>0.39±0.05</td><td>TO</td><td>0.79±0.06</td><td>6.73±0.18</td></tr><tr><td></td><th>FINITE-REACTIVE[8, 2]</th><td>107</td><td>619</td><td>0.74±0.11</td><td>TO</td><td>0.98±0.00</td><td>2.96±0.16</td></tr><tr><td></td><th>SMALL</th><td>7</td><td>16</td><td>n/a</td><td>6.15±1.97</td><td>7.13±0.51</td><td>4.76±0.09</td></tr><tr><td></td><th>Letter COMPLEX-PATROL[5, 5]</th><td>49</td><td>227</td><td>n/a</td><td>1.78±0.26</td><td>1.83±0.10</td><td>6.44±0.03</td></tr><tr><td></td><th>ALWAYS-REACTIVE[5, 1]</th><td>38</td><td>204</td><td>n/a</td><td>TO</td><td>3.06±0.07</td><td>7.06±0.02</td></tr><tr><td></td><th>Infinite-horizon SMALL</th><td>4</td><td>10</td><td>n/a</td><td>14.50±6.71</td><td>18.65±6.02</td><td>3.59±0.04</td></tr><tr><th rowspan="3">Zones</th><th>REACH-STAY[5]</th><td>34</td><td>116</td><td>n/a</td><td>914±862</td><td>2, 503±497</td><td>7.29±0.15</td></tr><tr><th>COMPLEX-PATROL[5, 5]</th><td>45</td><td>201</td><td>n/a</td><td>2.13±1.45</td><td>2.44±0.44</td><td>6.33±0.10</td></tr><tr><th>ALWAYS-REACTIVE[5, 1]</th><td>38</td><td>204</td><td>n/a</td><td>TO</td><td>3.73±0.80</td><td>7.00±0.00</td></tr></tbody></table>
+<p>Results. Table 1 lists evaluation results of SEMLTL and the baselines on both evaluation environments. As is standard, we report success rates (SR) for finite-horizon tasks and average visits to accepting states (µacc) for infinite-horizon tasks. Intuitively, µacc captures how often the policy successfully completes an accepting cycle in the LDBA. We also report the number of LDBA states constructed by SEMLTL (µstates).</p>
+<p>We observe that SEMLTL in both environments successfully learns a policy that is able to generalise to diverse LTL specifications, achieving strong results throughout (RQ2). SEMLTL consistently performs much better than LTL2ACTION, which demonstrates the structure and learnability of our semantic embeddings. For finite tasks, the semantic labelling of LDBAs only consists of the main formula. Both approaches thus only track one formula (using formula progression) and differ solely in the way they embed that formula. We clearly observe that SEMLTL is able to leverage the same information much more effectively, and over a diverse set of typical RL specifications. DEEPLTL also achieves strong results on tasks where constructing the entire automaton and enumerating reach-avoid sequences is feasible. This is expected, since it exhaustively analyses the entire automaton to form a complete and optimal plan to inform its policy. However, for more complex specifications DEEPLTL fails to compute even a single action within the 600s time limit (denoted by TO), due to the prohibitively expensive sequence enumeration. In contrast, we observe that SEMLTL successfully scales to highly complex formulae and achieves strong performance even on large task instances with hundreds of automaton states (RQ3). Notably, SEMLTL often only considers a small fraction of the overall LDBA (see µstates compared to |Q|). This highlights the suitability of many common RL tasks for on-the-fly automata construction, and demonstrates that the theoretical benefits of SEMLTL lead to significant advantages in practice. We provide full experimental results, including on more parameters for the different task families, per-specification results on SMALL tasks, and visualisations of SEMLTL trajectories in Appendix F.</p>
+<h2>7 Conclusion</h2>
+<p>We presented SEMLTL, a novel approach to train generalist policies for satisfying arbitrary LTL specifications. Our method is based on recent semantic LTL-to-automata translations that annotate each automaton state with rich, semantic information. Not only does this naturally enable support for full LTL, but it also allows automata states to be computed efficiently on the fly, without constructing the entire automaton upfront. We introduced a structured way to embed the semantic state information, and designed a suitable policy architecture based on these embeddings. Experimental results on a wide variety of specifications demonstrate that our approach successfully learns policies that can zero-shot generalise to novel LTL tasks, while being significantly more scalable and constructing only a fraction of the automaton.</p>
+<p>Future work will extend our approach to real-life robotics settings with unknown labelling functions and enhance scalability via the recently proposed LTLf+/PPLTL+ temporal logics [Aminof et al., 2025; De Giacomo et al., 2025] and exploit good-for-MDP reduction pipelines [Weinhuber et al., 2026].</p>
+<h2>Acknowledgements</h2>
+<p>This work was supported in parts by the UKRI Erlangen AI Hub on Mathematical and Computational Foundations of AI (No. EP/Y028872/1). This work is part of the IntelligenceOriented Verification&amp;Controller Synthesis (InOVationCS) project funded by the European Union under Grant Agreement No. 101171844. MJ is funded by the EPSRC Centre for Doctoral Training in Autonomous Intelligent Machines and Systems (EP/S024050/1).</p></div>
+            </section>
+
+
+        <section role="tabpanel" id="cite" aria-labelledby="tab-cite" hidden>
+            <div class="cite" data-cite>
+                <div class="cite__formats" role="radiogroup" aria-label="Citation format">
+                                            <button type="button" data-format="acm" aria-pressed="true">ACM</button>
+                                            <button type="button" data-format="apa" aria-pressed="false">APA</button>
+                                            <button type="button" data-format="bibtex" aria-pressed="false">BibTeX</button>
+                                            <button type="button" data-format="ris" aria-pressed="false">RIS</button>
+                                    </div>
+                                    <div class="cite__text" data-format-text="acm" >Alessandro Abate, Giuseppe De Giacomo, Mathias Jackermeier, Jan Křetínský, Maximilian Prokop, and Christoph Weinhuber. 2026. Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions. In <i>Proceedings of the Thirty-Fifth International Joint Conference on Artificial Intelligence, IJCAI-26</i>. IJCAI, 3–11. https://doi.org/10.24963/ijcai.2026/1</div>
+                                    <div class="cite__text" data-format-text="apa" hidden>Abate, A., De Giacomo, G., Jackermeier, M., Křetínský, J., Prokop, M., &amp; Weinhuber, C. (2026). Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions. In <i>Proceedings of the Thirty-Fifth International Joint Conference on Artificial Intelligence, IJCAI-26</i> (pp. 3–11). IJCAI. https://doi.org/10.24963/ijcai.2026/1</div>
+                                                    <pre class="cite__text" data-format-text="bibtex" hidden>@inproceedings{ijcai2026p1,
+  title     = {Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions},
+  author    = {Abate, Alessandro and De Giacomo, Giuseppe and Jackermeier, Mathias and Křetínský, Jan and Prokop, Maximilian and Weinhuber, Christoph},
+  booktitle = {Proceedings of the Thirty-Fifth International Joint Conference on
+               Artificial Intelligence, {IJCAI-26}},
+  publisher = {International Joint Conferences on Artificial Intelligence Organization},
+  editor    = {Diego Calvanese},
+  pages     = {3--11},
+  year      = {2026},
+  month     = {8},
+  note      = {Main Track},
+  doi       = {10.24963/ijcai.2026/1},
+  url       = {https://doi.org/10.24963/ijcai.2026/1},
+}
+</pre>
+                                    <pre class="cite__text" data-format-text="ris" hidden>TY  - CPAPER
+TI  - Semantically Labelled Automata for Multi-Task Reinforcement Learning with LTL Instructions
+AU  - Abate, Alessandro
+AU  - De Giacomo, Giuseppe
+AU  - Jackermeier, Mathias
+AU  - Křetínský, Jan
+AU  - Prokop, Maximilian
+AU  - Weinhuber, Christoph
+T2  - Proceedings of the Thirty-Fifth International Joint Conference on Artificial Intelligence, IJCAI-26
+PB  - International Joint Conferences on Artificial Intelligence Organization
+PY  - 2026
+SP  - 3
+EP  - 11
+DO  - 10.24963/ijcai.2026/1
+UR  - https://doi.org/10.24963/ijcai.2026/1
+ER  -
+</pre>
+                                <button type="button" class="button" data-copy>Copy</button>
+                <span class="cite__copied" role="status" hidden>Copied</span>
+            </div>
+        </section>
+
+        <section role="tabpanel" id="data" aria-labelledby="tab-data" hidden>
+            <p>Machine-readable versions of this paper, for tools and AI agents:</p>
+            <ul>
+                <li><a href="/proceedings/2026/1.md">Markdown</a> — metadata, abstract, full text and references</li>
+                <li><a href="/proceedings/2026/1.json">JSON</a> — metadata and structured references</li>
+                <li><a href="/proceedings/2026/bibtex/1">BibTeX</a></li>
+            </ul>
+        </section>
+    </div>
+
+    <nav class="article-nav" aria-label="Previous and next paper">
+                            <a class="article-nav__next" href="/proceedings/2026/2" title="Approximate Heuristic Search for Semi-Decentralized Systems"><span class="screen-reader-text">Next paper</span> ▶</a>
+            </nav>
+</div>
+        </div>
+    </article>
+</main>
+
+<section class="image-grid">
+            <a class="image-grid__tile" href="https://ijcai.org/">
+            <span class="image-grid__img">
+                <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/grid/welcome.jpg" alt="" loading="lazy">
+            </span>
+            <span class="image-grid__caption">Welcome</span>
+        </a>
+            <a class="image-grid__tile" href="https://ijcai.org/future_conferences/">
+            <span class="image-grid__img">
+                <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/grid/future-conferences.jpg" alt="" loading="lazy">
+            </span>
+            <span class="image-grid__caption">Future Conferences</span>
+        </a>
+            <a class="image-grid__tile" href="https://ijcai.org/aijd/">
+            <span class="image-grid__img">
+                <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/grid/ai-journal.png" alt="" loading="lazy">
+            </span>
+            <span class="image-grid__caption">AI Journal Division</span>
+        </a>
+            <a class="image-grid__tile" href="https://ijcai.org/all_proceedings/">
+            <span class="image-grid__img">
+                <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/grid/proceedings.jpg" alt="" loading="lazy">
+            </span>
+            <span class="image-grid__caption">IJCAI Proceedings</span>
+        </a>
+            <a class="image-grid__tile" href="https://ijcai.org/aboutijcai/">
+            <span class="image-grid__img">
+                <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/grid/about.jpg" alt="" loading="lazy">
+            </span>
+            <span class="image-grid__caption">About IJCAI</span>
+        </a>
+            <a class="image-grid__tile" href="https://ijcai.org/awards/">
+            <span class="image-grid__img">
+                <img src="https://ijcai.org/wp-content/themes/ijcai/assets/img/grid/awards.jpg" alt="" loading="lazy">
+            </span>
+            <span class="image-grid__caption">IJCAI Awards</span>
+        </a>
+    </section>
+
+<footer class="site-footer">
+    <div class="site-footer__bottom">
+        <div class="container">
+            <div class="footer-columns">
+                                    <div class="footer-column">
+                        <ul id="menu-footer-1" class="footer-menu"><li id="menu-item-250" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-250"><a href="https://ijcai.org/future_conferences/">Conferences</a>
+<ul class="sub-menu">
+	<li id="menu-item-251" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-251"><a href="https://ijcai.org/future_conferences/">Future Conferences</a></li>
+	<li id="menu-item-252" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-252"><a href="https://ijcai.org/past_conferences/">Past Conferences</a></li>
+</ul>
+</li>
+<li id="menu-item-253" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-253"><a href="https://ijcai.org/all_proceedings/">Proceedings</a>
+<ul class="sub-menu">
+	<li id="menu-item-254" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-254"><a href="/proceedings/2026/">IJCAI 2026 Proceedings</a></li>
+	<li id="menu-item-255" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-255"><a href="https://ijcai.org/all_proceedings/">All Proceedings</a></li>
+</ul>
+</li>
+<li id="menu-item-256" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-256"><a href="https://ijcai.org/awards/">Awards</a></li>
+</ul>                    </div>
+                                    <div class="footer-column">
+                        <ul id="menu-footer-2" class="footer-menu"><li id="menu-item-257" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-257"><a href="https://ijcai.org/trustees/current_trustees/">Trustees/officers</a>
+<ul class="sub-menu">
+	<li id="menu-item-258" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-258"><a href="https://ijcai.org/trustees/current_trustees/">Current trustees</a></li>
+	<li id="menu-item-259" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-259"><a href="https://ijcai.org/trustees/trustees_elect/">Trustees Elect</a></li>
+	<li id="menu-item-260" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-260"><a href="https://ijcai.org/officers/ijcai_secretariat/">IJCAI Secretariat</a></li>
+	<li id="menu-item-261" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-261"><a href="https://ijcai.org/officers/sponsorship_publicity/">IJCAI Sponsorship and Publicity Officers</a></li>
+	<li id="menu-item-262" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-262"><a href="https://ijcai.org/officers/ijcai_team/">IJCAI Team</a></li>
+	<li id="menu-item-263" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-263"><a href="https://ijcai.org/officers/local_arrangements_chairs/">Local Arrangements Chairs</a></li>
+	<li id="menu-item-264" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-264"><a href="https://ijcai.org/trustees/former_trustees_serving_on_the_executive_committee/">Former Trustees serving on the Executive Committee</a></li>
+	<li id="menu-item-265" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-265"><a href="https://ijcai.org/officers/other_former_officers/">Other Former Officers</a></li>
+</ul>
+</li>
+</ul>                    </div>
+                                    <div class="footer-column">
+                        <ul id="menu-footer-3" class="footer-menu"><li id="menu-item-266" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-266"><a href="https://ijcai.org/aijd/">AI Journal</a></li>
+<li id="menu-item-267" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-267"><a href="https://ijcai.org/aboutijcai/">About</a>
+<ul class="sub-menu">
+	<li id="menu-item-268" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-268"><a href="https://ijcai.org/aboutijcai/">About IJCAI</a></li>
+	<li id="menu-item-313" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-313"><a href="https://ijcai.org/documents/">Documents</a></li>
+	<li id="menu-item-269" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-269"><a href="https://ijcai.org/contact/">Contact Information</a></li>
+</ul>
+</li>
+</ul>                    </div>
+                            </div>
+
+            <a href="#top" class="back-to-top">
+                <span class="back-to-top__triangle"></span>
+                <span>Back to top</span>
+            </a>
+
+            <div class="legal-row">
+                                <a href="https://ijcai.org/publication_ethics/">Publication Ethics</a>
+                                                    <a href="https://ijcai.org/privacy_policy/">Privacy</a>
+                                <span>&copy; 2026 International Joint Conferences on Artificial Intelligence</span>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/ijcai/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<style id="global-styles-inline-css">
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}.wp-block-button{--wp--preset--dimension--25: 25%;--wp--preset--dimension--50: 50%;--wp--preset--dimension--75: 75%;--wp--preset--dimension--100: 100%;}:where(body) { margin: 0; }:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}body{padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}:root :where(.wp-element-button, .wp-block-button__link){background-color: #32373c;border-width: 0;color: #fff;font-family: inherit;font-size: inherit;font-style: inherit;font-weight: inherit;letter-spacing: inherit;line-height: inherit;padding-top: calc(0.667em + 2px);padding-right: calc(1.333em + 2px);padding-bottom: calc(0.667em + 2px);padding-left: calc(1.333em + 2px);text-decoration: none;text-transform: inherit;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */
+</style>
+<script id="ijcai-archive-js" src="https://ijcai.org/wp-content/themes/ijcai/assets/js/archive.js?ver=1.1.0"></script>
+<script id="ijcai-main-js" src="https://ijcai.org/wp-content/themes/ijcai/assets/js/main.js?ver=1.0.2"></script>
+<script id="wp-emoji-settings" type="application/json">
+{"baseUrl":"https://s.w.org/images/core/emoji/17.0.2/72x72/","ext":".png","svgUrl":"https://s.w.org/images/core/emoji/17.0.2/svg/","svgExt":".svg","source":{"concatemoji":"https://ijcai.org/wp-includes/js/wp-emoji-release.min.js?ver=7.1.4"}}
+</script>
+<script type="module">
+/*! This file is auto-generated */
+var e="script#wp-emoji-settings",t=document.querySelector(e);if(!(t instanceof HTMLScriptElement))throw new Error("Element missing: "+e);const r=JSON.parse(t.text),s=(window._wpemojiSettings=r,"wpEmojiSettingsSupports"),o=["flag","emoji"];function i(e){try{var t={supportTests:e,timestamp:(new Date).valueOf()};sessionStorage.setItem(s,JSON.stringify(t))}catch(e){}}function c(e,t,n){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);t=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(n,0,0);const r=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);return t.every((e,t)=>e===r[t])}function p(e,t){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);var n=e.getImageData(16,16,1,1);for(let e=0;e<n.data.length;e++)if(0!==n.data[e])return!1;return!0}function u(e,t,n,r){switch(t){case"flag":return n(e,"\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f","\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f")?!1:!n(e,"\ud83c\udde8\ud83c\uddf6","\ud83c\udde8\u200b\ud83c\uddf6")&&!n(e,"\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f","\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f");case"emoji":return!r(e,"\ud83e\u1fac8")}return!1}function f(e,t,n,r){let a;const s=(a="undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?new OffscreenCanvas(300,150):document.createElement("canvas")).getContext("2d",{willReadFrequently:!0}),o=(s.textBaseline="top",s.font="600 32px Arial",{});return e.forEach(e=>{o[e]=t(s,e,n,r)}),o}function a(e){var t=document.createElement("script");t.src=e,t.defer=!0,document.head.appendChild(t)}r.supports={everything:!0,everythingExceptFlag:!0},new Promise(t=>{let n=function(){try{var e=JSON.parse(sessionStorage.getItem(s));if("object"==typeof e&&"number"==typeof e.timestamp&&(new Date).valueOf()<e.timestamp+604800&&"object"==typeof e.supportTests)return e.supportTests}catch(e){}return null}();if(!n){if("undefined"!=typeof Worker&&"undefined"!=typeof OffscreenCanvas&&"undefined"!=typeof URL&&URL.createObjectURL&&"undefined"!=typeof Blob)try{var e="postMessage("+f.toString()+"("+[JSON.stringify(o),u.toString(),c.toString(),p.toString()].join(",")+"));",r=new Blob([e],{type:"text/javascript"});const a=new Worker(URL.createObjectURL(r),{name:"wpTestEmojiSupports"});return void(a.onmessage=e=>{i(n=e.data),a.terminate(),t(n)})}catch(e){}i(n=f(o,u,c,p))}t(n)}).then(e=>{for(const n in e)r.supports[n]=e[n],r.supports.everything=r.supports.everything&&r.supports[n],"flag"!==n&&(r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&r.supports[n]);var t;r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&!r.supports.flag,r.supports.everything||((t=r.source||{}).concatemoji?a(t.concatemoji):t.wpemoji&&t.twemoji&&(a(t.twemoji),a(t.wpemoji)))});
+//# sourceURL=https://ijcai.org/wp-includes/js/wp-emoji-loader.min.js
+</script>
+</body>
+</html>

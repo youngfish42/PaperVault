@@ -1,0 +1,449 @@
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { ref } from 'vue'
+import { onMounted } from 'vue'
+import { useI18n } from '@/utils/i18n'
+import { useAuth } from '@/composables/useAuth'
+
+/**
+ * Shared top navigation strip. Replaces the per-view inline tab strips
+ * that HomeView (`.pv-hero-tabs`) and AdvancedSearchView (`.pv-adv-tabs`)
+ * used to bring with them. Adding a 4th tab is a one-file change.
+ *
+ * Dark mode is intentionally kept as a prop + emit (not owned here) so
+ * the active state stays in the parent view, where it can also drive
+ * view-local dark-aware widgets without re-reading localStorage.
+ */
+
+const GITHUB_URL = 'https://github.com/youngfish42/PaperVault'
+const brandIconUrl = `${import.meta.env.BASE_URL}papervault-icon.png`
+
+const props = defineProps<{
+  activeKey: 'home' | 'advanced' | 'settings' | 'docs'
+  isDark: boolean
+  /**
+   * Optional current search expression. When present (home view passes its
+   * search box content), the Advanced Search tab carries it over so the
+   * builder opens pre-filled from the typed DSL.
+   */
+  query?: string
+}>()
+
+const emit = defineEmits<{
+  'toggle-dark': []
+}>()
+
+const router = useRouter()
+const { t, toggle: toggleLang } = useI18n()
+const loginVisible = ref(false)
+// Shared auth state (see composables/useAuth.ts): cached module-wide so the
+// Advanced Search page observes the same login status without re-fetching.
+const { isLoggedIn, displayName, ensureFetched, logout } = useAuth()
+onMounted(ensureFetched)
+
+const goHome = (): void => {
+  if (props.activeKey === 'home') return
+  router.push({ path: '/' })
+}
+const goAdvanced = (): void => {
+  if (props.activeKey === 'advanced') return
+  const q = props.query?.trim()
+  router.push({ path: '/advanced', query: q ? { q } : {} })
+}
+const goSettings = (): void => {
+  if (props.activeKey === 'settings') return
+  router.push({ path: '/settings' })
+}
+const goDocs = (): void => {
+  if (props.activeKey === 'docs') return
+  router.push({ path: '/docs' })
+}
+</script>
+
+<template>
+  <nav class="pv-nav">
+    <div class="pv-container pv-nav-inner">
+      <button
+        type="button"
+        class="brand"
+        aria-label="PaperVault"
+        @click="goHome"
+      >
+        <img
+          class="brand-icon"
+          :src="brandIconUrl"
+          alt=""
+          width="32"
+          height="32"
+        />
+        <span>PaperVault</span>
+      </button>
+      <button
+        class="pv-nav-tab"
+        :class="{ 'pv-nav-tab--active': props.activeKey === 'advanced' }"
+        type="button"
+        @click="goAdvanced"
+      >
+        {{ t('search.tab.advanced') }}
+      </button>
+      <button
+        class="pv-nav-tab"
+        :class="{ 'pv-nav-tab--active': props.activeKey === 'settings' }"
+        type="button"
+        @click="goSettings"
+      >
+        {{ t('toolbar.settings') }}
+      </button>
+      <button
+        class="pv-nav-tab"
+        :class="{ 'pv-nav-tab--active': props.activeKey === 'docs' }"
+        type="button"
+        @click="goDocs"
+      >
+        {{ t('toolbar.docs') }}
+      </button>
+      <a
+        class="pv-nav-github"
+        :href="GITHUB_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+        >GitHub</a
+      >
+      <div class="pv-nav-actions">
+        <template v-if="isLoggedIn">
+          <el-dropdown>
+            <el-button link type="primary">{{
+              displayName || t('auth.loggedIn')
+            }}</el-button>
+            <template #dropdown
+              ><el-dropdown-menu
+                ><el-dropdown-item @click="logout">{{
+                  t('auth.logout')
+                }}</el-dropdown-item></el-dropdown-menu
+              ></template
+            >
+          </el-dropdown>
+        </template>
+        <el-button v-else link type="primary" @click="loginVisible = true">{{
+          t('auth.login')
+        }}</el-button>
+        <el-link
+          type="primary"
+          :icon="props.isDark ? 'Sunny' : 'Moon'"
+          @click="emit('toggle-dark')"
+        >
+          {{ props.isDark ? t('toolbar.light') : t('toolbar.dark') }}
+        </el-link>
+        <el-link type="primary" icon="ChatLineRound" @click="toggleLang">
+          {{ t('toolbar.lang') }}
+        </el-link>
+      </div>
+    </div>
+  </nav>
+  <el-dialog
+    v-model="loginVisible"
+    width="440px"
+    class="login-dialog"
+    :show-close="false"
+  >
+    <div class="login-panel">
+      <button
+        class="login-close"
+        type="button"
+        :aria-label="t('auth.close')"
+        @click="loginVisible = false"
+      >
+        ×
+      </button>
+      <div class="login-eyebrow">PaperVault</div>
+      <h2>{{ t('auth.welcome') }}</h2>
+      <p class="login-description">
+        {{ t('auth.descriptionLine1') }}<br />{{ t('auth.descriptionLine2') }}
+      </p>
+      <div class="login-divider">
+        <span>{{ t('auth.chooseMethod') }}</span>
+      </div>
+      <div class="login-options">
+        <a
+          class="oauth-button oauth-button--zhihu"
+          href="/api/v1/auth/oauth/zhihu"
+          ><span class="oauth-icon">知</span
+          ><span>{{ t('auth.loginZhihu') }}</span
+          ><span class="oauth-arrow">→</span></a
+        >
+        <a
+          class="oauth-button oauth-button--github"
+          href="/api/v1/auth/oauth/github"
+          ><span class="oauth-icon oauth-icon--github">GH</span
+          ><span>{{ t('auth.loginGithub') }}</span
+          ><span class="oauth-arrow">→</span></a
+        >
+      </div>
+      <p class="login-footnote">{{ t('auth.footnote') }}</p>
+    </div>
+  </el-dialog>
+</template>
+
+<style scoped>
+.pv-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--el-bg-color, #fff);
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+.pv-nav-inner {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  gap: 4px;
+  max-width: none;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  text-decoration: none;
+  color: var(--el-text-color-primary, #333);
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 0 24px 0 0;
+  margin-right: 10px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+}
+.brand-icon {
+  display: block;
+  flex: none;
+  object-fit: contain;
+}
+.pv-nav-github {
+  margin: 0 18px 0 4px;
+  padding-left: 16px;
+  border-left: 1px solid var(--pv-line);
+  color: var(--el-text-color-secondary, #909399);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.login-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+.login-dialog :deep(.el-dialog) {
+  overflow: hidden;
+  border-radius: 18px;
+}
+.login-panel {
+  position: relative;
+  text-align: center;
+  padding: 34px 34px 28px;
+  background: linear-gradient(180deg, #fff 0%, #fafaff 100%);
+}
+.login-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  border: 0;
+  background: transparent;
+  color: #a3a6b0;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.login-eyebrow {
+  color: var(--el-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.login-panel h2 {
+  margin: 8px 0 6px;
+  font-size: 24px;
+  color: var(--el-text-color-primary);
+}
+.login-description {
+  margin: 0 auto 24px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.8;
+  font-size: 13px;
+}
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+  margin: 18px 0;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  height: 1px;
+  background: var(--el-border-color-lighter);
+  flex: 1;
+}
+.login-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.oauth-button {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid #e5e7ef;
+  border-radius: 11px;
+  color: #30313b;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.oauth-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 18px rgba(55, 48, 100, 0.12);
+  border-color: #c9c2f5;
+}
+.oauth-button--zhihu {
+  background: #fff;
+}
+.oauth-button--github {
+  background: #f6f8fa;
+  color: #24292f;
+  border-color: #d0d7de;
+}
+.oauth-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 12px;
+  border-radius: 8px;
+  background: #087cff;
+  color: #fff;
+  font-size: 15px;
+}
+.oauth-icon--github {
+  background: #0969da;
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: -0.04em;
+}
+.oauth-arrow {
+  margin-left: auto;
+  color: #a1a4b0;
+  font-size: 20px;
+  font-weight: 400;
+}
+.oauth-button--github .oauth-arrow {
+  color: #57606a;
+}
+.login-footnote {
+  margin: 20px 0 0;
+  color: #a4a6b0;
+  font-size: 11px;
+}
+.pv-nav-github:hover {
+  color: var(--el-color-primary, #409eff);
+}
+.pv-nav-tab {
+  position: relative;
+  white-space: nowrap;
+  padding: 19px 16px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-secondary, #909399);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+.pv-nav-tab:hover,
+.pv-nav-tab--active {
+  color: var(--el-text-color-primary, #303133);
+}
+.pv-nav-tab--active {
+  font-weight: 600;
+}
+.pv-nav-tab--active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--el-color-primary, #6f5ed3);
+}
+.pv-nav-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.pv-nav-actions :deep(.el-link),
+.pv-nav-actions :deep(.el-button) {
+  font-size: 13px;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .pv-nav-github {
+    display: none;
+  }
+  .pv-nav-actions :deep(.el-link:nth-last-child(-n + 2)) {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .pv-nav-inner {
+    min-height: 52px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .brand {
+    font-size: 17px;
+    gap: 6px;
+    padding-right: 10px;
+    margin-right: 2px;
+  }
+  .brand-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .pv-nav-tab {
+    padding: 18px 9px 17px;
+    font-size: 13px;
+  }
+  .pv-nav-actions {
+    gap: 6px;
+  }
+  .pv-nav-actions :deep(.el-link),
+  .pv-nav-actions :deep(.el-button) {
+    font-size: 0;
+  }
+  .pv-nav-actions :deep(.el-link .el-icon),
+  .pv-nav-actions :deep(.el-button .el-icon) {
+    font-size: 16px;
+    margin: 0;
+  }
+}
+@media (max-width: 420px) {
+  .brand {
+    padding-right: 4px;
+    margin-right: 0;
+  }
+  .brand span {
+    display: none;
+  }
+}
+</style>

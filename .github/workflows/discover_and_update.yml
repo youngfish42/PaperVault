@@ -1,0 +1,108 @@
+name: Discover and Update Conference Configs
+
+env:
+  PYTHON_VERSION: "3.10"
+
+concurrency:
+  # Isolate duplicate discovery runs without letting a long backfill cancel
+  # this workflow while it waits; direct pushes rebase onto the latest main.
+  group: papervault-discover
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # 每天北京时间 02:00 (UTC 18:00) 运行 
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+    inputs:
+      start_year:
+        description: "Start year for discovery (default: current year - 1)"
+        required: false
+        default: ""
+      end_year:
+        description: "End year for discovery (default: current year)"
+        required: false
+        default: ""
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TZ: Asia/Shanghai
+      GIT_LFS_SKIP_SMUDGE: "1"
+    permissions:
+      contents: write
+      # Required to dispatch Collect after a GITHUB_TOKEN-authored main push.
+      actions: write
+    steps:
+      - name: Checkout (no LFS; cache.jsonl.gz lives on Hugging Face)
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Cache DBLP discovery results
+        uses: actions/cache@v4
+        with:
+          path: cache/dblp_discovery_cache.json
+          key: dblp-discovery-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            dblp-discovery-cache-${{ runner.os }}-
+
+      - name: Run auto-discovery
+        id: discover
+        run: |
+          START_ARG=""
+          END_ARG=""
+          if [ -n "${{ github.event.inputs.start_year }}" ]; then
+            START_ARG="--start-year ${{ github.event.inputs.start_year }}"
+          fi
+          if [ -n "${{ github.event.inputs.end_year }}" ]; then
+            END_ARG="--end-year ${{ github.event.inputs.end_year }}"
+          fi
+          python -m discovery.generate_conf $START_ARG $END_ARG --soft-timeout 18000
+          echo "changed=$(git diff --name-only -- conf/ | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup GIT user
+        run: |
+          git config --local user.name "youngfish42"
+          git config --local user.email "youngfish42@users.noreply.github.com"
+
+      - name: Generate run summary
+        if: steps.discover.outputs.changed != '0'
+        run: |
+          python scripts/generate_run_summary.py discovery \
+            --output "$RUNNER_TEMP/run_summary.md" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat "$RUNNER_TEMP/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push to main
+        if: steps.discover.outputs.changed != '0'
+        run: |
+          python scripts/commit_automated_changes.py \
+            --message "chore(auto): discover new conference configs" \
+            --paths conf
+
+      - name: Dispatch paper collection
+        # A GITHUB_TOKEN-authored push does not emit another workflow-triggering
+        # push event, so explicitly preserve the discovery -> collection chain.
+        if: steps.discover.outputs.changed != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run collect_papers.yml --ref main

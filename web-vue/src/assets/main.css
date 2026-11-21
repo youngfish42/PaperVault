@@ -1,0 +1,310 @@
+@import './base.css';
+
+:root {
+  --pv-page-width: 1040px;
+  --pv-page-bg: var(--el-bg-color-page, #f5f7fa);
+  --pv-card-radius: 8px;
+  --pv-card-border: var(--el-border-color-lighter, #ebeef5);
+  --pv-max-width: 1600px;
+  --pv-gutter: 16px;
+  /* Vertical offset applied to sticky elements that must sit below the
+     topbar (e.g. .pv-side, .pv-adv-cheatsheet). Includes the topbar's own
+     rendered height plus a small breathing gap. */
+  --pv-sticky-top: 70px;
+  /* Bottom breathing room reserved under a sticky sidebar so long content
+     (e.g. ConfsTree) does not butt up against the viewport bottom. */
+  --pv-side-bottom-gap: 20px;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+.full {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.pv-container {
+  width: 100%;
+  max-width: var(--pv-max-width);
+  margin: 0 auto;
+  padding: 0 var(--pv-gutter);
+  box-sizing: border-box;
+}
+.pv-compact-card .el-card__body {
+  padding: 10px 14px;
+}
+.pv-flat-card.el-card,
+.pv-flat-card .el-card {
+  border: none;
+}
+.pv-flat-card > .el-card__body {
+  padding: 0;
+}
+.text-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.w-100 {
+  width: 100%;
+}
+.h-100 {
+  height: 100%;
+}
+.pointer {
+  cursor:pointer
+}
+.no-select{
+  user-select: none;
+}
+.pos-relative {
+  position: relative !important;
+}
+.pos-absolute {
+  position: absolute !important;
+}
+.pos-center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.align-left {
+  text-align: left;
+}
+.align-right {
+  text-align: right;
+}
+.align-center {
+  text-align: center;
+}
+.flex {
+  display: flex;
+}
+.flex-align-center{
+  align-items: center;
+}
+.flex-center {
+  justify-content: center;
+  vertical-align: center;
+}
+.flex-row {
+  flex-direction: row;
+}
+
+.mt-5 {
+  margin-top: 5px;
+}
+.mb-5 {
+  margin-bottom: 5px;
+}
+.mr-5 {
+  margin-right: 5px;
+}
+.ml-5 {
+  margin-left: 5px;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+.mb-10 {
+  margin-bottom: 10px;
+}
+.mr-10 {
+  margin-right: 10px;
+}
+.ml-10 {
+  margin-left: 10px;
+}
+
+.mt-15 {
+  margin-top: 15px;
+}
+.mb-15 {
+  margin-bottom: 15px;
+}
+.mr-15 {
+  margin-right: 15px;
+}
+.ml-15 {
+  margin-left: 15px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+.mb-20 {
+  margin-bottom: 20px;
+}
+.mr-20 {
+  margin-right: 20px;
+}
+.ml-20 {
+  margin-left: 20px;
+}
+
+
+.mt-25 {
+  margin-top: 25px;
+}
+.mb-25 {
+  margin-bottom: 25px;
+}
+.mr-25 {
+  margin-right: 25px;
+}
+.ml-25 {
+  margin-left: 25px;
+}
+
+.mt-30 {
+  margin-top: 30px;
+}
+.mb-30 {
+  margin-bottom: 30px;
+}
+.mr-30 {
+  margin-right: 30px;
+}
+.ml-30 {
+  margin-left: 30px;
+}
+
+.pv-syntax-scope .pv-syntax-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--el-text-color-primary, #303133);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+.pv-syntax-scope .pv-syntax-section {
+  margin-bottom: 14px;
+}
+.pv-syntax-scope .pv-syntax-section:last-child {
+  margin-bottom: 0;
+}
+.pv-syntax-scope .pv-syntax-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-color-primary, #6f5ed3);
+  margin-bottom: 6px;
+}
+.pv-syntax-scope .pv-syntax-section-desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.pv-syntax-scope .pv-syntax-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  background: var(--el-fill-color-lighter, #fafbfc);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.pv-syntax-scope .pv-syntax-table th {
+  text-align: left;
+  padding: 6px 12px;
+  background: var(--el-fill-color, #f0f2f5);
+  font-weight: 600;
+  color: var(--el-text-color-regular, #606266);
+  font-size: 12px;
+}
+.pv-syntax-scope .pv-syntax-table td {
+  padding: 6px 12px;
+  border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
+  vertical-align: middle;
+}
+.pv-syntax-scope .pv-syntax-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pv-syntax-scope .pv-syntax-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--el-color-primary-light-9, #ecf5ff);
+  color: var(--el-color-primary, #6f5ed3);
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.pv-syntax-scope .pv-syntax-chip--muted {
+  background: var(--el-fill-color, #f0f2f5);
+  color: var(--el-text-color-secondary, #909399);
+}
+.pv-syntax-scope .pv-syntax-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+  font-size: 12.5px;
+}
+.pv-syntax-scope .pv-syntax-grid > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pv-syntax-scope .pv-syntax-key {
+  flex-shrink: 0;
+  width: 64px;
+  font-size: 11.5px;
+  color: var(--el-text-color-secondary, #909399);
+  font-weight: 500;
+}
+.pv-syntax-scope .pv-syntax-example {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--el-color-primary-light-9, #ecf5ff);
+  border-left: 3px solid var(--el-color-primary, #6f5ed3);
+  border-radius: 4px;
+}
+.pv-syntax-scope .pv-syntax-example-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--el-color-primary, #6f5ed3);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.pv-syntax-scope .pv-syntax-example code {
+  background: transparent !important;
+  color: var(--el-text-color-primary, #303133) !important;
+  padding: 0 !important;
+  font-size: 12.5px !important;
+  word-break: break-all;
+}
+.pv-syntax-scope code {
+  background: rgba(111, 94, 211, 0.1);
+  color: var(--el-color-primary, #6f5ed3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Shared page geometry and color tokens */
+:root {
+  --pv-max-width: 1040px;
+  --pv-page-bg: #f5f7fb;
+  --pv-surface: #ffffff;
+  --pv-line: #dfe4ed;
+  --pv-accent: #5367d9;
+  --pv-ink: #172033;
+}
+html.dark {
+  --pv-page-bg: #171b21;
+  --pv-surface: #242a32;
+  --pv-line: #3a424e;
+  --pv-accent: #5b9cff;
+  --pv-ink: #edf2fb;
+}
+html, body { background: var(--pv-page-bg); color: var(--pv-ink); }
+.pv-container { max-width: var(--pv-max-width); }
+.el-card, .pv-adv-card, .pv-settings-card { background: var(--pv-surface); border-color: var(--pv-line); }
