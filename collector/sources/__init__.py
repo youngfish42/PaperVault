@@ -33,6 +33,7 @@ SOURCE_REGISTRY: tuple[SourceSpec, ...] = (
         conf_file="conf/iclr_conf.json",
         tqdm_desc="[+] Collecting ICLR",
         search_fn_name="search_from_iclr",
+        refresh_cached=True,
     ),
     SourceSpec(
         key="thecvf",

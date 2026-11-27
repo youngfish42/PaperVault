@@ -1,7 +1,10 @@
 """OpenReview (ICLR / NeurIPS) 自动发现"""
 
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Optional, Set
 from urllib.parse import quote
+
+from bs4 import BeautifulSoup
+
 from .base import BaseDiscovery
 
 # 复用 collector 中的「已接收 venue」判定，确保 discovery 与采集端口径一致。
@@ -35,6 +38,8 @@ class OpenReviewDiscovery(BaseDiscovery):
     对 2024+ 年份优先使用 v2 端点（api2.openreview.net），
     其 content 字段为嵌套 {"value": ...} 结构，包含 abstract，
     采集时即可被 collector.py 一并写入，无需 backfill。
+    OpenReview 请求失败或没有已接收 venue 时，ICLR 改从官方 Schedule
+    发现论文；只有页面含有效 poster/oral 论文卡片才生成配置。
     """
 
     def __init__(self, existing_conf: List[Dict[str, Any]] = None):
@@ -57,10 +62,7 @@ class OpenReviewDiscovery(BaseDiscovery):
             f"invitation={quote(invitation, safe='')}&"
             f"details=replyCount&offset=0&limit=1000"
         )
-        try:
-            data = self._get_json(url, timeout=30, retries=3)
-        except Exception:
-            return []
+        data = self._get_json(url, timeout=30, retries=3)
         venues: Set[str] = set()
         skipped: Set[str] = set()
         for note in data.get("notes", []):
@@ -88,11 +90,8 @@ class OpenReviewDiscovery(BaseDiscovery):
             f"invitation={quote(invitation, safe='')}&"
             f"offset=0&limit=1"
         )
-        try:
-            data = self._get_json(url, timeout=30, retries=2)
-            return data.get("count", 0)
-        except Exception:
-            return 0
+        data = self._get_json(url, timeout=30, retries=2)
+        return data.get("count", 0)
 
     def _generate_urls(self, name: str, venue: str, invitation: str, count: int, year: int) -> List[Dict[str, Any]]:
         limit = 1000
@@ -110,6 +109,23 @@ class OpenReviewDiscovery(BaseDiscovery):
             )
             results.append({"name": name, "url": url})
         return results
+
+    def _discover_iclr_schedule(self, year: int) -> Optional[Dict[str, Any]]:
+        url = f"https://iclr.cc/Conferences/{year}/Schedule"
+        entry = {"name": f"ICLR{year}", "url": url}
+        if any(item.get("url") == url for item in self.existing):
+            return entry
+        html = self._get_text(url, timeout=60, retries=2)
+        if not html:
+            return None
+        soup = BeautifulSoup(html, "html.parser")
+        for card in soup.find_all("div", class_="maincard"):
+            classes = card.get("class", [])
+            if "poster" not in classes and "oral" not in classes:
+                continue
+            if card.find("a", href=lambda value: value and "openreview.net/forum?id=" in value):
+                return entry
+        return None
 
     def discover(self, start_year: int, end_year: int) -> List[Dict[str, Any]]:
         results = []
@@ -134,22 +150,37 @@ class OpenReviewDiscovery(BaseDiscovery):
                     invitation_tpls if year >= V2_START_YEAR else list(reversed(invitation_tpls))
                 )
                 found = False
+                errors = []
                 for invitation_tpl in ordered_tpls:
                     invitation = invitation_tpl.format(year=year)
-                    venues = self._fetch_venues(invitation_tpl, year)
-                    if not venues:
+                    try:
+                        venues = self._fetch_venues(invitation_tpl, year)
+                        venue_urls = []
+                        for venue in venues:
+                            # 防御性双保险：即便 _fetch_venues 已过滤，这里再次校验，
+                            # 避免未来重构或 venue 字符串构造路径绕过过滤。
+                            if not is_openreview_accepted_venue(venue):
+                                continue
+                            count = self._count_for_venue(venue, invitation, year)
+                            if count:
+                                venue_urls.extend(self._generate_urls(name, venue, invitation, count, year))
+                    except Exception as exc:
+                        errors.append(f"{invitation}: {exc}")
                         continue
-                    for venue in venues:
-                        # 防御性双保险：即便 _fetch_venues 已过滤，这里再次校验，
-                        # 避免未来重构或 venue 字符串构造路径绕过过滤。
-                        if not is_openreview_accepted_venue(venue):
-                            continue
-                        count = self._count_for_venue(venue, invitation, year)
-                        if count == 0:
-                            continue
-                        results.extend(self._generate_urls(name, venue, invitation, count, year))
-                    found = True
-                    break  # 已找到有效 invitation，无需再试其它模板
-                if not found:
+                    if venue_urls:
+                        results.extend(venue_urls)
+                        found = True
+                        break  # 已找到有效 invitation，无需再试其它模板
+                if found:
+                    continue
+                if prefix == "ICLR":
+                    schedule = self._discover_iclr_schedule(year)
+                    if schedule:
+                        results.append(schedule)
+                        print(f"    [+] {name}: using ICLR official Schedule fallback")
+                        continue
+                if errors:
+                    print(f"    [!] OpenReview discovery failed for {name}: {'; '.join(errors)}")
+                else:
                     print(f"    [!] OpenReview returned no venues for {name} (tried {ordered_tpls})")
         return results

@@ -148,7 +148,7 @@ PaperVault/
 │   ├── miccai.py                 # MICCAI main-conference Open Access discovery (excludes satellite URLs)
 │   ├── ijcai.py                  # IJCAI main-proceedings discovery from all_proceedings (excludes proceedings_aai4g and other special paths)
 │   ├── nips.py                   # NeurIPS proceedings discovery
-│   ├── openreview.py             # OpenReview (ICLR) discovery
+│   ├── openreview.py             # OpenReview (ICLR) discovery, with ICLR official Schedule fallback when the API is unavailable or has no accepted venues
 │   └── generate_conf.py          # Generate/merge conf JSON from discovery results
 ├── scripts/                      # Maintenance / data enrichment scripts
 │   ├── fetch_abstracts.py            # Multi-source abstract backfill (Crossref/S2/arXiv/OpenAlex)
