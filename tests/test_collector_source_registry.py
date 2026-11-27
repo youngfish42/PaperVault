@@ -264,3 +264,46 @@ def test_ijcai_aggregates_repeated_volume_listings_before_title_merge(
     assert result["IJCAI2001"][0]["paper_url"] == cached["paper_url"]
     assert result["IJCAI2001"][0]["paper_abstract"] == "Official abstract"
     assert all("IJCAI::" + conf["url"] in progress_state for conf in confs)
+
+
+def test_iclr_new_url_for_cached_conf_recollects_once_then_uses_url_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    conf = {"name": "ICLR2026", "url": "https://iclr.cc/Conferences/2026/Schedule"}
+    _install_stub_confs(monkeypatch, {"iclr_conf.json": [conf]})
+    progress_sink: List[Dict[str, Any]] = []
+    _neuter_pkg_side_effects(monkeypatch, tmp_path, progress_sink)
+    progress_state = {}
+    monkeypatch.setattr(collector, "load_collect_progress", lambda: progress_state)
+    monkeypatch.setattr(collector, "load_cache", lambda _p: {"ICLR2026": [{
+        "paper_name": "Existing Paper",
+        "paper_url": "https://openreview.net/pdf?id=existing",
+        "paper_authors": ["A"],
+        "paper_abstract": "",
+        "paper_code": "#",
+    }]})
+    cache_file = tmp_path / "cache.jsonl.gz"
+    cache_file.touch()
+    calls = []
+
+    def _stub_iclr(url, name, res):
+        calls.append(url)
+        res.setdefault(name, []).append({
+            "paper_name": "Schedule Paper",
+            "paper_url": "https://openreview.net/pdf?id=schedule",
+            "paper_authors": ["B"],
+            "paper_abstract": "",
+            "paper_code": "#",
+        })
+        return res
+
+    monkeypatch.setattr(collector, "search_from_iclr", _stub_iclr)
+    collector.collect(cache_file=str(cache_file))
+
+    assert calls == [conf["url"]]
+    assert progress_state["ICLR::" + conf["url"]]["name"] == "ICLR2026"
+    assert "legacy" not in progress_state["ICLR::" + conf["url"]]
+
+    calls.clear()
+    collector.collect(cache_file=None)
+    assert calls == []
