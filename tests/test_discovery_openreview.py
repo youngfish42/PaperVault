@@ -115,3 +115,37 @@ def test_existing_iclr_schedule_is_reused_without_download(monkeypatch: pytest.M
     monkeypatch.setattr(discovery, "_get_text", fail_download)
 
     assert discovery._discover_iclr_schedule(2026) == entry
+
+
+def test_venue_count_failure_preserves_other_venues(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    discovery = OpenReviewDiscovery()
+
+    def venues(invitation_tpl, year):
+        if invitation_tpl.startswith("NeurIPS"):
+            return [
+                f"NeurIPS {year} oral",
+                f"NeurIPS {year} poster",
+                f"NeurIPS {year} spotlight",
+            ]
+        return []
+
+    def count(venue, invitation, year):
+        if venue.endswith("poster"):
+            raise RuntimeError("429 rate limited")
+        return 1
+
+    monkeypatch.setattr(discovery, "_fetch_venues", venues)
+    monkeypatch.setattr(discovery, "_count_for_venue", count)
+    monkeypatch.setattr(discovery, "_get_text", lambda url, timeout, retries: "")
+
+    result = discovery.discover(2026, 2026)
+
+    assert [item["name"] for item in result] == ["NIPS2026", "NIPS2026"]
+    assert "content.venue=NeurIPS%202026%20oral" in result[0]["url"]
+    assert "content.venue=NeurIPS%202026%20spotlight" in result[1]["url"]
+    assert all("poster" not in item["url"] for item in result)
+    output = capsys.readouterr().out
+    assert "Partial OpenReview discovery for NIPS2026" in output
+    assert "NeurIPS 2026 poster" in output

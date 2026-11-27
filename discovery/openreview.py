@@ -155,23 +155,28 @@ class OpenReviewDiscovery(BaseDiscovery):
                     invitation = invitation_tpl.format(year=year)
                     try:
                         venues = self._fetch_venues(invitation_tpl, year)
-                        venue_urls = []
-                        for venue in venues:
-                            # 防御性双保险：即便 _fetch_venues 已过滤，这里再次校验，
-                            # 避免未来重构或 venue 字符串构造路径绕过过滤。
-                            if not is_openreview_accepted_venue(venue):
-                                continue
-                            count = self._count_for_venue(venue, invitation, year)
-                            if count:
-                                venue_urls.extend(self._generate_urls(name, venue, invitation, count, year))
                     except Exception as exc:
                         errors.append(f"{invitation}: {exc}")
                         continue
+                    venue_urls = []
+                    for venue in venues:
+                        # 防御性双保险：即便 _fetch_venues 已过滤，这里再次校验，
+                        # 避免未来重构或 venue 字符串构造路径绕过过滤。
+                        if not is_openreview_accepted_venue(venue):
+                            continue
+                        try:
+                            count = self._count_for_venue(venue, invitation, year)
+                            if count:
+                                venue_urls.extend(self._generate_urls(name, venue, invitation, count, year))
+                        except Exception as exc:
+                            errors.append(f"{invitation} venue={venue}: {exc}")
                     if venue_urls:
                         results.extend(venue_urls)
                         found = True
                         break  # 已找到有效 invitation，无需再试其它模板
                 if found:
+                    if errors:
+                        print(f"    [!] Partial OpenReview discovery for {name}: {'; '.join(errors)}")
                     continue
                 if prefix == "ICLR":
                     schedule = self._discover_iclr_schedule(year)
