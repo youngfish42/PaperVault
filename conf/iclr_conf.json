@@ -112,6 +112,10 @@
         "url": "https://api2.openreview.net/notes?content.venue=ICLR%202026%20Poster&details=replyCount&offset=5000&limit=1000&invitation=ICLR.cc%2F2026%2FConference%2F-%2FSubmission"
     },
     {
+        "name": "ICLR2026",
+        "url": "https://iclr.cc/Conferences/2026/Schedule"
+    },
+    {
         "name": "NIPS2021",
         "url": "https://api.openreview.net/notes?invitation=NeurIPS.cc/2021/Conference/-/Blind_Submission"
     },
