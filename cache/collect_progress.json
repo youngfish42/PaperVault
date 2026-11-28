@@ -21587,7 +21587,7 @@
     },
     "DBLP::https://dblp.org/db/conf/icmcs/icme2026.html": {
       "name": "ICME2026",
-      "ts": "2026-10-27T20:12:16",
+      "ts": "2026-11-28T10:08:48",
       "empty": true
     },
     "DBLP::https://dblp.org/db/conf/isca/isca2026.html": {
@@ -23676,7 +23676,7 @@
     },
     "DBLP::https://dblp.org/db/journals/staeors/staeors18.html": {
       "name": "JSTARS2025",
-      "ts": "2026-10-27T20:13:22",
+      "ts": "2026-11-28T10:11:02",
       "empty": true
     },
     "DBLP::https://dblp.org/db/journals/staeors/staeors19.html": {
@@ -24326,6 +24326,14 @@
     "DBLP::https://dblp.org/db/journals/urban/urban130.html": {
       "name": "CEUS2026",
       "ts": "2026-11-17T10:50:32"
+    },
+    "ICLR::https://iclr.cc/Conferences/2026/Schedule": {
+      "name": "ICLR2026",
+      "ts": "2026-11-28T10:02:09"
+    },
+    "DBLP::https://dblp.org/db/journals/iandc/iandc313.html": {
+      "name": "IANDC2026",
+      "ts": "2026-11-28T10:09:55"
     }
   }
 }
